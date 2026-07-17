@@ -1,22 +1,7 @@
-import axios from 'axios';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5174';
-
-export const apiClient = axios.create({
-  baseURL: `${API_URL}/api`,
-  withCredentials: true,
-  headers: { 'Content-Type': 'application/json' },
-});
-
-apiClient.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('access_token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => Promise.reject(error),
-);
+// Single shared axios instance for all data hooks.
+//
+// Re-exported from ../api so every data request goes through the same
+// token-injection + 401 refresh/redirect interceptor. Previously this was a
+// separate bare instance with no refresh handling, so once the 15-minute
+// access token expired, data requests silently 401'd and pages rendered empty.
+export { api as apiClient } from '../api';

@@ -1,0 +1,24 @@
+import { Module } from '@nestjs/common';
+import { DatabaseModule } from '../../database/database.module';
+import { AuthModule } from '../auth/auth.module';
+import { InventoryController } from './inventory.controller';
+import { InventoryAdjustmentsService } from './inventory-adjustments.service';
+import { InventoryDashboardService } from './inventory-dashboard.service';
+import { InventoryItemsService } from './inventory-items.service';
+import { InventoryTransactionsService } from './inventory-transactions.service';
+import { InventoryTransfersService } from './inventory-transfers.service';
+import { InventoryWarehousesService } from './inventory-warehouses.service';
+
+@Module({
+  imports: [DatabaseModule, AuthModule],
+  controllers: [InventoryController],
+  providers: [
+    InventoryItemsService,
+    InventoryWarehousesService,
+    InventoryTransfersService,
+    InventoryTransactionsService,
+    InventoryAdjustmentsService,
+    InventoryDashboardService,
+  ],
+})
+export class InventoryModule {}

@@ -157,7 +157,7 @@ export function ComplianceTab({ workers }: ComplianceTabProps): React.ReactEleme
                   }
                   <div>
                     <p className="text-sm font-medium">{issue.workerName}
-                      <span className="text-xs text-muted-foreground ml-1.5">— {issue.role}</span>
+                      <span className="text-xs text-muted-foreground ml-1.5">- {issue.role}</span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">{issue.certName}</p>
                     <p className="text-xs text-muted-foreground">{issue.project}</p>

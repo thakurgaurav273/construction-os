@@ -1,105 +1,106 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Sparkles, CheckCircle2, ArrowRight } from 'lucide-react';
-import { Badge, Button } from '@sitepilot/ui';
+import { Sparkles, ArrowRight, ShieldCheck, Database, ListChecks } from 'lucide-react';
 import Link from 'next/link';
+import { Badge, Card, CardContent, Skeleton } from '@sitepilot/ui';
+import { useProjects } from '@/hooks/api/use-projects';
+import { EmptyState } from '@/components/shared/EmptyState';
 
-const capabilities = [
-  'Generate daily site reports from raw inputs',
-  'Summarise and flag issues across all projects',
-  'Detect schedule delays before they escalate',
-  'Suggest purchase orders based on consumption trends',
-  'Explain cost variances in plain language',
-  'Answer questions about any project in seconds',
+const HOW_IT_WORKS = [
+  {
+    icon: Database,
+    title: 'Live project data',
+    description: 'Reads each project’s real backend data - budget, schedule, team, workforce, and activity.',
+  },
+  {
+    icon: ListChecks,
+    title: 'Deterministic summaries',
+    description: 'Generates budget, risk, schedule, and workforce briefings computed directly from that data.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Never fabricates',
+    description: 'No external LLM. If something isn’t available from the backend, it says “No data available”.',
+  },
 ];
 
-const examplePrompts = [
-  'Which projects are at risk of delay this month?',
-  'Summarise budget variance across all active projects',
-  'Generate a weekly progress report for Marina Bay Tower',
-  'What materials need to be reordered this week?',
-];
+function statusLabel(status: string): string {
+  return status.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
+}
 
 export default function AIAssistantPage() {
+  const { data: projects = [], isLoading } = useProjects();
+
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-12rem)] p-6 md:p-8">
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="max-w-2xl w-full space-y-6"
-      >
-        {/* Hero */}
-        <div className="text-center">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 to-blue-500/20 mb-6"
-          >
-            <Sparkles className="h-10 w-10 text-violet-500" />
-          </motion.div>
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="max-w-4xl mx-auto p-6 md:p-8 space-y-8"
+    >
+      {/* Hero */}
+      <div className="text-center">
+        <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 to-blue-500/20 mb-5">
+          <Sparkles className="h-8 w-8 text-violet-500" />
+        </div>
+        <h1 className="text-3xl font-bold tracking-tight mb-3">AI Assistant</h1>
+        <p className="text-muted-foreground leading-relaxed max-w-xl mx-auto">
+          Your organization&apos;s AI entry point. Open a project&apos;s AI Director to get instant,
+          data-grounded summaries of budget, schedule, risks, team, and workforce.
+        </p>
+      </div>
 
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <h1 className="text-3xl font-bold tracking-tight">AI Assistant</h1>
-            <Badge variant="secondary" className="text-xs font-semibold">Coming Soon</Badge>
+      {/* How it works */}
+      <div className="grid md:grid-cols-3 gap-4">
+        {HOW_IT_WORKS.map((item) => (
+          <div key={item.title} className="bg-card border rounded-xl p-5">
+            <item.icon className="h-5 w-5 text-violet-500 mb-3" />
+            <p className="font-semibold text-sm mb-1">{item.title}</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
           </div>
+        ))}
+      </div>
 
-          <p className="text-muted-foreground leading-relaxed max-w-md mx-auto">
-            A construction-aware AI that understands your projects, budgets, and workforce - and answers in seconds.
-          </p>
+      {/* Per-project AI Director entry points */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold tracking-tight">Open AI Director for a project</h2>
+          <Badge variant="secondary" className="text-xs font-semibold">Live</Badge>
         </div>
 
-        {/* Two column cards */}
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="bg-card border rounded-xl p-6">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
-              Planned Capabilities
-            </p>
-            <ul className="space-y-3">
-              {capabilities.map((cap) => (
-                <li key={cap} className="flex items-start gap-3 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>{cap}</span>
-                </li>
-              ))}
-            </ul>
+        {isLoading ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-20 w-full rounded-xl" />
+            ))}
           </div>
-
-          <div className="bg-card border rounded-xl p-6">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
-              Example Questions
-            </p>
-            <ul className="space-y-3">
-              {examplePrompts.map((prompt) => (
-                <li
-                  key={prompt}
-                  className="flex items-start gap-3 text-sm p-2.5 rounded-lg bg-muted/40 text-muted-foreground italic"
-                >
-                  <Sparkles className="h-4 w-4 text-violet-400 shrink-0 mt-0.5" />
-                  &ldquo;{prompt}&rdquo;
-                </li>
-              ))}
-            </ul>
+        ) : projects.length === 0 ? (
+          <EmptyState
+            icon={Sparkles}
+            title="No projects yet"
+            description="Create a project to open its AI Director and generate data-grounded summaries."
+          />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {projects.map((project) => (
+              <Link key={project.id} href={`/dashboard/projects/${project.id}/ai`}>
+                <Card className="hover:border-primary/50 hover:shadow-md transition-all">
+                  <CardContent className="p-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate">{project.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {statusLabel(project.status)} · {project.progress}% complete
+                      </p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
-        </div>
-
-        {/* CTA - existing project-level AI */}
-        <div className="bg-gradient-to-r from-violet-500/10 to-blue-500/10 border border-violet-200/30 rounded-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <p className="font-semibold text-sm">Try AI Director on a project</p>
-            <p className="text-muted-foreground text-xs mt-0.5">
-              Project-level AI is live now - open any project to get started.
-            </p>
-          </div>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/projects">
-              Open a project <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-      </motion.div>
-    </div>
+        )}
+      </div>
+    </motion.div>
   );
 }

@@ -167,7 +167,7 @@ export default function WorkforcePage(): React.ReactElement {
 
       {/* Main Content + AI Insight */}
       <div className="grid gap-6 xl:grid-cols-4">
-        {/* Tabs — takes 3/4 */}
+        {/* Tabs - takes 3/4 */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}

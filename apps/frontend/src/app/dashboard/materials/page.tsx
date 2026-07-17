@@ -1,24 +1,115 @@
 'use client';
 
-import { Package } from 'lucide-react';
-import { ComingSoonPage } from '@/components/layout/ComingSoonPage';
+import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
+import { motion } from 'framer-motion';
+import { toast } from 'sonner';
+import {
+  Button,
+  Tabs, TabsList, TabsTrigger, TabsContent,
+  Skeleton,
+} from '@sitepilot/ui';
+import { Download, Plus } from 'lucide-react';
+import { MaterialsKpis } from './components/MaterialsKpis';
+import { MaterialsTable } from './components/MaterialsTable';
+import { MaterialDrawer } from './components/MaterialDrawer';
+import { InventoryTab } from './components/InventoryTab';
+import { MovementsTab } from './components/MovementsTab';
+import { SuppliersTab } from './components/SuppliersTab';
 
-export default function MaterialsPage() {
+// Analytics is chart-heavy and sits behind a tab, so load it on demand.
+const AnalyticsTab = dynamic(
+  () => import('./components/AnalyticsTab').then((mod) => mod.AnalyticsTab),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="grid gap-6 lg:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-72 w-full rounded-xl" />
+        ))}
+      </div>
+    ),
+  },
+);
+
+export default function MaterialsPage(): React.ReactElement {
+  const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  function handleSelectMaterial(materialId: string): void {
+    setSelectedMaterialId(materialId);
+    setDrawerOpen(true);
+  }
+
   return (
-    <ComingSoonPage
-      icon={Package}
-      iconBg="bg-amber-500/10"
-      iconColor="text-amber-500"
-      title="Materials"
-      description="Centralised material management across all projects - track stock, deliveries, and consumption in real time."
-      capabilities={[
-        'Organisation-wide material catalogue',
-        'Real-time stock levels and reorder alerts',
-        'Delivery tracking and scheduling',
-        'Cross-project consumption analytics',
-        'Vendor and supplier linkage',
-        'Material cost trend reporting',
-      ]}
-    />
+    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col sm:flex-row items-start justify-between gap-4"
+      >
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Materials</h2>
+          <p className="text-muted-foreground mt-1">
+            Track stock, deliveries, and consumption across every project in real time.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => toast.success('Inventory export started (demo)')}>
+            <Download className="mr-1.5 h-4 w-4" /> Export
+          </Button>
+          <Button onClick={() => toast('Material catalogue form opening (demo)')}>
+            <Plus className="mr-1.5 h-4 w-4" /> Add Material
+          </Button>
+        </div>
+      </motion.div>
+
+      {/* KPI Cards */}
+      <MaterialsKpis />
+
+      {/* Tabs */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+      >
+        <Tabs defaultValue="materials">
+          <TabsList className="mb-4 flex-wrap h-auto">
+            <TabsTrigger value="materials">Materials</TabsTrigger>
+            <TabsTrigger value="inventory">Inventory</TabsTrigger>
+            <TabsTrigger value="movements">Movements</TabsTrigger>
+            <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="materials">
+            <MaterialsTable onSelect={handleSelectMaterial} />
+          </TabsContent>
+
+          <TabsContent value="inventory">
+            <InventoryTab onSelect={handleSelectMaterial} />
+          </TabsContent>
+
+          <TabsContent value="movements">
+            <MovementsTab />
+          </TabsContent>
+
+          <TabsContent value="suppliers">
+            <SuppliersTab />
+          </TabsContent>
+
+          <TabsContent value="analytics">
+            <AnalyticsTab />
+          </TabsContent>
+        </Tabs>
+      </motion.div>
+
+      <MaterialDrawer
+        materialId={selectedMaterialId}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+      />
+    </div>
   );
 }

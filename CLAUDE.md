@@ -30,6 +30,41 @@ Last Updated:
 
 ---
 
+
+# SitePilot Development Rules
+
+## Never do
+
+- Re-read documentation unless explicitly asked.
+- Audit the entire repository.
+- Refactor unrelated modules.
+- Rename working components.
+- Move folders.
+- Change the design system.
+- Replace working implementations.
+
+## Always do
+
+- Reuse existing components.
+- Match existing UI exactly.
+- Match Workforce architecture.
+- Match Procurement architecture.
+- Use existing hooks.
+- Use existing Zustand stores.
+- Use existing Tailwind tokens.
+- Use existing loading skeleton pattern.
+- Keep changes localized.
+
+## Verification
+
+Always run:
+
+pnpm typecheck
+pnpm lint
+pnpm build
+
+Only fix errors introduced by your changes.
+
 # Project
 
 SitePilot

@@ -192,7 +192,7 @@ export function AttendanceTab({ workers }: AttendanceTabProps): React.ReactEleme
                     <p className="text-xs text-muted-foreground">{worker.role} · {worker.project}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-amber-600">{worker.lastCheckIn?.replace('Today, ', '') ?? '—'}</p>
+                    <p className="text-sm font-semibold text-amber-600">{worker.lastCheckIn?.replace('Today, ', '') ?? '-'}</p>
                     <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 mt-0.5">Late</Badge>
                   </div>
                 </div>

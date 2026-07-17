@@ -349,6 +349,420 @@ async function seedWorkers(orgId: string) {
   console.log(`  → Seeded ${WORKER_SEEDS.length} workers`);
 }
 
+// ─── Daily Report Seed Data ──────────────────────────────────────────────────
+
+type DailyReportSeedEntry = {
+  dayOffset: number;
+  weather: string;
+  overallProgress: number;
+  workCompleted: string;
+  remarks: string;
+  labourCount: number;
+  status: 'DRAFT' | 'SUBMITTED';
+  aiSummary: string;
+  labourDetails: object;
+  materialsConsumed: object[];
+  equipmentUsed: object[];
+  issues: object[];
+};
+
+// projectCode -> DailyReport[] (projects resolved by code at seed time)
+const DAILY_REPORTS: Record<string, DailyReportSeedEntry[]> = {
+  'GRV-001': [
+    { dayOffset: 1, weather: 'Clear, 31°C', overallProgress: 52, workCompleted: 'Floor 4 slab pour completed (240 m³). Column reinforcement for Floor 5 tied and inspected.', remarks: 'Concrete cube samples collected for 7-day and 28-day testing. No safety incidents.', labourCount: 148, status: 'SUBMITTED', aiSummary: 'Strong day: Floor 4 slab pour completed on schedule with full labour attendance and zero safety incidents.', labourDetails: { skilled: 64, unskilled: 78, supervisors: 6 }, materialsConsumed: [{ material: 'RMC M30', quantity: 240, unit: 'm³' }, { material: 'TMT Steel Fe550', quantity: 12.5, unit: 'MT' }], equipmentUsed: [{ name: 'Tower Crane', hours: 9 }, { name: 'Concrete Pump', hours: 6 }], issues: [] },
+    { dayOffset: 2, weather: 'Partly cloudy, 29°C', overallProgress: 51, workCompleted: 'Floor 4 shuttering strike-off. MEP sleeve placement for Floor 5 in progress.', remarks: 'Curtain wall aluminium delivery delayed by supplier - 10-day impact flagged to PMC.', labourCount: 142, status: 'SUBMITTED', aiSummary: 'Steady progress on structural works, but a supplier delay on curtain wall sections may affect the façade timeline.', labourDetails: { skilled: 60, unskilled: 76, supervisors: 6 }, materialsConsumed: [{ material: 'Plywood Shuttering', quantity: 85, unit: 'sheets' }], equipmentUsed: [{ name: 'Tower Crane', hours: 8 }, { name: 'Passenger Hoist', hours: 7 }], issues: [{ severity: 'medium', description: 'Curtain wall aluminium sections delayed by supplier' }] },
+    { dayOffset: 4, weather: 'Clear, 32°C', overallProgress: 50, workCompleted: 'Basement waterproofing membrane laid across 620 m². Floor 3 blockwork 80% complete.', remarks: 'Monthly safety audit conducted - 0 critical findings, 3 minor observations closed on site.', labourCount: 151, status: 'SUBMITTED', aiSummary: 'Waterproofing and blockwork advanced well; safety audit passed with only minor, already-closed observations.', labourDetails: { skilled: 66, unskilled: 79, supervisors: 6 }, materialsConsumed: [{ material: 'APP Membrane', quantity: 640, unit: 'm²' }, { material: 'AAC Blocks', quantity: 1200, unit: 'nos' }], equipmentUsed: [{ name: 'Tower Crane', hours: 9 }, { name: 'Mortar Mixer', hours: 5 }], issues: [] },
+  ],
+  'GRV-002': [
+    { dayOffset: 1, weather: 'Overcast, 28°C', overallProgress: 34, workCompleted: 'Storm drain lining Ch. 14+000 to 16+000 completed. De-silting at Sector 4-A ongoing.', remarks: 'BESCOM HT cable conflict at Ch. 1+240 - coordination meeting scheduled for tomorrow.', labourCount: 62, status: 'SUBMITTED', aiSummary: 'Drainage lining progressing on the 14–16 km reach; an underground BESCOM cable conflict needs resolution before excavation continues.', labourDetails: { skilled: 24, unskilled: 34, supervisors: 4 }, materialsConsumed: [{ material: 'Precast RCC Segments', quantity: 48, unit: 'nos' }], equipmentUsed: [{ name: 'Excavator', hours: 8 }, { name: 'Tipper Truck', hours: 10 }], issues: [{ severity: 'high', description: 'BESCOM HT cable found at Ch. 1+240' }] },
+    { dayOffset: 3, weather: 'Light rain, 26°C', overallProgress: 33, workCompleted: 'Manhole upgrades at 4 locations. Smart flow sensor mounting brackets installed.', remarks: 'Work paused for 2 hours due to intermittent rain. No damage to open trenches.', labourCount: 58, status: 'SUBMITTED', aiSummary: 'Rain caused a short stoppage but sensor and manhole works stayed on track with no trench damage.', labourDetails: { skilled: 22, unskilled: 32, supervisors: 4 }, materialsConsumed: [{ material: 'Precast Manhole Rings', quantity: 12, unit: 'nos' }], equipmentUsed: [{ name: 'Excavator', hours: 6 }, { name: 'Dewatering Pump', hours: 9 }], issues: [{ severity: 'minor', description: 'Rain stoppage - 2 hours lost' }] },
+  ],
+  'GRV-003': [
+    { dayOffset: 1, weather: 'Clear, 30°C', overallProgress: 78, workCompleted: 'Tower C–F Floor 12 slab poured (312 workers on site). STP 72-hour test run completed.', remarks: '750 KLD STP results within KSPCB norms. Concrete cube tests passed.', labourCount: 312, status: 'SUBMITTED', aiSummary: 'Excellent output: Floor 12 slab poured across four towers and the STP passed its commissioning test within regulatory norms.', labourDetails: { skilled: 138, unskilled: 162, supervisors: 12 }, materialsConsumed: [{ material: 'RMC M35', quantity: 410, unit: 'm³' }, { material: 'TMT Steel Fe550', quantity: 22, unit: 'MT' }], equipmentUsed: [{ name: 'Tower Crane', hours: 10 }, { name: 'Boom Placer', hours: 8 }], issues: [] },
+    { dayOffset: 2, weather: 'Clear, 31°C', overallProgress: 77, workCompleted: 'Tower A & B - 240 units handed over to client for finishing. Podium landscaping started.', remarks: 'IGBC auditor inspection for Green Homes certification - provisionally passed.', labourCount: 298, status: 'SUBMITTED', aiSummary: 'Major milestone: 240 units handed over and a provisional pass on the IGBC green certification inspection.', labourDetails: { skilled: 130, unskilled: 156, supervisors: 12 }, materialsConsumed: [{ material: 'Vitrified Tiles', quantity: 2400, unit: 'm²' }], equipmentUsed: [{ name: 'Tower Crane', hours: 9 }, { name: 'Passenger Hoist', hours: 8 }], issues: [] },
+    { dayOffset: 3, weather: 'Partly cloudy, 29°C', overallProgress: 77, workCompleted: 'Tower E scaffolding erected to Floor 13. Internal road kerb laying in Sector 2.', remarks: 'Tower E scaffold awaiting third-party clearance before Floor 13 pour can proceed.', labourCount: 305, status: 'SUBMITTED', aiSummary: 'Progress continues, though the Floor 13 pour on Tower E is gated on a pending third-party scaffold clearance.', labourDetails: { skilled: 134, unskilled: 159, supervisors: 12 }, materialsConsumed: [{ material: 'Scaffold Pipes', quantity: 180, unit: 'nos' }], equipmentUsed: [{ name: 'Tower Crane', hours: 9 }, { name: 'JCB', hours: 7 }], issues: [{ severity: 'medium', description: 'Tower E scaffold pending third-party clearance' }] },
+  ],
+  'GRV-004': [
+    { dayOffset: 2, weather: 'Clear, 33°C', overallProgress: 22, workCompleted: 'All open excavations backfilled and barricaded per NHAI instruction. Equipment demobilised.', remarks: 'Site closure report submitted. Project on hold pending revised forest clearance from MoEFCC.', labourCount: 0, status: 'SUBMITTED', aiSummary: 'Site fully secured and demobilised under the NHAI stop-work notice; work remains paused until forest clearance is granted.', labourDetails: { skilled: 0, unskilled: 0, supervisors: 2 }, materialsConsumed: [], equipmentUsed: [{ name: 'Excavator', hours: 3 }], issues: [{ severity: 'high', description: 'Stop-work notice - pending forest clearance' }] },
+  ],
+};
+
+async function seedDailyReports(orgId: string) {
+  const reportCount = await prisma.dailyReport.count({ where: { organizationId: orgId } });
+  if (reportCount > 0) {
+    console.log('  → Daily reports already seeded, skipping');
+    return;
+  }
+
+  const projects = await prisma.project.findMany({
+    where: { organizationId: orgId },
+    select: { id: true, code: true },
+  });
+  const projectIdByCode = Object.fromEntries(projects.map((p) => [p.code, p.id]));
+
+  // Reports are submitted by the site engineer; fall back to any org member.
+  const engineer = await prisma.userOrganization.findFirst({
+    where: { organizationId: orgId, role: 'SITE_ENGINEER' },
+    select: { userId: true },
+  });
+  const anyMember = await prisma.userOrganization.findFirst({
+    where: { organizationId: orgId },
+    select: { userId: true },
+  });
+  const submittedById = engineer?.userId ?? anyMember?.userId;
+  if (!submittedById) {
+    console.log('  → No org members found, skipping daily reports');
+    return;
+  }
+
+  let created = 0;
+  for (const [code, reports] of Object.entries(DAILY_REPORTS)) {
+    const projectId = projectIdByCode[code];
+    if (!projectId) continue;
+
+    for (const r of reports) {
+      await prisma.dailyReport.create({
+        data: {
+          projectId,
+          organizationId:   orgId,
+          submittedById,
+          date:             subDays(new Date(), r.dayOffset),
+          weather:          r.weather,
+          overallProgress:  r.overallProgress,
+          workCompleted:    r.workCompleted,
+          remarks:          r.remarks,
+          labourCount:      r.labourCount,
+          status:           r.status,
+          aiSummary:        r.aiSummary,
+          labourDetails:    r.labourDetails,
+          materialsConsumed: r.materialsConsumed,
+          equipmentUsed:    r.equipmentUsed,
+          issues:           r.issues,
+          createdAt:        subDays(new Date(), r.dayOffset),
+        },
+      });
+      created++;
+    }
+  }
+
+  console.log(`  → Seeded ${created} daily reports`);
+}
+
+// ─── Notification Seed Data ──────────────────────────────────────────────────
+
+type NotificationSeedEntry = {
+  dayOffset: number;
+  type: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
+  title: string;
+  message: string;
+  read: boolean;
+  entityType: string;
+};
+
+const NOTIFICATIONS: NotificationSeedEntry[] = [
+  { dayOffset: 0, type: 'SUCCESS', title: 'Daily report submitted',        message: 'Floor 4 slab pour completed at Whitefield IT Corridor - Block C. 148 workers on site.',        read: false, entityType: 'project' },
+  { dayOffset: 0, type: 'WARNING', title: 'Material delay flagged',         message: 'Curtain wall aluminium sections delayed by supplier - 10-day impact expected on GRV-001.',       read: false, entityType: 'project' },
+  { dayOffset: 1, type: 'SUCCESS', title: 'Purchase order approved',        message: 'PO-2024-089 approved - Structural steel 85MT from Tata Steel @ ₹68,000/MT.',                    read: false, entityType: 'purchase_order' },
+  { dayOffset: 1, type: 'ERROR',   title: 'Certification expired',          message: 'Narendra Kumar’s Safety Induction Certificate expired 37 days ago - PPE non-compliance flagged.', read: false, entityType: 'worker' },
+  { dayOffset: 2, type: 'INFO',    title: 'Handover certificate issued',    message: 'Tower A & B - 240 units handed over to Brigade Group for finishing works.',                      read: true,  entityType: 'project' },
+  { dayOffset: 2, type: 'WARNING', title: 'Scaffold clearance required',    message: 'Tower E scaffolding requires third-party clearance before the Floor 13 pour on GRV-003.',        read: false, entityType: 'project' },
+  { dayOffset: 3, type: 'SUCCESS', title: 'STP commissioning complete',     message: '750 KLD STP commissioned and test-run for 72 hours - results within KSPCB norms.',               read: true,  entityType: 'project' },
+  { dayOffset: 4, type: 'ERROR',   title: 'Project placed on hold',         message: 'NHAI issued a stop-work notice on GRV-004 pending revised forest clearance from MoEFCC.',         read: true,  entityType: 'project' },
+  { dayOffset: 5, type: 'INFO',    title: 'Safety audit completed',         message: 'Monthly safety audit at GRV-001: 0 critical findings, 3 minor observations raised and closed.',  read: true,  entityType: 'project' },
+];
+
+async function seedNotifications(orgId: string) {
+  const notifCount = await prisma.notification.count({ where: { organizationId: orgId } });
+  if (notifCount > 0) {
+    console.log('  → Notifications already seeded, skipping');
+    return;
+  }
+
+  const members = await prisma.userOrganization.findMany({
+    where: { organizationId: orgId },
+    select: { userId: true },
+  });
+  if (members.length === 0) {
+    console.log('  → No org members found, skipping notifications');
+    return;
+  }
+
+  for (let i = 0; i < NOTIFICATIONS.length; i++) {
+    const n = NOTIFICATIONS[i];
+    await prisma.notification.create({
+      data: {
+        type:           n.type,
+        title:          n.title,
+        message:        n.message,
+        read:           n.read,
+        entityType:     n.entityType,
+        userId:         members[i % members.length].userId,
+        organizationId: orgId,
+        createdAt:      subDays(new Date(), n.dayOffset),
+      },
+    });
+  }
+
+  console.log(`  → Seeded ${NOTIFICATIONS.length} notifications`);
+}
+
+// ─── Materials Seed Data ─────────────────────────────────────────────────────
+
+const MATERIAL_CATEGORIES = [
+  { name: 'Steel & Rebar',      description: 'Structural steel, TMT bars and reinforcement.' },
+  { name: 'Cement & Concrete',  description: 'Cement, ready-mix concrete and binders.' },
+  { name: 'Aggregates',         description: 'Sand, stone and crushed aggregates.' },
+  { name: 'Masonry',            description: 'Blocks, bricks and masonry units.' },
+  { name: 'Wood',               description: 'Plywood, shuttering and timber.' },
+  { name: 'Electrical',         description: 'Cables, conduits and electrical fittings.' },
+  { name: 'Plumbing',           description: 'Pipes, fittings and sanitary items.' },
+  { name: 'Finishes',           description: 'Tiles, paint and finishing materials.' },
+  { name: 'Waterproofing',      description: 'Waterproofing compounds and membranes.' },
+];
+
+const MATERIAL_SUPPLIERS = [
+  { name: 'Tata Steel',            contactName: 'Anil Kapoor',    email: 'sales@tatasteel.example',   phone: '+91 80 4100 2201', leadTimeDays: 10, rating: 4.7, onTimeRate: 94, openPurchaseOrders: 3, totalSpend: 41_800_000 },
+  { name: 'UltraTech Cement',      contactName: 'Meera Iyer',     email: 'orders@ultratech.example',  phone: '+91 80 4100 2202', leadTimeDays: 5,  rating: 4.6, onTimeRate: 96, openPurchaseOrders: 2, totalSpend: 18_600_000 },
+  { name: 'Bhagwati RMC',          contactName: 'Ravi Deshpande', email: 'dispatch@bhagwatirmc.example', phone: '+91 80 4100 2203', leadTimeDays: 1, rating: 4.3, onTimeRate: 88, openPurchaseOrders: 4, totalSpend: 22_400_000 },
+  { name: 'Bengaluru Aggregates',  contactName: 'Suresh Gowda',   email: 'sales@blraggregates.example', phone: '+91 80 4100 2204', leadTimeDays: 3, rating: 4.0, onTimeRate: 82, openPurchaseOrders: 1, totalSpend: 9_300_000 },
+  { name: 'Xtratech Blocks',       contactName: 'Farha Khan',     email: 'sales@xtratech.example',    phone: '+91 80 4100 2205', leadTimeDays: 6,  rating: 4.2, onTimeRate: 90, openPurchaseOrders: 0, totalSpend: 7_100_000 },
+  { name: 'Century Plyboards',     contactName: 'Debashish Roy',  email: 'orders@centuryply.example', phone: '+91 80 4100 2206', leadTimeDays: 8,  rating: 4.5, onTimeRate: 91, openPurchaseOrders: 1, totalSpend: 5_600_000 },
+  { name: 'Polycab Wires',         contactName: 'Nitin Shah',     email: 'sales@polycab.example',     phone: '+91 80 4100 2207', leadTimeDays: 7,  rating: 4.6, onTimeRate: 95, openPurchaseOrders: 2, totalSpend: 6_900_000 },
+  { name: 'Supreme Pipes',         contactName: 'Kavya Menon',    email: 'orders@supreme.example',    phone: '+91 80 4100 2208', leadTimeDays: 9,  rating: 3.9, onTimeRate: 79, openPurchaseOrders: 1, totalSpend: 3_200_000 },
+  { name: 'Kajaria Ceramics',      contactName: 'Rahul Bansal',   email: 'sales@kajaria.example',     phone: '+91 80 4100 2209', leadTimeDays: 12, rating: 4.4, onTimeRate: 89, openPurchaseOrders: 2, totalSpend: 8_400_000 },
+  { name: 'Asian Paints',          contactName: 'Priya Rao',      email: 'orders@asianpaints.example', phone: '+91 80 4100 2210', leadTimeDays: 6, rating: 4.7, onTimeRate: 97, openPurchaseOrders: 1, totalSpend: 4_100_000 },
+  { name: 'Pidilite (Dr. Fixit)',  contactName: 'Vivek Nair',     email: 'sales@drfixit.example',     phone: '+91 80 4100 2211', leadTimeDays: 5,  rating: 4.5, onTimeRate: 92, openPurchaseOrders: 0, totalSpend: 2_700_000 },
+];
+
+type MatMovementType = 'INBOUND' | 'OUTBOUND' | 'CONSUMPTION' | 'ADJUSTMENT' | 'TRANSFER';
+
+type MaterialSeedEntry = {
+  name: string; sku: string; unit: string; unitCost: number;
+  quantity: number; reserved: number; incoming: number; minStock: number; maxStock: number;
+  warehouse: string; category: string; supplier: string;
+  specifications: Record<string, string>;
+  projects: { code: string; allocated: number; consumed: number }[];
+  movements: { type: MatMovementType; quantity: number; reference?: string; note?: string; projectCode?: string; dayOffset: number }[];
+};
+
+const MATERIALS: MaterialSeedEntry[] = [
+  {
+    name: 'TMT Steel Fe500D', sku: 'STL-TMT-500D-16', unit: 'MT', unitCost: 62000,
+    quantity: 18, reserved: 12, incoming: 40, minStock: 25, maxStock: 200,
+    warehouse: 'Central Store', category: 'Steel & Rebar', supplier: 'Tata Steel',
+    specifications: { Grade: 'Fe500D', Diameter: '16mm', Standard: 'IS 1786:2008', Length: '12m' },
+    projects: [{ code: 'GRV-001', allocated: 85, consumed: 47 }, { code: 'GRV-003', allocated: 120, consumed: 92 }],
+    movements: [
+      { type: 'INBOUND', quantity: 50, reference: 'PO-STL-0089', note: 'Received from Tata Steel', dayOffset: 30 },
+      { type: 'CONSUMPTION', quantity: 22, projectCode: 'GRV-001', note: 'Floor 4 slab reinforcement', dayOffset: 5 },
+      { type: 'OUTBOUND', quantity: 10, projectCode: 'GRV-003', note: 'Issued to Tower C', dayOffset: 1 },
+    ],
+  },
+  {
+    name: 'OPC Cement 53 Grade', sku: 'CEM-OPC-53', unit: 'Bags', unitCost: 410,
+    quantity: 4200, reserved: 800, incoming: 2000, minStock: 1500, maxStock: 8000,
+    warehouse: 'Central Store', category: 'Cement & Concrete', supplier: 'UltraTech Cement',
+    specifications: { Grade: '53', Type: 'OPC', Standard: 'IS 12269', Weight: '50kg/bag' },
+    projects: [{ code: 'GRV-001', allocated: 3000, consumed: 1850 }, { code: 'GRV-002', allocated: 1200, consumed: 640 }],
+    movements: [
+      { type: 'INBOUND', quantity: 5000, reference: 'PO-CEM-0142', dayOffset: 20 },
+      { type: 'CONSUMPTION', quantity: 1500, projectCode: 'GRV-001', note: 'Column casting', dayOffset: 3 },
+      { type: 'CONSUMPTION', quantity: 300, projectCode: 'GRV-002', note: 'Drain lining', dayOffset: 0 },
+    ],
+  },
+  {
+    name: 'River Sand', sku: 'AGG-SAND-RIV', unit: 'CFT', unitCost: 55,
+    quantity: 900, reserved: 200, incoming: 0, minStock: 1000, maxStock: 6000,
+    warehouse: 'Site Store - Whitefield', category: 'Aggregates', supplier: 'Bengaluru Aggregates',
+    specifications: { Type: 'River Sand', Zone: 'Zone II', Standard: 'IS 383' },
+    projects: [{ code: 'GRV-001', allocated: 2000, consumed: 1400 }],
+    movements: [
+      { type: 'INBOUND', quantity: 2500, reference: 'PO-AGG-0051', dayOffset: 18 },
+      { type: 'CONSUMPTION', quantity: 600, projectCode: 'GRV-001', note: 'Plastering works', dayOffset: 2 },
+    ],
+  },
+  {
+    name: 'M20 Ready-Mix Concrete', sku: 'CON-RMC-M20', unit: 'Cu.m', unitCost: 5200,
+    quantity: 320, reserved: 260, incoming: 80, minStock: 100, maxStock: 800,
+    warehouse: 'Site Store - Sarjapur', category: 'Cement & Concrete', supplier: 'Bhagwati RMC',
+    specifications: { Grade: 'M20', Slump: '100-125mm', Standard: 'IS 456' },
+    projects: [{ code: 'GRV-003', allocated: 500, consumed: 410 }],
+    movements: [
+      { type: 'INBOUND', quantity: 400, reference: 'PO-RMC-0210', dayOffset: 12 },
+      { type: 'CONSUMPTION', quantity: 140, projectCode: 'GRV-003', note: 'Tower C floor 12 slab', dayOffset: 1 },
+      { type: 'ADJUSTMENT', quantity: -6, note: 'Wastage reconciliation', dayOffset: 4 },
+    ],
+  },
+  {
+    name: 'AAC Blocks 600x200x150', sku: 'MAS-AAC-150', unit: 'Nos', unitCost: 48,
+    quantity: 62000, reserved: 5000, incoming: 0, minStock: 8000, maxStock: 40000,
+    warehouse: 'Central Store', category: 'Masonry', supplier: 'Xtratech Blocks',
+    specifications: { Size: '600x200x150mm', Density: '551-650 kg/m3', Standard: 'IS 2185 Part 3' },
+    projects: [{ code: 'GRV-003', allocated: 40000, consumed: 21000 }],
+    movements: [
+      { type: 'INBOUND', quantity: 70000, reference: 'PO-AAC-0033', note: 'Bulk order - overstocked', dayOffset: 22 },
+      { type: 'CONSUMPTION', quantity: 8000, projectCode: 'GRV-003', note: 'Internal walls', dayOffset: 6 },
+    ],
+  },
+  {
+    name: 'Fly Ash Bricks', sku: 'MAS-FAB-STD', unit: 'Nos', unitCost: 7.5,
+    quantity: 150000, reserved: 20000, incoming: 0, minStock: 30000, maxStock: 250000,
+    warehouse: 'Site Store - Whitefield', category: 'Masonry', supplier: 'Xtratech Blocks',
+    specifications: { Size: '230x110x75mm', Strength: '7.5 N/mm2', Standard: 'IS 12894' },
+    projects: [{ code: 'GRV-001', allocated: 90000, consumed: 61000 }],
+    movements: [
+      { type: 'INBOUND', quantity: 200000, reference: 'PO-FAB-0077', dayOffset: 25 },
+      { type: 'CONSUMPTION', quantity: 15000, projectCode: 'GRV-001', note: 'Partition walls', dayOffset: 3 },
+    ],
+  },
+  {
+    name: 'Aggregate 20mm', sku: 'AGG-STONE-20', unit: 'CFT', unitCost: 48,
+    quantity: 5200, reserved: 400, incoming: 0, minStock: 1500, maxStock: 5000,
+    warehouse: 'Site Store - Whitefield', category: 'Aggregates', supplier: 'Bengaluru Aggregates',
+    specifications: { Size: '20mm', Type: 'Crushed Stone', Standard: 'IS 383' },
+    projects: [{ code: 'GRV-002', allocated: 3000, consumed: 1200 }],
+    movements: [
+      { type: 'INBOUND', quantity: 6000, reference: 'PO-AGG-0061', note: 'Overstocked - excess order', dayOffset: 15 },
+      { type: 'CONSUMPTION', quantity: 800, projectCode: 'GRV-002', dayOffset: 4 },
+    ],
+  },
+  {
+    name: 'Plywood 18mm Shuttering', sku: 'WD-PLY-18', unit: 'Sheets', unitCost: 2100,
+    quantity: 480, reserved: 60, incoming: 200, minStock: 150, maxStock: 1200,
+    warehouse: 'Central Store', category: 'Wood', supplier: 'Century Plyboards',
+    specifications: { Thickness: '18mm', Size: '8x4 ft', Type: 'Film Faced Shuttering' },
+    projects: [{ code: 'GRV-001', allocated: 400, consumed: 260 }, { code: 'GRV-003', allocated: 300, consumed: 180 }],
+    movements: [
+      { type: 'INBOUND', quantity: 600, reference: 'PO-WD-0044', dayOffset: 28 },
+      { type: 'CONSUMPTION', quantity: 120, projectCode: 'GRV-001', note: 'Slab shuttering', dayOffset: 2 },
+    ],
+  },
+  {
+    name: 'Electrical Cable 4 sq.mm', sku: 'ELE-CBL-4', unit: 'Mtr', unitCost: 62,
+    quantity: 8000, reserved: 1500, incoming: 5000, minStock: 3000, maxStock: 20000,
+    warehouse: 'Central Store', category: 'Electrical', supplier: 'Polycab Wires',
+    specifications: { Size: '4 sq.mm', Type: 'FR PVC', Cores: 'Single', Standard: 'IS 694' },
+    projects: [{ code: 'GRV-001', allocated: 6000, consumed: 3200 }],
+    movements: [
+      { type: 'INBOUND', quantity: 10000, reference: 'PO-ELE-0091', dayOffset: 16 },
+      { type: 'CONSUMPTION', quantity: 1800, projectCode: 'GRV-001', note: 'Floors 11-13 conduit wiring', dayOffset: 2 },
+    ],
+  },
+  {
+    name: 'PVC Pipe 110mm', sku: 'PLB-PVC-110', unit: 'Mtr', unitCost: 340,
+    quantity: 260, reserved: 40, incoming: 0, minStock: 300, maxStock: 2000,
+    warehouse: 'Site Store - Sarjapur', category: 'Plumbing', supplier: 'Supreme Pipes',
+    specifications: { Diameter: '110mm', Class: '4 kg/cm2', Type: 'SWR', Standard: 'IS 13592' },
+    projects: [{ code: 'GRV-003', allocated: 600, consumed: 340 }],
+    movements: [
+      { type: 'INBOUND', quantity: 800, reference: 'PO-PLB-0022', dayOffset: 21 },
+      { type: 'CONSUMPTION', quantity: 220, projectCode: 'GRV-003', note: 'Drainage stack', dayOffset: 5 },
+    ],
+  },
+  {
+    name: 'Vitrified Tiles 600x600', sku: 'FIN-TIL-600', unit: 'Boxes', unitCost: 720,
+    quantity: 1400, reserved: 200, incoming: 300, minStock: 400, maxStock: 5000,
+    warehouse: 'Central Store', category: 'Finishes', supplier: 'Kajaria Ceramics',
+    specifications: { Size: '600x600mm', Finish: 'Glazed Vitrified', Coverage: '4 sqm/box' },
+    projects: [{ code: 'GRV-003', allocated: 1200, consumed: 700 }],
+    movements: [
+      { type: 'INBOUND', quantity: 2000, reference: 'PO-FIN-0130', dayOffset: 19 },
+      { type: 'CONSUMPTION', quantity: 300, projectCode: 'GRV-003', note: 'Tower A flooring', dayOffset: 6 },
+    ],
+  },
+  {
+    name: 'Emulsion Paint (Interior)', sku: 'FIN-PNT-EMU', unit: 'Ltr', unitCost: 280,
+    quantity: 0, reserved: 0, incoming: 400, minStock: 200, maxStock: 3000,
+    warehouse: 'Central Store', category: 'Finishes', supplier: 'Asian Paints',
+    specifications: { Type: 'Acrylic Emulsion', Finish: 'Matt', Coverage: '140 sqft/ltr' },
+    projects: [{ code: 'GRV-001', allocated: 800, consumed: 800 }],
+    movements: [
+      { type: 'INBOUND', quantity: 800, reference: 'PO-FIN-0101', dayOffset: 40 },
+      { type: 'CONSUMPTION', quantity: 800, projectCode: 'GRV-001', note: 'Fully consumed - reorder raised', dayOffset: 4 },
+    ],
+  },
+  {
+    name: 'Waterproofing Compound', sku: 'WP-CMP-2K', unit: 'Kg', unitCost: 190,
+    quantity: 180, reserved: 120, incoming: 0, minStock: 250, maxStock: 1500,
+    warehouse: 'Site Store - Whitefield', category: 'Waterproofing', supplier: 'Pidilite (Dr. Fixit)',
+    specifications: { Type: '2K Acrylic', Application: 'Terrace & Wet Areas', Coverage: '1.5 kg/sqm' },
+    projects: [{ code: 'GRV-001', allocated: 400, consumed: 220 }],
+    movements: [
+      { type: 'INBOUND', quantity: 500, reference: 'PO-WP-0018', dayOffset: 24 },
+      { type: 'CONSUMPTION', quantity: 200, projectCode: 'GRV-001', note: 'Terrace waterproofing', dayOffset: 3 },
+      { type: 'OUTBOUND', quantity: 120, projectCode: 'GRV-001', note: 'Reserved for wet-area works', dayOffset: 1 },
+    ],
+  },
+];
+
+async function seedMaterials(orgId: string) {
+  const count = await prisma.material.count({ where: { organizationId: orgId } });
+  if (count > 0) {
+    console.log('  → Materials already seeded, skipping');
+    return;
+  }
+
+  const catByName: Record<string, string> = {};
+  for (const c of MATERIAL_CATEGORIES) {
+    const cat = await prisma.materialCategory.upsert({
+      where: { name_organizationId: { name: c.name, organizationId: orgId } },
+      create: { name: c.name, description: c.description, organizationId: orgId },
+      update: {},
+    });
+    catByName[c.name] = cat.id;
+  }
+
+  const supByName: Record<string, string> = {};
+  for (const s of MATERIAL_SUPPLIERS) {
+    const sup = await prisma.materialSupplier.create({ data: { ...s, organizationId: orgId } });
+    supByName[s.name] = sup.id;
+  }
+
+  const projects = await prisma.project.findMany({
+    where: { organizationId: orgId },
+    select: { id: true, code: true },
+  });
+  const projIdByCode: Record<string, string> = Object.fromEntries(projects.map((p) => [p.code, p.id]));
+
+  for (const m of MATERIALS) {
+    const material = await prisma.material.create({
+      data: {
+        name: m.name, sku: m.sku, unit: m.unit, unitCost: m.unitCost,
+        quantity: m.quantity, reserved: m.reserved, incoming: m.incoming,
+        minStock: m.minStock, maxStock: m.maxStock, warehouse: m.warehouse,
+        specifications: m.specifications,
+        categoryId: catByName[m.category], supplierId: supByName[m.supplier],
+        organizationId: orgId,
+      },
+    });
+
+    for (const u of m.projects) {
+      const projectId = projIdByCode[u.code];
+      if (!projectId) continue;
+      await prisma.materialProjectUsage.create({
+        data: { materialId: material.id, projectId, allocated: u.allocated, consumed: u.consumed, organizationId: orgId },
+      });
+    }
+
+    for (const mv of m.movements) {
+      await prisma.materialMovement.create({
+        data: {
+          materialId: material.id,
+          type: mv.type,
+          quantity: mv.quantity,
+          reference: mv.reference ?? null,
+          note: mv.note ?? null,
+          projectId: mv.projectCode ? projIdByCode[mv.projectCode] ?? null : null,
+          organizationId: orgId,
+          occurredAt: subDays(new Date(), mv.dayOffset),
+        },
+      });
+    }
+  }
+
+  console.log(`  → Seeded ${MATERIALS.length} materials, ${MATERIAL_CATEGORIES.length} categories, ${MATERIAL_SUPPLIERS.length} suppliers`);
+}
+
 async function main() {
   const orgs = await prisma.userOrganization.findMany({
     where: { role: 'OWNER' },
@@ -359,6 +773,9 @@ async function main() {
     console.log(`Seeding org: ${membership.organization.name} (${membership.organization.id})`);
     await seedOrg(membership.organization.id, membership.userId);
     await seedWorkers(membership.organization.id);
+    await seedMaterials(membership.organization.id);
+    await seedDailyReports(membership.organization.id);
+    await seedNotifications(membership.organization.id);
     console.log(`  ✓ Done`);
   }
 }

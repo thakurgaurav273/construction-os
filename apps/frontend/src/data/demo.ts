@@ -1,4 +1,4 @@
-import { addDays, subDays } from 'date-fns';
+import { addDays } from 'date-fns';
 
 export const company = {
   name: 'Nexus Infrastructure Pvt Ltd',
@@ -130,51 +130,4 @@ export const weatherAlerts = {
   current: 'Partly Cloudy',
   temp: '28°C',
   forecast: 'Heavy rain expected on Thursday. NH-48 earthworks may be delayed.',
-};
-
-export const projectDetails: Record<string, any> = {
-  p1: {
-    id: 'p1',
-    name: 'Marina Bay Residential Tower',
-    status: 'on-track',
-    progress: 45,
-    budget: 120000000,
-    spent: 54000000,
-    manager: 'Sarah Jenkins',
-    startDate: subDays(new Date(), 120).toISOString(),
-    dueDate: addDays(new Date(), 180).toISOString(),
-    location: 'Marina Bay, South District',
-    description: 'A 42-story luxury residential tower featuring 240 units, underground parking, and a rooftop infinity pool.',
-    team: [
-      { id: 'u1', name: 'Sarah Jenkins', role: 'Project Manager', email: 'sarah.j@nexus.com', avatar: 'SJ' },
-      { id: 'u2', name: 'Marcus Cole', role: 'Lead Architect', email: 'marcus.c@nexus.com', avatar: 'MC' },
-      { id: 'u3', name: 'David Chen', role: 'Site Supervisor', email: 'david.c@nexus.com', avatar: 'DC' },
-      { id: 'u4', name: 'Elena Rodriguez', role: 'Safety Officer', email: 'elena.r@nexus.com', avatar: 'ER' },
-    ],
-    budgetBreakdown: [
-      { category: 'Materials', allocated: 45000000, spent: 22000000 },
-      { category: 'Labor', allocated: 40000000, spent: 18000000 },
-      { category: 'Equipment', allocated: 20000000, spent: 11000000 },
-      { category: 'Permits & Misc', allocated: 15000000, spent: 3000000 },
-    ],
-    timeline: [
-      { id: 't1', title: 'Site Preparation & Excavation', status: 'completed', start: subDays(new Date(), 120).toISOString(), end: subDays(new Date(), 90).toISOString() },
-      { id: 't2', title: 'Foundation & Substructure', status: 'completed', start: subDays(new Date(), 90).toISOString(), end: subDays(new Date(), 30).toISOString() },
-      { id: 't3', title: 'Superstructure (Floors 1-20)', status: 'in-progress', start: subDays(new Date(), 30).toISOString(), end: addDays(new Date(), 60).toISOString() },
-      { id: 't4', title: 'Superstructure (Floors 21-42)', status: 'pending', start: addDays(new Date(), 60).toISOString(), end: addDays(new Date(), 120).toISOString() },
-      { id: 't5', title: 'Interior Finishing', status: 'pending', start: addDays(new Date(), 90).toISOString(), end: addDays(new Date(), 180).toISOString() },
-    ],
-    documents: [
-      { id: 'd1', name: 'Architectural Blueprints v2.pdf', type: 'PDF', size: '14.2 MB', date: subDays(new Date(), 14).toISOString() },
-      { id: 'd2', name: 'Structural Engineering Report.docx', type: 'DOCX', size: '2.4 MB', date: subDays(new Date(), 30).toISOString() },
-      { id: 'd3', name: 'Environmental Permit.pdf', type: 'PDF', size: '1.1 MB', date: subDays(new Date(), 110).toISOString() },
-      { id: 'd4', name: 'Q3 Budget Revision.xlsx', type: 'XLSX', size: '850 KB', date: subDays(new Date(), 5).toISOString() },
-    ],
-    activity: [
-      { id: 'act1', user: 'Sarah Jenkins', action: 'approved', target: 'Q3 Budget Revision.xlsx', time: '2 hours ago' },
-      { id: 'act2', user: 'David Chen', action: 'completed milestone', target: 'Foundation & Substructure', time: '2 days ago' },
-      { id: 'act3', user: 'Elena Rodriguez', action: 'uploaded', target: 'Weekly Safety Audit.pdf', time: '3 days ago' },
-      { id: 'act4', user: 'Marcus Cole', action: 'updated', target: 'Architectural Blueprints v2.pdf', time: '14 days ago' },
-    ]
-  }
 };
