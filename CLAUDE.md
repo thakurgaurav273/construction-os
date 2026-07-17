@@ -2539,7 +2539,7 @@ Choose the solution that is:
 - Easier to understand
 - Easier to extend
 
-Code should be written for the next engineer—not just for today's task.
+Code should be written for the next engineer-not just for today's task.
 
 Think in systems, not files.
 

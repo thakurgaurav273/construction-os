@@ -12,7 +12,7 @@
 
 SitePilot aims to become the operating system for construction companies.
 
-The long-term vision is to provide a single platform where organizations can manage every aspect of construction projects—from planning and procurement to workforce, finance, reporting, and AI-powered decision making.
+The long-term vision is to provide a single platform where organizations can manage every aspect of construction projects-from planning and procurement to workforce, finance, reporting, and AI-powered decision making.
 
 Rather than becoming another ERP, SitePilot should become the central workspace where every stakeholder collaborates.
 
@@ -391,6 +391,6 @@ Organizations should be able to:
 - Automate repetitive work
 - Use AI for decision support
 
-—all within a single, unified platform.
+-all within a single, unified platform.
 
 Every release should move the product closer to this vision while maintaining simplicity, reliability, and a high standard of user experience.

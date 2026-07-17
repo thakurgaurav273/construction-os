@@ -23,7 +23,7 @@ The goal is to preserve engineering context for future developers and AI coding 
 
 ---
 
-# ADR-001 — Modular Monolith Architecture
+# ADR-001 - Modular Monolith Architecture
 
 **Status**
 
@@ -105,7 +105,7 @@ Negative
 
 ---
 
-# ADR-002 — Next.js App Router
+# ADR-002 - Next.js App Router
 
 **Status**
 
@@ -153,7 +153,7 @@ Benefits
 
 ---
 
-# ADR-003 — NestJS Backend
+# ADR-003 - NestJS Backend
 
 **Status**
 
@@ -207,7 +207,7 @@ Benefits
 
 ---
 
-# ADR-004 — PostgreSQL
+# ADR-004 - PostgreSQL
 
 **Status**
 
@@ -257,7 +257,7 @@ PostgreSQL is a better fit.
 
 ---
 
-# ADR-005 — Prisma ORM
+# ADR-005 - Prisma ORM
 
 **Status**
 
@@ -282,7 +282,7 @@ Raw SQL should only be introduced for proven performance bottlenecks.
 
 ---
 
-# ADR-006 — Multi-Tenant Database
+# ADR-006 - Multi-Tenant Database
 
 **Status**
 
@@ -328,7 +328,7 @@ Application code must rigorously enforce tenant isolation.
 
 ---
 
-# ADR-007 — RBAC
+# ADR-007 - RBAC
 
 **Status**
 
@@ -364,7 +364,7 @@ This allows organizations to define flexible role structures in future releases.
 
 ---
 
-# ADR-008 — REST API
+# ADR-008 - REST API
 
 **Status**
 
@@ -395,7 +395,7 @@ GraphQL may be reconsidered for public APIs in the future.
 
 ---
 
-# ADR-009 — TanStack Query
+# ADR-009 - TanStack Query
 
 **Status**
 
@@ -423,7 +423,7 @@ Benefits
 
 ---
 
-# ADR-010 — Zustand
+# ADR-010 - Zustand
 
 **Status**
 
@@ -446,7 +446,7 @@ Do not store API data in Zustand.
 
 ---
 
-# ADR-011 — S3-Compatible Object Storage
+# ADR-011 - S3-Compatible Object Storage
 
 **Status**
 
@@ -468,7 +468,7 @@ The database stores metadata only.
 
 ---
 
-# ADR-012 — Event-Driven Side Effects
+# ADR-012 - Event-Driven Side Effects
 
 **Status**
 
@@ -510,7 +510,7 @@ Business logic should not directly trigger secondary effects.
 
 ---
 
-# ADR-013 — AI Provider Abstraction
+# ADR-013 - AI Provider Abstraction
 
 **Status**
 
@@ -555,7 +555,7 @@ without changing business logic.
 
 ---
 
-# ADR-014 — Design System
+# ADR-014 - Design System
 
 **Status**
 
@@ -573,7 +573,7 @@ Reusable components take precedence over one-off implementations.
 
 ---
 
-# ADR-015 — Authentication Strategy
+# ADR-015 - Authentication Strategy
 
 **Status**
 
@@ -593,7 +593,7 @@ Recommendations
 
 ---
 
-# ADR-016 — Background Processing
+# ADR-016 - Background Processing
 
 **Status**
 

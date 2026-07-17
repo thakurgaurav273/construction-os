@@ -10,7 +10,7 @@ export default function InventoryPage() {
       iconBg="bg-violet-500/10"
       iconColor="text-violet-500"
       title="Inventory"
-      description="Warehouse and site inventory management — know exactly what you have, where it is, and when to reorder."
+      description="Warehouse and site inventory management - know exactly what you have, where it is, and when to reorder."
       capabilities={[
         'Multi-warehouse stock management',
         'Bin and location tracking',

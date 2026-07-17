@@ -10,7 +10,7 @@ export default function RegisterPage() {
           Create your account
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Get started with SitePilot — free for 14 days
+          Get started with SitePilot - free for 14 days
         </p>
       </div>
 

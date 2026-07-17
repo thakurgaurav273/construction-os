@@ -8,15 +8,7 @@ export interface RegisterPayload {
   organizationName: string;
 }
 
-export interface RegisterResponse extends LoginResponse {
-  organization: {
-    id: string;
-    name: string;
-    slug: string;
-    currency: string;
-    timezone: string;
-  };
-}
+export type RegisterResponse = LoginResponse;
 
 export interface UpdateOrganizationPayload {
   address?: string;
@@ -25,24 +17,29 @@ export interface UpdateOrganizationPayload {
   timezone?: string;
 }
 
+function unwrap<T>(response: { data: { data: T } | T }): T {
+  const body = response.data as any;
+  return 'data' in body && 'success' in body ? body.data : body;
+}
+
 export const authApi = {
   register: async (data: RegisterPayload): Promise<RegisterResponse> => {
     const response = await api.post('/auth/register', data);
-    return response.data;
+    return unwrap(response);
   },
 
   login: async (data: { email: string; password: string }): Promise<LoginResponse> => {
     const response = await api.post('/auth/login', data);
-    return response.data;
+    return unwrap(response);
   },
 
   logout: async (refreshToken: string) => {
     const response = await api.post('/auth/logout', { refreshToken });
-    return response.data;
+    return unwrap(response);
   },
 
   updateOrganization: async (data: UpdateOrganizationPayload) => {
     const response = await api.patch('/auth/organization', data);
-    return response.data;
+    return unwrap(response);
   },
 };

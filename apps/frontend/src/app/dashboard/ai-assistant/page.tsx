@@ -47,7 +47,7 @@ export default function AIAssistantPage() {
           </div>
 
           <p className="text-muted-foreground leading-relaxed max-w-md mx-auto">
-            A construction-aware AI that understands your projects, budgets, and workforce — and answers in seconds.
+            A construction-aware AI that understands your projects, budgets, and workforce - and answers in seconds.
           </p>
         </div>
 
@@ -85,12 +85,12 @@ export default function AIAssistantPage() {
           </div>
         </div>
 
-        {/* CTA — existing project-level AI */}
+        {/* CTA - existing project-level AI */}
         <div className="bg-gradient-to-r from-violet-500/10 to-blue-500/10 border border-violet-200/30 rounded-xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <p className="font-semibold text-sm">Try AI Director on a project</p>
             <p className="text-muted-foreground text-xs mt-0.5">
-              Project-level AI is live now — open any project to get started.
+              Project-level AI is live now - open any project to get started.
             </p>
           </div>
           <Button variant="outline" size="sm" asChild>

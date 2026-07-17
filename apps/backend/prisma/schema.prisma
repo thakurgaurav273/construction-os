@@ -59,6 +59,23 @@ enum NotificationType {
   ERROR
 }
 
+enum WorkerStatus {
+  ACTIVE
+  ON_LEAVE
+  ABSENT
+  LATE
+}
+
+enum WorkerType {
+  EMPLOYEE
+  SUBCONTRACTOR
+}
+
+enum WorkerShift {
+  DAY
+  NIGHT
+}
+
 // ─── Core Entities ──────────────────────────────────────────────────────────
 
 model User {
@@ -103,6 +120,7 @@ model Organization {
   notifications Notification[]
   invitations   Invitation[]
   documents     Document[]
+  workers       Worker[]
 
   @@map("organizations")
 }
@@ -187,6 +205,7 @@ model Project {
   dailyReports DailyReport[]
   documents    Document[]
   activities   Activity[]
+  workers      Worker[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -316,4 +335,41 @@ model Notification {
   @@index([userId, read])
   @@index([organizationId])
   @@map("notifications")
+}
+
+// ─── Workforce ───────────────────────────────────────────────────────────────
+
+model Worker {
+  id                String        @id @default(uuid())
+  name              String
+  initials          String
+  role              String
+  trade             String
+  type              WorkerType    @default(EMPLOYEE)
+  phone             String?
+  email             String?
+  status            WorkerStatus  @default(ACTIVE)
+  experienceYears   Int           @default(0)
+  shift             WorkerShift   @default(DAY)
+  attendancePercent Float         @default(0)
+  lastCheckIn       String?
+  supervisor        String?
+  projectId         String?
+  emergencyContact  Json?
+  skills            String[]
+  certifications    Json?
+  ppeCompliant      Boolean       @default(true)
+  weeklyAttendance  Json?
+  recentActivity    Json?
+  organizationId    String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  project      Project?     @relation(fields: [projectId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([organizationId, status])
+  @@map("workers")
 }

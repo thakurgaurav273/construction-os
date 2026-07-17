@@ -2,91 +2,153 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Users, DollarSign, Clock, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
-import { format } from 'date-fns';
+import { FileText, Users, DollarSign, Clock, CheckCircle2, AlertTriangle, ArrowRight, TrendingUp, ShoppingCart } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@sitepilot/ui';
-import { Progress } from '@sitepilot/ui';
-import { Button } from '@sitepilot/ui';
-import { Badge } from '@sitepilot/ui';
-
-import { projectDetails } from '@/data/demo';
-import { useTimeline } from '@/hooks/api/use-timeline';
-
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Badge, Progress, Button, Skeleton } from '@sitepilot/ui';
+import { useProject } from '@/hooks/api/use-projects';
 
 const containerVariants = {
   hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
+  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
 };
-
 const itemVariants = {
   hidden: { opacity: 0, y: 10 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } },
 };
 
+function statusVariant(status: string) {
+  if (status === 'ACTIVE')    return 'default' as const;
+  if (status === 'ON_HOLD')   return 'secondary' as const;
+  if (status === 'COMPLETED') return 'outline' as const;
+  return 'destructive' as const;
+}
+
+function activityIcon(type: string) {
+  if (type === 'approval') return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+  if (type === 'alert')    return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+  if (type === 'update')   return <TrendingUp className="h-4 w-4 text-violet-500" />;
+  if (type === 'purchase') return <ShoppingCart className="h-4 w-4 text-amber-500" />;
+  return <FileText className="h-4 w-4 text-blue-500" />;
+}
+
+function activityBg(type: string) {
+  if (type === 'approval') return 'bg-emerald-500/10';
+  if (type === 'alert')    return 'bg-amber-500/10';
+  if (type === 'update')   return 'bg-violet-500/10';
+  return 'bg-primary/10';
+}
+
+function formatCrore(n: number | null | undefined) {
+  if (!n) return '-';
+  return `₹${(n / 10_000_000).toFixed(2)} Cr`;
+}
+
+function initials(name: string) {
+  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function roleLabel(role: string) {
+  const map: Record<string, string> = {
+    MANAGER: 'Project Manager', ENGINEER: 'Engineer', VIEWER: 'Viewer',
+    ADMIN: 'Admin', OWNER: 'Owner',
+  };
+  return map[role] ?? role;
+}
+
 export default function ProjectOverviewPage({ params }: { params: { id: string } }) {
-  const project = projectDetails[params.id] || projectDetails['p1'];
-  const { data: timelineEvents = [] } = useTimeline();
+  const { data: project, isLoading, isError } = useProject(params.id);
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <div className="xl:col-span-2"><Skeleton className="h-64 rounded-xl" /></div>
+        <div className="space-y-6"><Skeleton className="h-28 rounded-xl" /><Skeleton className="h-28 rounded-xl" /></div>
+        <div className="xl:col-span-2"><Skeleton className="h-64 rounded-xl" /></div>
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+    );
+  }
+
+  if (isError || !project) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <p className="text-lg font-semibold">Failed to load project</p>
+        <p className="text-muted-foreground mt-1">Please try refreshing the page.</p>
+      </div>
+    );
+  }
+
+  const budgetPct = project.budget ? Math.min((project.spent / project.budget) * 100, 100) : 0;
+  const manager = project.members?.find((m) => m.role === 'MANAGER');
 
   return (
-    <motion.div 
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="grid gap-6 md:grid-cols-2 xl:grid-cols-3"
-    >
-      {/* Description & About */}
+    <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      {/* About */}
       <motion.div variants={itemVariants} className="xl:col-span-2">
         <Card className="h-full">
           <CardHeader>
             <CardTitle>About the Project</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground leading-relaxed">{project.description}</p>
-            
+            <p className="text-muted-foreground leading-relaxed">{project.description ?? 'No description provided.'}</p>
             <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-6 border-t pt-6">
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Status</p>
-                <Badge variant={project.status === 'on-track' ? 'default' : 'secondary'} className="capitalize">{project.status.replace('-', ' ')}</Badge>
+                <Badge variant={statusVariant(project.status)} className="capitalize">
+                  {project.status.replace('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase())}
+                </Badge>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Start Date</p>
-                <p className="font-medium">{format(new Date(project.startDate), 'MMM dd, yyyy')}</p>
+                <p className="font-medium">
+                  {project.startDate ? format(new Date(project.startDate), 'MMM dd, yyyy') : '-'}
+                </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Due Date</p>
-                <p className="font-medium">{format(new Date(project.dueDate), 'MMM dd, yyyy')}</p>
+                <p className="text-sm text-muted-foreground mb-1">Completion</p>
+                <p className="font-medium">
+                  {project.expectedCompletion ? format(new Date(project.expectedCompletion), 'MMM dd, yyyy') : '-'}
+                </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Manager</p>
-                <p className="font-medium">{project.manager}</p>
+                <p className="text-sm text-muted-foreground mb-1">Client</p>
+                <p className="font-medium">{project.clientName ?? '-'}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </motion.div>
 
-      {/* Quick Stats */}
+      {/* Financials & Progress */}
       <motion.div variants={itemVariants} className="space-y-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground flex items-center"><DollarSign className="mr-2 h-4 w-4" /> Financials</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground flex items-center">
+              <DollarSign className="mr-2 h-4 w-4" /> Financials
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${(project.spent / 1000000).toFixed(1)}M <span className="text-sm font-normal text-muted-foreground">/ ${(project.budget / 1000000).toFixed(1)}M</span></div>
-            <Progress value={(project.spent / project.budget) * 100} className="h-2 mt-3" />
+            <div className="text-2xl font-bold">
+              {formatCrore(project.spent)}{' '}
+              <span className="text-sm font-normal text-muted-foreground">/ {formatCrore(project.budget)}</span>
+            </div>
+            <Progress value={budgetPct} className="h-2 mt-3" />
+            <p className="text-xs text-muted-foreground mt-2">{budgetPct.toFixed(1)}% of budget utilised</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground flex items-center"><Clock className="mr-2 h-4 w-4" /> Timeline Progress</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground flex items-center">
+              <Clock className="mr-2 h-4 w-4" /> Timeline Progress
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{project.progress}% <span className="text-sm font-normal text-muted-foreground">completed</span></div>
+            <div className="text-2xl font-bold">
+              {project.progress}%{' '}
+              <span className="text-sm font-normal text-muted-foreground">completed</span>
+            </div>
             <Progress value={project.progress} className="h-2 mt-3" />
           </CardContent>
         </Card>
@@ -98,31 +160,40 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>Latest logs for {project.name}</CardDescription>
+              <CardDescription>Latest events for {project.name}</CardDescription>
             </div>
-            <Button variant="ghost" size="sm">View All <ArrowRight className="ml-2 h-4 w-4" /></Button>
+            <Button variant="ghost" size="sm">
+              View All <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {(project.activity ?? []).map((act: any, idx: number) => (
-                <div key={idx} className="flex items-start gap-4">
-                  <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${act.type === 'approval' ? 'bg-emerald-500/10 text-emerald-500' : act.type === 'alert' ? 'bg-amber-500/10 text-amber-500' : 'bg-primary/10 text-primary'}`}>
-                    {act.type === 'approval' ? <CheckCircle2 className="h-4 w-4" /> : act.type === 'alert' ? <AlertTriangle className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+            {(!project.activities || project.activities.length === 0) ? (
+              <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
+            ) : (
+              <div className="space-y-5">
+                {project.activities.map((act, idx) => (
+                  <div key={act.id} className="flex gap-3">
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${activityBg(act.type)}`}>
+                      {activityIcon(act.type)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{act.title}</p>
+                      {act.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{act.description}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {act.actor.name} &middot; {formatDistanceToNow(new Date(act.createdAt), { addSuffix: true })}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm">
-                      <span className="font-semibold">{act.user}</span> {act.action} <span className="font-medium">{act.target}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">{act.time}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
 
-      {/* Key Team Members */}
+      {/* Team */}
       <motion.div variants={itemVariants}>
         <Card className="h-full">
           <CardHeader className="flex flex-row items-center justify-between">
@@ -130,23 +201,26 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {project.team.slice(0, 3).map((member: { id: string; avatar: string; name: string; role: string }) => (
-                <div key={member.id} className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center text-sm font-bold shrink-0">
-                    {member.avatar}
+            {(!project.members || project.members.length === 0) ? (
+              <p className="text-sm text-muted-foreground">No members assigned.</p>
+            ) : (
+              <div className="space-y-4">
+                {project.members.slice(0, 4).map((member) => (
+                  <div key={member.id} className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                      {initials(member.user.name)}
+                    </div>
+                    <div className="overflow-hidden">
+                      <p className="text-sm font-medium truncate">{member.user.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{roleLabel(member.role)}</p>
+                    </div>
                   </div>
-                  <div className="overflow-hidden">
-                    <p className="text-sm font-medium truncate">{member.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{member.role}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
-
     </motion.div>
   );
 }

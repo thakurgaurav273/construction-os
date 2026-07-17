@@ -10,7 +10,7 @@ export default function FinancePage() {
       iconBg="bg-green-500/10"
       iconColor="text-green-500"
       title="Finance"
-      description="Full financial visibility across every project — budgets, invoices, payments, and cash flow in one view."
+      description="Full financial visibility across every project - budgets, invoices, payments, and cash flow in one view."
       capabilities={[
         'Organisation-wide budget management',
         'Invoice creation and approval workflows',

@@ -153,10 +153,11 @@ export class AuthService {
       },
     });
 
-    const { password, ...userWithoutPassword } = user;
+    const { password, organizations, ...userWithoutPassword } = user;
 
     return {
       user: userWithoutPassword,
+      organization: defaultOrg?.organization ?? null,
       accessToken,
       refreshToken,
     };

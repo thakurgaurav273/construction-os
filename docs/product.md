@@ -280,7 +280,7 @@ Modules should be loosely coupled but work together through shared business enti
 
 ---
 
-# Module 1 — Authentication
+# Module 1 - Authentication
 
 ## Goal
 
@@ -306,7 +306,7 @@ Provide secure authentication and organization onboarding.
 
 ---
 
-# Module 2 — Organizations
+# Module 2 - Organizations
 
 Every customer is an Organization.
 
@@ -344,7 +344,7 @@ Everything belongs to an organization.
 
 ---
 
-# Module 3 — Dashboard
+# Module 3 - Dashboard
 
 The dashboard provides a real-time overview.
 
@@ -408,7 +408,7 @@ Dashboard widgets should be configurable.
 
 ---
 
-# Module 4 — Projects
+# Module 4 - Projects
 
 Projects are the heart of SitePilot.
 
@@ -524,7 +524,7 @@ Project Completed
 
 ---
 
-# Module 5 — Workforce
+# Module 5 - Workforce
 
 Manage employees working on projects.
 
@@ -582,7 +582,7 @@ Attendance should eventually support biometric integrations.
 
 ---
 
-# Module 6 — Vendors
+# Module 6 - Vendors
 
 Manage suppliers.
 
@@ -624,7 +624,7 @@ Communication
 
 ---
 
-# Module 7 — Materials
+# Module 7 - Materials
 
 Track all construction materials.
 
@@ -674,7 +674,7 @@ Every stock movement must be traceable.
 
 ---
 
-# Module 8 — Warehouses
+# Module 8 - Warehouses
 
 Organizations can have multiple warehouses.
 
@@ -706,7 +706,7 @@ History
 
 ---
 
-# Module 9 — Purchase Orders
+# Module 9 - Purchase Orders
 
 Procurement begins here.
 
@@ -788,7 +788,7 @@ Approval workflow should be configurable in future versions.
 
 ---
 
-# Module 10 — Daily Reports
+# Module 10 - Daily Reports
 
 Daily Reports are submitted by site engineers.
 
@@ -818,7 +818,7 @@ AI should eventually generate summaries automatically.
 
 ---
 
-# Module 11 — Billing
+# Module 11 - Billing
 
 Track project finances.
 
@@ -858,7 +858,7 @@ Budget Variance
 
 ---
 
-# Module 12 — Reports
+# Module 12 - Reports
 
 Generate reports for management.
 
@@ -888,7 +888,7 @@ Scheduled Reports
 
 ---
 
-# Module 13 — Notifications
+# Module 13 - Notifications
 
 Users receive notifications for
 
@@ -916,7 +916,7 @@ Push (Future)
 
 ---
 
-# Module 14 — Documents
+# Module 14 - Documents
 
 Projects should allow storing
 
@@ -940,7 +940,7 @@ Versioning will be introduced later.
 
 ---
 
-# Module 15 — AI Assistant
+# Module 15 - AI Assistant
 
 AI should exist throughout the platform instead of being a standalone chatbot.
 
@@ -972,7 +972,7 @@ Every workflow should be intuitive, require minimal clicks, and maintain complet
 
 ---
 
-# Workflow 1 — Organization Setup
+# Workflow 1 - Organization Setup
 
 The first experience should be simple.
 
@@ -999,7 +999,7 @@ Create First Project
 
 ---
 
-# Workflow 2 — Invite Team Members
+# Workflow 2 - Invite Team Members
 
 ```
 Settings
@@ -1027,7 +1027,7 @@ Future
 
 ---
 
-# Workflow 3 — Create Project
+# Workflow 3 - Create Project
 
 ```
 Projects
@@ -1067,7 +1067,7 @@ Automatically create
 
 ---
 
-# Workflow 4 — Daily Site Operations
+# Workflow 4 - Daily Site Operations
 
 Engineer opens project.
 
@@ -1101,7 +1101,7 @@ Generate summary automatically.
 
 ---
 
-# Workflow 5 — Material Request
+# Workflow 5 - Material Request
 
 ```
 Site Engineer
@@ -1125,7 +1125,7 @@ Generate Purchase Request.
 
 ---
 
-# Workflow 6 — Procurement
+# Workflow 6 - Procurement
 
 ```
 Purchase Request
@@ -1151,7 +1151,7 @@ Every step should be traceable.
 
 ---
 
-# Workflow 7 — Vendor Management
+# Workflow 7 - Vendor Management
 
 ```
 Vendor Created
@@ -1171,7 +1171,7 @@ Vendor profile becomes a complete history.
 
 ---
 
-# Workflow 8 — Inventory
+# Workflow 8 - Inventory
 
 Inventory movement should never lose history.
 
@@ -1205,7 +1205,7 @@ Every movement should be recorded.
 
 ---
 
-# Workflow 9 — Budget Tracking
+# Workflow 9 - Budget Tracking
 
 Project Budget
 
@@ -1241,7 +1241,7 @@ Remaining
 
 ---
 
-# Workflow 10 — Project Completion
+# Workflow 10 - Project Completion
 
 ```
 Complete Pending Tasks

@@ -10,7 +10,7 @@ export default function ProcurementPage() {
       iconBg="bg-blue-500/10"
       iconColor="text-blue-500"
       title="Procurement"
-      description="End-to-end procurement management — from RFQs to vendor selection and purchase order approvals."
+      description="End-to-end procurement management - from RFQs to vendor selection and purchase order approvals."
       capabilities={[
         'Request for Quotation (RFQ) management',
         'Vendor comparison and selection matrix',

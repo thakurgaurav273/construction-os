@@ -41,7 +41,7 @@ export function LoginForm() {
       const data = await authApi.login(values);
       
       // Store in Zustand
-      setAuth(data.user, data.accessToken);
+      setAuth(data.user, data.accessToken, data.organization);
       
       // We also need to set the refresh token somewhere (e.g., localStorage or cookies)
       // Usually nextjs middleware expects `access_token` in cookies

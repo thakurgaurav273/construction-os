@@ -54,7 +54,7 @@ export function RegisterForm() {
         organizationName: values.organizationName,
       });
 
-      setAuth(data.user, data.accessToken);
+      setAuth(data.user, data.accessToken, data.organization);
       document.cookie = `access_token=${data.accessToken}; path=/; max-age=86400`;
       localStorage.setItem('access_token', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);

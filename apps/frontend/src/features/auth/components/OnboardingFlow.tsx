@@ -13,19 +13,19 @@ import { authApi } from '../api/auth.api';
 import { useAuthStore } from '@/store/auth.store';
 
 const CURRENCIES = [
-  { value: 'INR', label: 'INR — Indian Rupee' },
-  { value: 'USD', label: 'USD — US Dollar' },
-  { value: 'AED', label: 'AED — UAE Dirham' },
-  { value: 'SGD', label: 'SGD — Singapore Dollar' },
-  { value: 'GBP', label: 'GBP — British Pound' },
+  { value: 'INR', label: 'INR - Indian Rupee' },
+  { value: 'USD', label: 'USD - US Dollar' },
+  { value: 'AED', label: 'AED - UAE Dirham' },
+  { value: 'SGD', label: 'SGD - Singapore Dollar' },
+  { value: 'GBP', label: 'GBP - British Pound' },
 ];
 
 const TIMEZONES = [
-  { value: 'Asia/Kolkata', label: 'IST — India (UTC+5:30)' },
-  { value: 'Asia/Dubai', label: 'GST — Dubai (UTC+4)' },
-  { value: 'Asia/Singapore', label: 'SGT — Singapore (UTC+8)' },
-  { value: 'Europe/London', label: 'GMT — London (UTC+0)' },
-  { value: 'America/New_York', label: 'EST — New York (UTC-5)' },
+  { value: 'Asia/Kolkata', label: 'IST - India (UTC+5:30)' },
+  { value: 'Asia/Dubai', label: 'GST - Dubai (UTC+4)' },
+  { value: 'Asia/Singapore', label: 'SGT - Singapore (UTC+8)' },
+  { value: 'Europe/London', label: 'GMT - London (UTC+0)' },
+  { value: 'America/New_York', label: 'EST - New York (UTC-5)' },
 ];
 
 const detailsSchema = z.object({

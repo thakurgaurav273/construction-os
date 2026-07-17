@@ -1,4 +1,4 @@
-import type { User } from './index';
+import type { Organization, User } from './index';
 
 export interface TokenPayload {
   userId: string;
@@ -7,6 +7,7 @@ export interface TokenPayload {
 
 export interface LoginResponse {
   user: User;
+  organization: Organization | null;
   accessToken: string;
   refreshToken: string;
 }

@@ -82,9 +82,14 @@ export function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const user = useAuthStore((state) => state.user);
+  const organization = useAuthStore((state) => state.organization);
 
-  const initials = user?.name
+  const userInitials = user?.name
     ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+    : '?';
+
+  const orgInitials = organization?.name
+    ? organization.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
     : 'SP';
 
   return (
@@ -98,19 +103,24 @@ export function Sidebar() {
       <div className="flex h-16 items-center px-4 border-b border-sidebar-border shrink-0">
         <div className="flex items-center gap-3 overflow-hidden">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-xs shrink-0">
-            SP
+            {orgInitials}
           </div>
           <AnimatePresence>
             {!isCollapsed && (
-              <motion.span
+              <motion.div
                 initial={{ opacity: 0, width: 0 }}
                 animate={{ opacity: 1, width: 'auto' }}
                 exit={{ opacity: 0, width: 0 }}
                 transition={{ duration: 0.2 }}
-                className="font-semibold text-sidebar-foreground whitespace-nowrap overflow-hidden"
+                className="overflow-hidden"
               >
-                SitePilot
-              </motion.span>
+                <span className="block font-semibold text-sm text-sidebar-foreground whitespace-nowrap truncate leading-tight">
+                  {organization?.name ?? 'SitePilot'}
+                </span>
+                <span className="block text-[10px] text-muted-foreground whitespace-nowrap leading-tight">
+                  Construction ERP
+                </span>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
@@ -197,7 +207,7 @@ export function Sidebar() {
       <div className="p-3 border-t border-sidebar-border shrink-0">
         <div className={cn('flex items-center gap-3 overflow-hidden', isCollapsed && 'justify-center')}>
           <div className="h-8 w-8 rounded-full bg-primary/10 border flex items-center justify-center text-xs font-semibold text-primary shrink-0">
-            {initials}
+            {userInitials}
           </div>
           <AnimatePresence>
             {!isCollapsed && (

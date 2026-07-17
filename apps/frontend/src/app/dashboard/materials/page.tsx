@@ -10,7 +10,7 @@ export default function MaterialsPage() {
       iconBg="bg-amber-500/10"
       iconColor="text-amber-500"
       title="Materials"
-      description="Centralised material management across all projects — track stock, deliveries, and consumption in real time."
+      description="Centralised material management across all projects - track stock, deliveries, and consumption in real time."
       capabilities={[
         'Organisation-wide material catalogue',
         'Real-time stock levels and reorder alerts',

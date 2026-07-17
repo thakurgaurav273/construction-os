@@ -217,7 +217,7 @@ export default function DailyReportsPage() {
                       {report.issues > 0 ? (
                         <span className="text-amber-600 font-medium">{report.issues} issue{report.issues > 1 ? 's' : ''}</span>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
