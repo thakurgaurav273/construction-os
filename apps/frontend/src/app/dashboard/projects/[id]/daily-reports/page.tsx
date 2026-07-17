@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Plus, Search, Filter, FileText, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { format, subDays } from 'date-fns';
@@ -10,6 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@sitepilot/ui';
 import { Button } from '@sitepilot/ui';
 import { Input } from '@sitepilot/ui';
 import { Badge } from '@sitepilot/ui';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@sitepilot/ui';
 
 // Mock data for the list
 const historicalReports = [
@@ -21,6 +29,21 @@ const historicalReports = [
 ];
 
 export default function DailyReportsListPage({ params }: { params: { id: string } }) {
+  const router = useRouter();
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const filteredReports = historicalReports.filter((report) => {
+    const query = search.trim().toLowerCase();
+    const matchesSearch =
+      query === '' ||
+      report.author.toLowerCase().includes(query) ||
+      report.weather.toLowerCase().includes(query) ||
+      report.status.toLowerCase().includes(query);
+    const matchesStatus = statusFilter === 'all' || report.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
@@ -46,12 +69,26 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
           <div className="flex items-center gap-4 w-full max-w-sm">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Search reports..." className="pl-9 bg-background" />
+              <Input
+                placeholder="Search reports..."
+                className="pl-9 bg-background"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
           </div>
-          <Button variant="outline" size="sm">
-            <Filter className="mr-2 h-4 w-4" /> Filter
-          </Button>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[160px]">
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Filter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="flagged">Flagged</SelectItem>
+            </SelectContent>
+          </Select>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -67,7 +104,7 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {historicalReports.map((report) => (
+                {filteredReports.map((report) => (
                   <tr key={report.id} className="hover:bg-muted/10 transition-colors group">
                     <td className="px-6 py-4 font-medium flex items-center">
                       <FileText className="mr-3 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -96,7 +133,17 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Button variant="ghost" size="sm">View</Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/projects/${params.id}/daily-reports/${report.id}`,
+                          )
+                        }
+                      >
+                        View
+                      </Button>
                     </td>
                   </tr>
                 ))}

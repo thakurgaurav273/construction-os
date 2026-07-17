@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Users, Search, HardHat, CheckCircle2, AlertCircle } from 'lucide-react';
 import {
   Card,
@@ -10,9 +11,16 @@ import {
   CardDescription,
   Button,
   Input,
+  Label,
   Badge,
   Progress,
   Skeleton,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from '@sitepilot/ui';
 import { useWorkforce } from '@/hooks/api/use-workforce';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -20,6 +28,24 @@ import { EmptyState } from '@/components/shared/EmptyState';
 export default function WorkforcePage({ params }: { params: { id: string } }) {
   const { data: allWorkers = [], isLoading } = useWorkforce();
   const [search, setSearch] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newRole, setNewRole] = useState('');
+
+  function resetAddForm() {
+    setNewName('');
+    setNewRole('');
+  }
+
+  function handleAddPersonnel() {
+    if (!newName.trim()) {
+      toast.error('Enter a name.');
+      return;
+    }
+    toast.success(`${newName.trim()} assigned to this project`);
+    resetAddForm();
+    setAddOpen(false);
+  }
 
   const projectWorkers = useMemo(
     () => allWorkers.filter((w) => w.projectId === params.id),
@@ -76,7 +102,7 @@ export default function WorkforcePage({ params }: { params: { id: string } }) {
           <h2 className="text-2xl font-bold tracking-tight">Workforce</h2>
           <p className="text-muted-foreground">Personnel assigned to this project.</p>
         </div>
-        <Button>Add Personnel</Button>
+        <Button onClick={() => setAddOpen(true)}>Add Personnel</Button>
       </div>
 
       {stats.total === 0 ? (
@@ -199,6 +225,49 @@ export default function WorkforcePage({ params }: { params: { id: string } }) {
           </div>
         </>
       )}
+
+      <Dialog
+        open={addOpen}
+        onOpenChange={(o) => {
+          if (!o) resetAddForm();
+          setAddOpen(o);
+        }}
+      >
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Add Personnel</DialogTitle>
+            <DialogDescription>Assign a worker to this project.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="personnel-name">Name</Label>
+              <Input
+                id="personnel-name"
+                placeholder="e.g. Rajesh Kumar"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="personnel-role">Role / Trade</Label>
+              <Input
+                id="personnel-role"
+                placeholder="e.g. Electrician"
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { resetAddForm(); setAddOpen(false); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddPersonnel}>Add Personnel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

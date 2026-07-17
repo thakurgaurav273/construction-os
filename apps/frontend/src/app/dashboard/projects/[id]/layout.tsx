@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 
 import { Badge, Button, Skeleton, cn } from '@sitepilot/ui';
 import { useProject } from '@/hooks/api/use-projects';
+import { ProjectFormDialog } from '../components/ProjectFormDialog';
 
 const tabs = [
   { name: 'Overview',        href: '' },
@@ -44,6 +45,7 @@ export default function ProjectDetailLayout({
   const pathname = usePathname();
   const projectId = params.id;
   const { data: project, isLoading } = useProject(projectId);
+  const [editOpen, setEditOpen] = useState(false);
 
   return (
     <div className="flex-1 flex flex-col h-full relative">
@@ -101,8 +103,12 @@ export default function ProjectDetailLayout({
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
-            <Button variant="outline">Project Settings</Button>
-            <Button>Update Progress</Button>
+            <Button variant="outline" disabled={!project} onClick={() => setEditOpen(true)}>
+              Project Settings
+            </Button>
+            <Button disabled={!project} onClick={() => setEditOpen(true)}>
+              Update Progress
+            </Button>
           </div>
         </div>
 
@@ -144,6 +150,10 @@ export default function ProjectDetailLayout({
           {children}
         </div>
       </div>
+
+      {project && (
+        <ProjectFormDialog open={editOpen} onOpenChange={setEditOpen} project={project} />
+      )}
     </div>
   );
 }

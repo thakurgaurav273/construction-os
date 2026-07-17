@@ -6,8 +6,15 @@ import { motion } from 'framer-motion';
 import { Plus, Search, Filter, Building2, Users, Clock, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 
-import { Button, Input, Badge, Card, CardContent, Progress, Skeleton } from '@sitepilot/ui';
+import {
+  Button, Input, Badge, Card, CardContent, Progress, Skeleton,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@sitepilot/ui';
 import { useProjects } from '@/hooks/api/use-projects';
+import { ProjectFormDialog } from './components/ProjectFormDialog';
+
+const STATUS_FILTERS = ['PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED', 'ARCHIVED'] as const;
+const PRIORITY_FILTERS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -36,13 +43,21 @@ function formatCrore(n: number | null | undefined) {
 
 export default function ProjectsListPage() {
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [priorityFilter, setPriorityFilter] = useState('ALL');
+  const [createOpen, setCreateOpen] = useState(false);
   const { data: projects = [], isLoading } = useProjects();
 
-  const filtered = projects.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    (p.clientName ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (p.location ?? '').toLowerCase().includes(search.toLowerCase()),
-  );
+  const query = search.toLowerCase();
+  const filtered = projects.filter((p) => {
+    const matchesSearch =
+      p.name.toLowerCase().includes(query) ||
+      (p.clientName ?? '').toLowerCase().includes(query) ||
+      (p.location ?? '').toLowerCase().includes(query);
+    const matchesStatus = statusFilter === 'ALL' || p.status === statusFilter;
+    const matchesPriority = priorityFilter === 'ALL' || p.priority === priorityFilter;
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 max-w-7xl mx-auto">
@@ -53,7 +68,7 @@ export default function ProjectsListPage() {
             {isLoading ? 'Loading...' : `${projects.length} project${projects.length !== 1 ? 's' : ''} across your organisation`}
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> New Project
         </Button>
       </div>
@@ -68,9 +83,31 @@ export default function ProjectsListPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="w-full sm:w-auto">
-          <Filter className="mr-2 h-4 w-4" /> Filters
-        </Button>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-40">
+              <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All statuses</SelectItem>
+              {STATUS_FILTERS.map((s) => (
+                <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All priorities</SelectItem>
+              {PRIORITY_FILTERS.map((p) => (
+                <SelectItem key={p} value={p}>{statusLabel(p)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {isLoading ? (
@@ -82,8 +119,15 @@ export default function ProjectsListPage() {
           <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold">No projects found</h3>
           <p className="text-muted-foreground mt-1">
-            {search ? 'Try adjusting your search.' : 'Create your first project to get started.'}
+            {search || statusFilter !== 'ALL' || priorityFilter !== 'ALL'
+              ? 'Try adjusting your search or filters.'
+              : 'Create your first project to get started.'}
           </p>
+          {!search && statusFilter === 'ALL' && priorityFilter === 'ALL' && (
+            <Button className="mt-4" onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> New Project
+            </Button>
+          )}
         </div>
       ) : (
         <motion.div
@@ -151,6 +195,8 @@ export default function ProjectsListPage() {
           ))}
         </motion.div>
       )}
+
+      <ProjectFormDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

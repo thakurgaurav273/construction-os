@@ -7,7 +7,10 @@ import {
   FileText, Plus, Search, Filter,
   CheckCircle2, Clock, AlertCircle, CloudRain, Sun, Cloud,
 } from 'lucide-react';
-import { Button, Input, Badge, Card, CardContent } from '@sitepilot/ui';
+import {
+  Button, Input, Badge, Card, CardContent,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@sitepilot/ui';
 import Link from 'next/link';
 
 const reports = [
@@ -103,12 +106,15 @@ const itemVariants = {
 
 export default function DailyReportsPage() {
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
-  const filtered = reports.filter(
-    (r) =>
+  const filtered = reports.filter((r) => {
+    const matchesSearch =
       r.project.toLowerCase().includes(search.toLowerCase()) ||
-      r.author.toLowerCase().includes(search.toLowerCase()),
-  );
+      r.author.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const stats = {
     total: reports.length,
@@ -169,9 +175,20 @@ export default function DailyReportsPage() {
             className="pl-9"
           />
         </div>
-        <Button variant="outline" size="sm">
-          <Filter className="mr-2 h-4 w-4" /> Filter
-        </Button>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[170px]">
+            <span className="flex items-center">
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Filter" />
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {Object.entries(statusConfig).map(([value, config]) => (
+              <SelectItem key={value} value={value}>{config.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}

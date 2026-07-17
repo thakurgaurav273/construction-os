@@ -1,12 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, MoreHorizontal, Users } from 'lucide-react';
 import { Card, CardContent, Button, Skeleton } from '@sitepilot/ui';
 import { useProject } from '@/hooks/api/use-projects';
 import { getInitials } from '@/lib/utils';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { AddMemberDialog } from '../../components/AddMemberDialog';
 
 function roleLabel(role: string): string {
   return role.charAt(0) + role.slice(1).toLowerCase();
@@ -14,13 +15,14 @@ function roleLabel(role: string): string {
 
 export default function ProjectTeamPage({ params }: { params: { id: string } }) {
   const { data: project, isLoading } = useProject(params.id);
+  const [addOpen, setAddOpen] = useState(false);
   const members = project?.members ?? [];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-semibold tracking-tight">Project Team</h3>
-        <Button>Add Member</Button>
+        <Button onClick={() => setAddOpen(true)}>Add Member</Button>
       </div>
 
       {isLoading ? (
@@ -41,7 +43,7 @@ export default function ProjectTeamPage({ params }: { params: { id: string } }) 
           icon={Users}
           title="No team members yet"
           description="Assign engineers, managers, and viewers to this project to see them here."
-          action={<Button>Add Member</Button>}
+          action={<Button onClick={() => setAddOpen(true)}>Add Member</Button>}
         />
       ) : (
         <motion.div
@@ -83,6 +85,8 @@ export default function ProjectTeamPage({ params }: { params: { id: string } }) 
           ))}
         </motion.div>
       )}
+
+      <AddMemberDialog projectId={params.id} open={addOpen} onOpenChange={setAddOpen} />
     </div>
   );
 }

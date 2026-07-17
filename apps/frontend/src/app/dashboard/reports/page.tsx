@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import { FileText, Download, Calendar, Clock, BarChart3, PieChart, ShieldAlert, Users, LayoutDashboard, Settings2, FileOutput } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@sitepilot/ui';
 import { Button } from '@sitepilot/ui';
@@ -61,21 +62,21 @@ export default function ReportsPage() {
                   <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${report.bg} ${report.color}`}>
                     <report.icon className="h-6 w-6" />
                   </div>
-                  <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity"><Settings2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => toast('Template settings coming soon')}><Settings2 className="h-4 w-4" /></Button>
                 </div>
                 <CardTitle className="mt-4">{report.name}</CardTitle>
                 <CardDescription className="h-10">{report.desc}</CardDescription>
               </CardHeader>
               <CardContent className="flex-1 flex items-end">
                 <div className="w-full flex gap-2 pt-4 border-t">
-                  <Button variant="outline" className="flex-1"><FileOutput className="mr-2 h-4 w-4" /> Generate</Button>
-                  <Button variant="outline" size="icon" title="Schedule Report"><Calendar className="h-4 w-4" /></Button>
+                  <Button variant="outline" className="flex-1" onClick={() => toast.success(`Generating ${report.name}...`)}><FileOutput className="mr-2 h-4 w-4" /> Generate</Button>
+                  <Button variant="outline" size="icon" title="Schedule Report" onClick={() => toast('Opening scheduler...')}><Calendar className="h-4 w-4" /></Button>
                 </div>
               </CardContent>
             </Card>
           ))}
           
-          <Card className="flex flex-col items-center justify-center border-dashed text-center hover:bg-muted/30 transition-colors cursor-pointer min-h-[250px]">
+          <Card className="flex flex-col items-center justify-center border-dashed text-center hover:bg-muted/30 transition-colors cursor-pointer min-h-[250px]" onClick={() => toast('Custom report builder coming soon')}>
             <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
               <FileText className="h-6 w-6 text-muted-foreground" />
             </div>
@@ -116,7 +117,7 @@ export default function ReportsPage() {
                         <Badge variant="outline" className="text-[10px]">{item.type} • {item.size}</Badge>
                       </td>
                       <td className="px-4 py-4 text-right">
-                        <Button variant="ghost" size="sm"><Download className="mr-2 h-4 w-4" /> Download</Button>
+                        <Button variant="ghost" size="sm" onClick={() => toast.success(`Downloading ${item.name}`)}><Download className="mr-2 h-4 w-4" /> Download</Button>
                       </td>
                     </tr>
                   ))}
@@ -133,7 +134,7 @@ export default function ReportsPage() {
             <Clock className="h-16 w-16 mb-6 opacity-20" />
             <h3 className="text-xl font-bold text-foreground mb-2">No Active Schedules</h3>
             <p className="max-w-md mb-6">You haven&apos;t set up any automated report generation. Automate your weekly progress or monthly cost reports to save time.</p>
-            <Button><Calendar className="mr-2 h-4 w-4" /> Create Schedule</Button>
+            <Button onClick={() => toast('Schedule creation coming soon')}><Calendar className="mr-2 h-4 w-4" /> Create Schedule</Button>
           </div>
         </Card>
       )}

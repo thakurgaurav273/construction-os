@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { format, formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -111,7 +112,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline">Download Report</Button>
+          <Button variant="outline" onClick={() => toast.success('Report export started')}>Download Report</Button>
           <Button asChild>
             <Link href="/dashboard/projects"><Plus className="mr-2 h-4 w-4" /> New Project</Link>
           </Button>

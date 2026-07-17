@@ -1,11 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import { toast } from 'sonner';
 import {
   Sheet, SheetContent, SheetTitle,
   Badge, Button, Progress, ScrollArea,
   Avatar, AvatarFallback,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@sitepilot/ui';
+import { useProjects } from '@/hooks/api/use-projects';
 import {
   Phone, Mail, MapPin, Award, ShieldCheck, ShieldAlert,
   Clock, Briefcase, User, AlertTriangle, CheckCircle2,
@@ -98,7 +102,34 @@ function getAttendancePct(pct: number): { color: string; label: string } {
 }
 
 export function WorkerDrawer({ worker, open, onClose }: WorkerDrawerProps): React.ReactElement {
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const { data: projects } = useProjects();
+
   if (!worker) return <></>;
+
+  const projectOptions = projects ?? [];
+
+  function handleAssign(): void {
+    if (!worker) return;
+    if (!selectedProjectId) {
+      toast.error('Select a project to assign.');
+      return;
+    }
+    const project = projectOptions.find((p) => p.id === selectedProjectId);
+    toast.success(`Assigned ${worker.name} to ${project?.name ?? 'project'}`);
+    setSelectedProjectId('');
+    setAssignOpen(false);
+  }
+
+  function handleMessage(): void {
+    if (!worker) return;
+    if (worker.email) {
+      window.open(`mailto:${worker.email}`);
+      return;
+    }
+    toast('Messaging coming soon');
+  }
 
   const palette = getPalette(worker.id);
   const presentDays = worker.weeklyAttendance.filter((d) => d.present).length;
@@ -357,13 +388,50 @@ export function WorkerDrawer({ worker, open, onClose }: WorkerDrawerProps): Reac
 
         {/* ── Sticky Footer ── */}
         <div className="shrink-0 border-t bg-background px-5 py-3 grid grid-cols-3 gap-2">
-          <Button size="sm" className="col-span-2 gap-1.5">
+          <Button size="sm" className="col-span-2 gap-1.5" onClick={() => setAssignOpen(true)}>
             <UserPlus className="h-3.5 w-3.5" /> Assign Project
           </Button>
-          <Button size="sm" variant="outline" className="gap-1.5">
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={handleMessage}>
             <MessageSquare className="h-3.5 w-3.5" /> Message
           </Button>
         </div>
+
+        {/* Assign Project Dialog */}
+        <Dialog
+          open={assignOpen}
+          onOpenChange={(o) => {
+            if (!o) setSelectedProjectId('');
+            setAssignOpen(o);
+          }}
+        >
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle>Assign Project</DialogTitle>
+              <DialogDescription>Assign {worker.name} to a project.</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-1.5">
+              <Label>Project</Label>
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setSelectedProjectId(''); setAssignOpen(false); }}>
+                Cancel
+              </Button>
+              <Button onClick={handleAssign}>Assign</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </SheetContent>
     </Sheet>
   );

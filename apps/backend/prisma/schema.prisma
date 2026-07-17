@@ -135,6 +135,10 @@ model Organization {
   stockAdjustments      StockAdjustment[]
   stockReservations     StockReservation[]
   inventoryAudits       InventoryAudit[]
+  vendors               Vendor[]
+  purchaseOrders        PurchaseOrder[]
+  rfqs                  Rfq[]
+  deliveries            Delivery[]
 
   @@map("organizations")
 }
@@ -225,6 +229,8 @@ model Project {
   warehouses            Warehouse[]
   inventoryTransactions InventoryTransaction[]
   stockReservations     StockReservation[]
+  purchaseOrders        PurchaseOrder[]
+  rfqs                  Rfq[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -781,4 +787,153 @@ model InventoryAudit {
 
   @@index([organizationId])
   @@map("inventory_audits")
+}
+
+model Vendor {
+  id                    String    @id @default(uuid())
+  name                  String
+  code                  String
+  categories            String[]
+  status                String    @default("active")
+  rating                Float     @default(0)
+  performanceScore      Float     @default(0)
+  onTimeDeliveryPercent Float     @default(0)
+  deliveryAccuracy      Float     @default(0)
+  qualityRating         Float     @default(0)
+  responseTimeHours     Float     @default(0)
+  projectCount          Int       @default(0)
+  totalOrders           Int       @default(0)
+  outstandingBalance    Decimal   @default(0) @db.Decimal(15, 2)
+  lastOrderDate         DateTime?
+  contactPerson         String?
+  phone                 String?
+  email                 String?
+  gstNumber             String?
+  paymentTerms          String?
+  city                  String?
+  state                 String?
+  aiRecommendation      String?
+  organizationId        String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([code, organizationId])
+  @@index([organizationId])
+  @@map("vendors")
+}
+
+model PurchaseOrder {
+  id               String   @id @default(uuid())
+  poNumber         String
+  category         String
+  createdBy        String
+  approver         String
+  requestedDate    DateTime @default(now())
+  expectedDelivery DateTime
+  amount           Decimal  @default(0) @db.Decimal(15, 2)
+  approvalStatus   String   @default("pending")
+  deliveryStatus   String   @default("not_started")
+  priority         String   @default("medium")
+  deliveryAddress  String   @default("")
+  notes            String   @default("")
+  projectId        String?
+  vendorId         String?
+  organizationId   String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  project      Project?          @relation(fields: [projectId], references: [id])
+  vendor       Vendor?           @relation(fields: [vendorId], references: [id])
+  items        PoLineItem[]
+  timeline     PoApprovalStep[]
+
+  @@unique([poNumber, organizationId])
+  @@index([organizationId])
+  @@index([projectId])
+  @@map("purchase_orders")
+}
+
+model PoLineItem {
+  id              String  @id @default(uuid())
+  purchaseOrderId String
+  description     String
+  category        String
+  unit            String
+  quantity        Decimal @default(0) @db.Decimal(15, 3)
+  rate            Decimal @default(0) @db.Decimal(15, 2)
+  taxPercent      Float   @default(0)
+  discountPercent Float   @default(0)
+  sortOrder       Int     @default(0)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId])
+  @@map("po_line_items")
+}
+
+model PoApprovalStep {
+  id              String    @id @default(uuid())
+  purchaseOrderId String
+  stage           String
+  actor           String
+  date            DateTime?
+  note            String    @default("")
+  sortOrder       Int       @default(0)
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId])
+  @@map("po_approval_steps")
+}
+
+model Rfq {
+  id                String   @id @default(uuid())
+  rfqNumber         String
+  title             String
+  category          String
+  vendorsInvited    Int      @default(0)
+  responsesReceived Int      @default(0)
+  issuedDate        DateTime @default(now())
+  closingDate       DateTime
+  status            String   @default("open")
+  priority          String   @default("medium")
+  estimatedValue    Decimal  @default(0) @db.Decimal(15, 2)
+  createdBy         String
+  projectId         String?
+  organizationId    String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  project      Project?     @relation(fields: [projectId], references: [id])
+
+  @@unique([rfqNumber, organizationId])
+  @@index([organizationId])
+  @@map("rfqs")
+}
+
+model Delivery {
+  id             String    @id @default(uuid())
+  poNumber       String
+  vendorName     String
+  projectName    String
+  category       String
+  status         String    @default("pending")
+  scheduledDate  DateTime
+  actualDate     DateTime?
+  itemSummary    String    @default("")
+  delayDays      Int       @default(0)
+  trackingId     String    @default("")
+  organizationId String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@map("deliveries")
 }

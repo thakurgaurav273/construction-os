@@ -1,13 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
-import { File, FileText, Image as ImageIcon, LayoutGrid, List, Search, Upload, Filter, MoreVertical, Download, Eye, FileArchive, Clock } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { File, FileText, Image as ImageIcon, LayoutGrid, List, Search, Upload, Filter, MoreVertical, Download, Eye, Trash2, FileArchive, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@sitepilot/ui';
 import { Button } from '@sitepilot/ui';
 import { Input } from '@sitepilot/ui';
 import { Badge } from '@sitepilot/ui';
 import { Progress } from '@sitepilot/ui';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@sitepilot/ui';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@sitepilot/ui';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@sitepilot/ui';
 
 const categories = ['All Documents', 'Drawings', 'Permits', 'Safety', 'Contracts'];
 
@@ -24,13 +38,34 @@ export default function DocumentsPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeCategory, setActiveCategory] = useState('All Documents');
   const [search, setSearch] = useState('');
-  const [selectedDoc, setSelectedDoc] = useState<any>(null);
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [documents, setDocuments] = useState(mockDocuments);
+  const [selectedDoc, setSelectedDoc] = useState<(typeof mockDocuments)[number] | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const filteredDocs = mockDocuments.filter(doc => {
+  const filteredDocs = documents.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(search.toLowerCase());
     const matchesCat = activeCategory === 'All Documents' || doc.category === activeCategory;
-    return matchesSearch && matchesCat;
+    const matchesType = typeFilter === 'all' || doc.type === typeFilter;
+    return matchesSearch && matchesCat && matchesType;
   });
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      toast.success(`${file.name} uploaded`);
+    }
+    event.target.value = '';
+  };
+
+  const handleDelete = (doc: (typeof mockDocuments)[number]) => {
+    setDocuments((docs) => docs.filter((d) => d.id !== doc.id));
+    toast.success(`${doc.name} deleted`);
+  };
 
   const getFileIcon = (type: string) => {
     switch(type) {
@@ -49,8 +84,25 @@ export default function DocumentsPage() {
           <p className="text-muted-foreground">Manage and track all project documentation.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline"><Filter className="mr-2 h-4 w-4" /> Filter</Button>
-          <Button><Upload className="mr-2 h-4 w-4" /> Upload</Button>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[150px]">
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Filter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="pdf">PDF</SelectItem>
+              <SelectItem value="doc">Document</SelectItem>
+              <SelectItem value="image">Image</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={handleUploadClick}><Upload className="mr-2 h-4 w-4" /> Upload</Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleFileSelected}
+          />
         </div>
       </div>
 

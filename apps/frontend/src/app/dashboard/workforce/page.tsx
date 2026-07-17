@@ -2,9 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
   Button, Tabs, TabsList, TabsTrigger, TabsContent,
+  Input, Label,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@sitepilot/ui';
 import {
   Users, UserCheck, UserX, HardHat, ShieldCheck, Award,
@@ -55,6 +58,10 @@ export default function WorkforcePage(): React.ReactElement {
   const [isClient, setIsClient] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newTrade, setNewTrade] = useState('');
+  const [newPhone, setNewPhone] = useState('');
 
   const { data: apiWorkers } = useWorkforce();
   const { data: apiStats } = useWorkforceStats();
@@ -80,6 +87,22 @@ export default function WorkforcePage(): React.ReactElement {
     setDrawerOpen(true);
   }
 
+  function resetAddForm(): void {
+    setNewName('');
+    setNewTrade('');
+    setNewPhone('');
+  }
+
+  function handleAddWorker(): void {
+    if (!newName.trim()) {
+      toast.error('Enter a worker name.');
+      return;
+    }
+    toast.success(`${newName.trim()} added`);
+    resetAddForm();
+    setAddOpen(false);
+  }
+
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       {/* Page Header */}
@@ -95,10 +118,10 @@ export default function WorkforcePage(): React.ReactElement {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => toast.success('Workforce export started')}>
             <Download className="mr-2 h-4 w-4" /> Export
           </Button>
-          <Button>
+          <Button onClick={() => setAddOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" /> Add Worker
           </Button>
         </div>
@@ -269,6 +292,59 @@ export default function WorkforcePage(): React.ReactElement {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />
+
+      {/* Add Worker Dialog */}
+      <Dialog
+        open={addOpen}
+        onOpenChange={(o) => {
+          if (!o) resetAddForm();
+          setAddOpen(o);
+        }}
+      >
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Add Worker</DialogTitle>
+            <DialogDescription>Register a new worker in the directory.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="worker-name">Name</Label>
+              <Input
+                id="worker-name"
+                placeholder="e.g. Rajesh Kumar"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="worker-trade">Role / Trade</Label>
+              <Input
+                id="worker-trade"
+                placeholder="e.g. Electrician"
+                value={newTrade}
+                onChange={(e) => setNewTrade(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="worker-phone">Phone</Label>
+              <Input
+                id="worker-phone"
+                placeholder="e.g. +91 98765 43210"
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { resetAddForm(); setAddOpen(false); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddWorker}>Add Worker</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

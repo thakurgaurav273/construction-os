@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, UploadCloud, Sparkles, User, Hammer, Truck, AlertTriangle, 
@@ -73,9 +75,31 @@ Today's operations at the Marina Bay site proceeded smoothly despite early morni
 }
 
 // --- Main Page ---
+interface MaterialRow {
+  name: string;
+  quantity: string;
+  unit: string;
+}
+
+interface EquipmentRow {
+  name: string;
+  hours: string;
+  status: string;
+}
+
 export default function NewDailyReportPage({ params }: { params: { id: string } }) {
+  const router = useRouter();
   const [generatingAi, setGeneratingAi] = useState(false);
   const { content, isTyping, isFinished } = useAiStream(generatingAi);
+
+  const [materials, setMaterials] = useState<MaterialRow[]>([
+    { name: 'C40 Concrete', quantity: '120', unit: 'm³' },
+    { name: 'Rebar 16mm', quantity: '450', unit: 'kg' },
+  ]);
+  const [equipment, setEquipment] = useState<EquipmentRow[]>([
+    { name: 'Tower Crane T1', hours: '8', status: 'Active' },
+    { name: 'Concrete Pump', hours: '4', status: 'Active' },
+  ]);
 
   const handleGenerate = () => {
     setGeneratingAi(true);
@@ -83,6 +107,27 @@ export default function NewDailyReportPage({ params }: { params: { id: string } 
     setTimeout(() => {
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     }, 100);
+  };
+
+  const handleAddMaterial = () => {
+    setMaterials((rows) => [...rows, { name: '', quantity: '', unit: '' }]);
+  };
+
+  const handleAddEquipment = () => {
+    setEquipment((rows) => [...rows, { name: '', hours: '', status: 'Active' }]);
+  };
+
+  const handleSaveDraft = () => {
+    toast.success('Draft saved');
+  };
+
+  const handleDiscard = () => {
+    router.back();
+  };
+
+  const handleSubmit = () => {
+    toast.success('Report submitted');
+    router.push(`/dashboard/projects/${params.id}/daily-reports`);
   };
 
   return (
@@ -103,7 +148,7 @@ export default function NewDailyReportPage({ params }: { params: { id: string } 
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline">Save Draft</Button>
+          <Button variant="outline" onClick={handleSaveDraft}>Save Draft</Button>
           <Button onClick={handleGenerate} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20 group transition-all duration-300">
             <Sparkles className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" /> 
             Generate AI Summary
@@ -173,17 +218,14 @@ export default function NewDailyReportPage({ params }: { params: { id: string } 
               <CardTitle className="text-lg flex items-center"><Hammer className="mr-2 h-5 w-5 text-muted-foreground" /> Materials Used</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input defaultValue="C40 Concrete" />
-                <Input defaultValue="120" className="w-24" />
-                <Input defaultValue="m³" className="w-24" />
-              </div>
-              <div className="flex gap-2">
-                <Input defaultValue="Rebar 16mm" />
-                <Input defaultValue="450" className="w-24" />
-                <Input defaultValue="kg" className="w-24" />
-              </div>
-              <Button variant="outline" size="sm" className="w-full mt-2"><Plus className="mr-2 h-4 w-4" /> Add Material</Button>
+              {materials.map((material, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input defaultValue={material.name} placeholder="Material" />
+                  <Input defaultValue={material.quantity} placeholder="Qty" className="w-24" />
+                  <Input defaultValue={material.unit} placeholder="Unit" className="w-24" />
+                </div>
+              ))}
+              <Button variant="outline" size="sm" className="w-full mt-2" onClick={handleAddMaterial}><Plus className="mr-2 h-4 w-4" /> Add Material</Button>
             </CardContent>
           </Card>
 
@@ -192,17 +234,14 @@ export default function NewDailyReportPage({ params }: { params: { id: string } 
               <CardTitle className="text-lg flex items-center"><Truck className="mr-2 h-5 w-5 text-muted-foreground" /> Equipment</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-               <div className="flex gap-2">
-                <Input defaultValue="Tower Crane T1" />
-                <Input defaultValue="8" className="w-24" />
-                <Badge variant="default" className="flex items-center justify-center w-24">Active</Badge>
-              </div>
-              <div className="flex gap-2">
-                <Input defaultValue="Concrete Pump" />
-                <Input defaultValue="4" className="w-24" />
-                <Badge variant="default" className="flex items-center justify-center w-24">Active</Badge>
-              </div>
-              <Button variant="outline" size="sm" className="w-full mt-2"><Plus className="mr-2 h-4 w-4" /> Add Equipment</Button>
+              {equipment.map((item, index) => (
+                <div key={index} className="flex gap-2">
+                  <Input defaultValue={item.name} placeholder="Equipment" />
+                  <Input defaultValue={item.hours} placeholder="Hrs" className="w-24" />
+                  <Badge variant="default" className="flex items-center justify-center w-24">{item.status}</Badge>
+                </div>
+              ))}
+              <Button variant="outline" size="sm" className="w-full mt-2" onClick={handleAddEquipment}><Plus className="mr-2 h-4 w-4" /> Add Equipment</Button>
             </CardContent>
           </Card>
         </div>
@@ -324,8 +363,8 @@ export default function NewDailyReportPage({ params }: { params: { id: string } 
                     transition={{ delay: 0.5 }}
                     className="mt-8 pt-6 border-t flex justify-end gap-3"
                   >
-                    <Button variant="outline">Discard</Button>
-                    <Button><Save className="mr-2 h-4 w-4" /> Save & Submit Report</Button>
+                    <Button variant="outline" onClick={handleDiscard}>Discard</Button>
+                    <Button onClick={handleSubmit}><Save className="mr-2 h-4 w-4" /> Save & Submit Report</Button>
                   </motion.div>
                 )}
               </CardContent>
