@@ -1,0 +1,12 @@
+{
+  "extends": "@sitepilot/config/tsconfig/nestjs",
+  "compilerOptions": {
+    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src", "prisma"],
+  "exclude": ["node_modules", "dist", "test"]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "site-pilot",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\" --ignore-path .gitignore",
+    "db:migrate": "pnpm --filter=@sitepilot/backend prisma migrate dev",
+    "db:seed": "pnpm --filter=@sitepilot/backend run prisma:seed",
+    "db:studio": "pnpm --filter=@sitepilot/backend prisma studio",
+    "db:generate": "pnpm --filter=@sitepilot/backend prisma generate",
+    "db:reset": "pnpm --filter=@sitepilot/backend prisma migrate reset"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "turbo": "^2.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.12.3"
+}
