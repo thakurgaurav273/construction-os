@@ -1,12 +1,19 @@
-import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Patch, Body, Get, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
+  }
 
   @Post('login')
   login(@Body() loginDto: LoginDto) {
@@ -27,8 +34,15 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   getMe(@CurrentUser() user: Record<string, unknown>) {
-    // The current user decorator currently returns the JWT payload.
-    // In a real scenario, you might want to fetch the full user.
     return user;
+  }
+
+  @Patch('organization')
+  @UseGuards(JwtAuthGuard)
+  updateOrganization(
+    @CurrentUser() user: Record<string, unknown>,
+    @Body() dto: UpdateOrganizationDto,
+  ) {
+    return this.authService.updateOrganization(user.organizationId as string, dto);
   }
 }

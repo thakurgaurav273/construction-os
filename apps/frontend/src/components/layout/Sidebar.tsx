@@ -2,118 +2,221 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LayoutDashboard, 
-  Briefcase, 
-  ShoppingCart, 
-  FileText, 
-  Users, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Briefcase,
+  FileText,
+  Sparkles,
+  ShoppingCart,
+  Package,
+  Warehouse,
+  Users,
+  DollarSign,
+  BarChart3,
+  Settings,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@sitepilot/ui';
-import { company } from '@/data/demo';
+import { useAuthStore } from '@/store/auth.store';
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Projects', href: '/projects', icon: Briefcase },
-  { name: 'Procurement', href: '/procurement', icon: ShoppingCart },
-  { name: 'Reports', href: '/reports', icon: FileText },
-  { name: 'Workforce', href: '/workforce', icon: Users },
-  { name: 'Settings', href: '/settings', icon: Settings },
+interface NavItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+interface NavGroup {
+  group: string;
+  items: NavItem[];
+}
+
+const navigation: NavGroup[] = [
+  {
+    group: 'Overview',
+    items: [
+      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    group: 'Projects',
+    items: [
+      { name: 'Projects',      href: '/dashboard/projects',      icon: Briefcase },
+      { name: 'Daily Reports', href: '/dashboard/daily-reports', icon: FileText },
+      { name: 'AI Assistant',  href: '/dashboard/ai-assistant',  icon: Sparkles },
+    ],
+  },
+  {
+    group: 'Operations',
+    items: [
+      { name: 'Procurement', href: '/dashboard/procurement', icon: ShoppingCart },
+      { name: 'Materials',   href: '/dashboard/materials',   icon: Package },
+      { name: 'Inventory',   href: '/dashboard/inventory',   icon: Warehouse },
+      { name: 'Workforce',   href: '/dashboard/workforce',   icon: Users },
+    ],
+  },
+  {
+    group: 'Business',
+    items: [
+      { name: 'Finance', href: '/dashboard/finance',  icon: DollarSign },
+      { name: 'Reports', href: '/dashboard/reports',  icon: BarChart3 },
+    ],
+  },
+  {
+    group: 'Administration',
+    items: [
+      { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+    ],
+  },
 ];
+
+function isItemActive(href: string, pathname: string): boolean {
+  if (href === '/dashboard') return pathname === '/dashboard';
+  return pathname.startsWith(href);
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const user = useAuthStore((state) => state.user);
+
+  const initials = user?.name
+    ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+    : 'SP';
 
   return (
-    <motion.div 
+    <motion.div
       initial={false}
-      animate={{ width: isCollapsed ? 80 : 256 }}
+      animate={{ width: isCollapsed ? 72 : 240 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className="relative flex flex-col border-r bg-sidebar h-screen z-20 hidden md:flex"
+      className="relative flex flex-col border-r bg-sidebar h-screen z-20 hidden md:flex shrink-0 overflow-hidden"
     >
-      <div className="flex h-16 items-center px-4 border-b border-sidebar-border overflow-hidden shrink-0">
-        <div className="flex items-center gap-3 w-full">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold shrink-0">
-            {company.logo}
+      {/* Logo */}
+      <div className="flex h-16 items-center px-4 border-b border-sidebar-border shrink-0">
+        <div className="flex items-center gap-3 overflow-hidden">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-xs shrink-0">
+            SP
           </div>
-          {!isCollapsed && (
-            <motion.span 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="font-semibold text-sidebar-foreground truncate"
-            >
-              SitePilot
-            </motion.span>
-          )}
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: 'auto' }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={{ duration: 0.2 }}
+                className="font-semibold text-sidebar-foreground whitespace-nowrap overflow-hidden"
+              >
+                SitePilot
+              </motion.span>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
+      {/* Collapse toggle */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full border bg-background shadow-sm hover:bg-accent text-muted-foreground z-30"
+        className="absolute -right-3 top-[4.5rem] flex h-6 w-6 items-center justify-center rounded-full border bg-background shadow-sm hover:bg-accent text-muted-foreground z-30 shrink-0"
+        aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
-        {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
       </button>
 
-      <nav className="flex-1 space-y-1 p-3 overflow-y-auto overflow-x-hidden">
-        {navigation.map((item) => {
-          const isActive = pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                'group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors relative',
-                isActive 
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground' 
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-5">
+        {navigation.map((group) => (
+          <div key={group.group}>
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="px-4 mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60 whitespace-nowrap"
+                >
+                  {group.group}
+                </motion.p>
               )}
-            >
-              <item.icon className={cn("h-5 w-5 shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
-              
-              <AnimatePresence mode="wait">
-                {!isCollapsed && (
-                  <motion.span
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: 'auto' }}
-                    exit={{ opacity: 0, width: 0 }}
-                    className="truncate"
-                  >
-                    {item.name}
-                  </motion.span>
-                )}
-              </AnimatePresence>
+            </AnimatePresence>
 
-              {isActive && (
-                <motion.div 
-                  layoutId="sidebar-active"
-                  className="absolute left-0 w-1 h-full bg-primary rounded-r-full" 
-                />
-              )}
-            </Link>
-          );
-        })}
+            <div className="space-y-0.5 px-2">
+              {group.items.map((item) => {
+                const active = isItemActive(item.href, pathname);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'group relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
+                      active
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',
+                      isCollapsed && 'justify-center px-0',
+                    )}
+                    title={isCollapsed ? item.name : undefined}
+                  >
+                    {active && (
+                      <motion.div
+                        layoutId="sidebar-active-indicator"
+                        className="absolute left-0 top-1 bottom-1 w-0.5 bg-primary rounded-r-full"
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                    <item.icon
+                      className={cn(
+                        'h-4 w-4 shrink-0',
+                        active ? 'text-primary' : 'text-muted-foreground group-hover:text-sidebar-accent-foreground',
+                      )}
+                    />
+                    <AnimatePresence>
+                      {!isCollapsed && (
+                        <motion.span
+                          initial={{ opacity: 0, width: 0 }}
+                          animate={{ opacity: 1, width: 'auto' }}
+                          exit={{ opacity: 0, width: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="whitespace-nowrap overflow-hidden"
+                        >
+                          {item.name}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border overflow-hidden shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-sidebar-accent border shrink-0 overflow-hidden relative">
-            <Image src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" fill className="object-cover" unoptimized />
+      {/* User */}
+      <div className="p-3 border-t border-sidebar-border shrink-0">
+        <div className={cn('flex items-center gap-3 overflow-hidden', isCollapsed && 'justify-center')}>
+          <div className="h-8 w-8 rounded-full bg-primary/10 border flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+            {initials}
           </div>
-          {!isCollapsed && (
-            <div className="flex flex-col truncate">
-              <span className="text-sm font-medium text-sidebar-foreground truncate">Alex Manager</span>
-              <span className="text-xs text-muted-foreground truncate">alex@nexus.com</span>
-            </div>
-          )}
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.div
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: 'auto' }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col overflow-hidden"
+              >
+                <span className="text-sm font-medium text-sidebar-foreground truncate leading-tight">
+                  {user?.name ?? 'User'}
+                </span>
+                <span className="text-xs text-muted-foreground truncate">
+                  {user?.email ?? ''}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </motion.div>

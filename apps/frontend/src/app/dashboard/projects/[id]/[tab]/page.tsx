@@ -1,28 +1,58 @@
 'use client';
 
-import React from 'react';
 import { motion } from 'framer-motion';
-import { FileQuestion } from 'lucide-react';
-import { Button } from '@sitepilot/ui';
+import { Layers, CheckCircle2 } from 'lucide-react';
+import { Badge } from '@sitepilot/ui';
 
-export default function ProjectDynamicTabPage({ params }: { params: { id: string, tab: string } }) {
-  // Extract and format the tab name
-  const tabName = params.tab.charAt(0).toUpperCase() + params.tab.slice(1);
+export default function ProjectDynamicTabPage({
+  params,
+}: {
+  params: { id: string; tab: string };
+}) {
+  const tabName = params.tab
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="h-[60vh] flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-xl bg-card"
-    >
-      <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mb-6">
-        <FileQuestion className="h-8 w-8 text-muted-foreground" />
-      </div>
-      <h2 className="text-2xl font-bold tracking-tight mb-2">{tabName} Module</h2>
-      <p className="text-muted-foreground max-w-md mx-auto mb-8">
-        This section is currently under construction. It will feature detailed {params.tab.toLowerCase()} data for the selected project in a future update.
-      </p>
-      <Button>Request Early Access</Button>
-    </motion.div>
+    <div className="flex items-center justify-center min-h-[60vh] p-8">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="max-w-md w-full text-center"
+      >
+        <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-muted mb-5">
+          <Layers className="h-8 w-8 text-muted-foreground" />
+        </div>
+
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <h2 className="text-2xl font-bold tracking-tight">{tabName}</h2>
+          <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+        </div>
+
+        <p className="text-muted-foreground text-sm leading-relaxed mb-6">
+          This module is in development and will be available in an upcoming release.
+        </p>
+
+        <div className="bg-card border rounded-xl p-5 text-left">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+            What&apos;s planned
+          </p>
+          <ul className="space-y-2.5">
+            {[
+              'Detailed tracking and analytics',
+              'Integration with project financials',
+              'Export and reporting capabilities',
+            ].map((cap) => (
+              <li key={cap} className="flex items-center gap-2.5 text-sm">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                {cap}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </motion.div>
+    </div>
   );
 }

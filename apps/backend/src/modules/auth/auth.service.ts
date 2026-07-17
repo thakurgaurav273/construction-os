@@ -1,8 +1,14 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../database/prisma.service';
 import * as bcrypt from 'bcrypt';
 import type { LoginDto } from './dto/login.dto';
+import type { RegisterDto } from './dto/register.dto';
+import type { UpdateOrganizationDto } from './dto/update-organization.dto';
 
 @Injectable()
 export class AuthService {
@@ -10,6 +16,94 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
   ) {}
+
+  async register(dto: RegisterDto) {
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (existing) {
+      throw new ConflictException('An account with this email already exists');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 12);
+    const slug = this.generateSlug(dto.organizationName);
+
+    // Ensure slug is unique
+    const slugExists = await this.prisma.organization.findUnique({ where: { slug } });
+    const finalSlug = slugExists ? `${slug}-${Date.now()}` : slug;
+
+    const { user, organization } = await this.prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name: dto.name,
+          email: dto.email,
+          password: hashedPassword,
+          status: 'ACTIVE',
+        },
+      });
+
+      const newOrg = await tx.organization.create({
+        data: {
+          name: dto.organizationName,
+          slug: finalSlug,
+          currency: 'INR',
+          timezone: 'Asia/Kolkata',
+        },
+      });
+
+      await tx.userOrganization.create({
+        data: {
+          userId: newUser.id,
+          organizationId: newOrg.id,
+          role: 'OWNER',
+        },
+      });
+
+      return { user: newUser, organization: newOrg };
+    });
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      organizationId: organization.id,
+      role: 'OWNER',
+    };
+
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+    await this.prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const { password: _, ...userWithoutPassword } = user;
+
+    return {
+      user: userWithoutPassword,
+      organization,
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  async updateOrganization(organizationId: string, dto: UpdateOrganizationDto) {
+    const organization = await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        ...(dto.address !== undefined && { address: dto.address }),
+        ...(dto.gstNumber !== undefined && { gstNumber: dto.gstNumber }),
+        ...(dto.currency !== undefined && { currency: dto.currency }),
+        ...(dto.timezone !== undefined && { timezone: dto.timezone }),
+      },
+    });
+
+    return { success: true, organization };
+  }
 
   async login(loginDto: LoginDto) {
     const user = await this.prisma.user.findUnique({
@@ -37,7 +131,7 @@ export class AuthService {
       throw new UnauthorizedException('User account is inactive');
     }
 
-    const defaultOrg = user.organizations[0]; // For MVP, we can pick the first organization
+    const defaultOrg = user.organizations[0];
     const payload = {
       sub: user.id,
       email: user.email,
@@ -48,7 +142,6 @@ export class AuthService {
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
-    // Store refresh token
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -60,7 +153,6 @@ export class AuthService {
       },
     });
 
-    // Don't return password
     const { password, ...userWithoutPassword } = user;
 
     return {
@@ -73,7 +165,7 @@ export class AuthService {
   async refreshToken(token: string) {
     try {
       const payload = this.jwtService.verify(token);
-      
+
       const storedToken = await this.prisma.refreshToken.findUnique({
         where: { token },
       });
@@ -92,7 +184,6 @@ export class AuthService {
       const newAccessToken = this.jwtService.sign(newPayload, { expiresIn: '15m' });
       const newRefreshToken = this.jwtService.sign(newPayload, { expiresIn: '7d' });
 
-      // Revoke old and create new
       await this.prisma.$transaction([
         this.prisma.refreshToken.update({
           where: { id: storedToken.id },
@@ -122,5 +213,15 @@ export class AuthService {
       data: { revoked: true },
     });
     return { success: true };
+  }
+
+  private generateSlug(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .slice(0, 50);
   }
 }

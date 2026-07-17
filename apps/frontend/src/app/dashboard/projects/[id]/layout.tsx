@@ -14,18 +14,16 @@ import { cn } from '@sitepilot/ui';
 import { projectDetails } from '@/data/demo';
 
 const tabs = [
-  { name: 'Overview', href: '' },
-  { name: 'AI Director', href: '/ai' },
+  { name: 'Overview',        href: '' },
+  { name: 'Budget',          href: '/budget' },
+  { name: 'Timeline',        href: '/timeline' },
+  { name: 'Team',            href: '/team' },
+  { name: 'Daily Reports',   href: '/daily-reports' },
+  { name: 'AI Assistant',    href: '/ai' },
   { name: 'Purchase Orders', href: '/purchase-orders' },
-  { name: 'Daily Reports', href: '/daily-reports' },
-  { name: 'Timeline', href: '/timeline' },
-  { name: 'Progress', href: '/progress' },
-  { name: 'Budget', href: '/budget' },
-  { name: 'Workforce', href: '/workforce' },
-  { name: 'Materials', href: '/materials' },
-  { name: 'Documents', href: '/documents' },
-  { name: 'Activity', href: '/activity' },
-  { name: 'Analytics', href: '/analytics' },
+  { name: 'Documents',       href: '/documents' },
+  { name: 'Materials',       href: '/materials' },
+  { name: 'Workforce',       href: '/workforce' },
 ];
 
 export default function ProjectDetailLayout({

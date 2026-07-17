@@ -104,7 +104,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {project.recentActivity.map((act: any, idx: number) => (
+              {(project.activity ?? []).map((act: any, idx: number) => (
                 <div key={idx} className="flex items-start gap-4">
                   <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${act.type === 'approval' ? 'bg-emerald-500/10 text-emerald-500' : act.type === 'alert' ? 'bg-amber-500/10 text-amber-500' : 'bg-primary/10 text-primary'}`}>
                     {act.type === 'approval' ? <CheckCircle2 className="h-4 w-4" /> : act.type === 'alert' ? <AlertTriangle className="h-4 w-4" /> : <FileText className="h-4 w-4" />}

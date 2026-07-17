@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -90,6 +91,13 @@ export function LoginForm() {
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? 'Signing in...' : 'Sign in'}
       </Button>
+
+      <p className="text-center text-sm text-gray-600">
+        Don&apos;t have an account?{' '}
+        <Link href="/register" className="font-medium text-gray-900 underline underline-offset-4 hover:text-black">
+          Create one
+        </Link>
+      </p>
     </form>
   );
 }
