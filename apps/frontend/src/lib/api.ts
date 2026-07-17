@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance, type AxiosError } from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5174';
 
 export const api: AxiosInstance = axios.create({
   baseURL: `${API_URL}/api`,
@@ -58,9 +58,17 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const response = await api.post<{ data: { accessToken: string } }>('/auth/refresh');
-        const newToken = response.data.data.accessToken;
+        const rToken = localStorage.getItem('refreshToken');
+        if (!rToken) throw new Error('No refresh token');
+        
+        const response = await axios.post(`${API_URL}/api/auth/refresh`, { refreshToken: rToken });
+        const newToken = response.data.accessToken;
+        const newRefreshToken = response.data.refreshToken;
+        
         localStorage.setItem('access_token', newToken);
+        localStorage.setItem('refreshToken', newRefreshToken);
+        document.cookie = `access_token=${newToken}; path=/; max-age=86400`;
+        
         processQueue(null, newToken);
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
@@ -69,6 +77,8 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         localStorage.removeItem('access_token');
+        localStorage.removeItem('refreshToken');
+        document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {

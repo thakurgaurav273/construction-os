@@ -14,7 +14,7 @@ async function bootstrap() {
   });
 
   const config = app.get(ConfigService);
-  const frontendUrl = config.get<string>('FRONTEND_URL', 'http://localhost:3000');
+  const frontendUrl = config.get<string>('FRONTEND_URL', 'http://localhost:5173');
 
   app.use(helmet());
   app.use(cookieParser(config.get<string>('COOKIE_SECRET')));
@@ -50,7 +50,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
-  const port = config.get<number>('PORT', 3001);
+  const port = config.get<number>('PORT', 5174);
   await app.listen(port);
 
   console.warn(`SitePilot API running on http://localhost:${port}/api`);

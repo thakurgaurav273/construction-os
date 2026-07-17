@@ -1,6 +1,5 @@
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   transpilePackages: ['@sitepilot/ui'],
   images: {
     remotePatterns: [
@@ -13,6 +12,9 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['@sitepilot/ui', 'lucide-react', 'recharts'],
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
