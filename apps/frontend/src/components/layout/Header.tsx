@@ -25,7 +25,7 @@ export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void
   // Decoupled from direct demo store, now using API hooks layer
   const { data: notifications = [] } = useNotifications();
   const markNotificationsReadMutation = useMarkNotificationsRead();
-  const unreadCount = notifications.filter((n: any) => !n.read).length;
+  const unreadCount = notifications.filter((n: any) => !(n.read || n.isRead)).length;
 
   const handleNotificationsOpen = (open: boolean) => {
     if (open && unreadCount > 0) {

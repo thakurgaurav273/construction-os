@@ -42,12 +42,12 @@ services:
     ports:
       - '5174:5174'
     environment:
-      - DATABASE_URL=postgresql://sitepilot:sitepilot@postgres:5432/sitepilot?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-sitepilot}:${POSTGRES_PASSWORD:-sitepilot}@postgres:5432/${POSTGRES_DB:-sitepilot}?schema=public
       - REDIS_URL=redis://redis:6379
-      - FRONTEND_URL=http://localhost:5173
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
       - PORT=5174
-      - COOKIE_SECRET=dokploy_secret_cookie_key
-      - JWT_SECRET=dokploy_secret_jwt_key
+      - COOKIE_SECRET=${COOKIE_SECRET:-dokploy_secret_cookie_key}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-dokploy_secret_jwt_key}
       - DEMO_MODE=true
     depends_on:
       postgres:
@@ -64,7 +64,7 @@ services:
     ports:
       - '5173:5173'
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:5174/api
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:5174/api}
       - PORT=5173
     depends_on:
       - backend

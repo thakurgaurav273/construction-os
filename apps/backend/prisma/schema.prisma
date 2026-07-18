@@ -143,6 +143,9 @@ model Organization {
   payments              Payment[]
   budgetItems           BudgetItem[]
   cashFlowEntries       CashFlowEntry[]
+  reports               Report[]
+  generatedReports      GeneratedReport[]
+  reportSchedules       ReportSchedule[]
 
   @@map("organizations")
 }
@@ -239,6 +242,7 @@ model Project {
   payments              Payment[]
   budgetItems           BudgetItem[]
   cashFlowEntries       CashFlowEntry[]
+  generatedReports      GeneratedReport[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -1097,4 +1101,74 @@ model NotificationPreference {
   updatedAt           DateTime @updatedAt
 
   @@map("notification_preferences")
+}
+// ─── Reports ───────────────────────────────────────────────────────────────────
+
+model Report {
+  id             String   @id @default(uuid())
+  name           String
+  type           String   // EXECUTIVE, COST, WORKFORCE, SCHEDULE, PROCUREMENT, INVENTORY, FINANCIAL, SAFETY
+  description    String?
+  projects       String[] // project IDs
+  organizationId String
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization     Organization           @relation(fields: [organizationId], references: [id])
+  generatedReports GeneratedReport[]
+  schedules         ReportSchedule[]
+
+  @@index([organizationId])
+  @@index([type])
+  @@map("reports")
+}
+
+model GeneratedReport {
+  id             String   @id @default(uuid())
+  reportId       String
+  projectId      String?
+  organizationId String
+  name           String
+  type           String
+  format         String   // PDF, EXCEL, HTML
+  status         String   // PENDING, GENERATING, COMPLETED, FAILED
+  fileUrl        String?
+  fileSize       Int?
+  data           Json?
+  generatedBy    String
+  generatedAt    DateTime @default(now())
+  expiresAt      DateTime?
+
+  report       Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([reportId])
+  @@index([status])
+  @@index([organizationId])
+  @@map("generated_reports")
+}
+
+model ReportSchedule {
+  id          String   @id @default(uuid())
+  reportId    String
+  name        String
+  frequency   String   // DAILY, WEEKLY, MONTHLY
+  projects    String[]
+  recipients  String[] // email addresses
+  enabled     Boolean  @default(true)
+  lastRunAt   DateTime?
+  nextRunAt   DateTime
+  organizationId String
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  report    Report     @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([nextRunAt])
+  @@map("report_schedules")
 }

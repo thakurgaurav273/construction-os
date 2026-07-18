@@ -6,7 +6,8 @@ export interface Notification {
   type: string;
   title: string;
   message: string;
-  isRead: boolean;
+  read: boolean;
+  isRead?: boolean;
   createdAt: string;
 }
 
@@ -15,7 +16,9 @@ export function useNotifications() {
     queryKey: ['notifications'],
     queryFn: async () => {
       const res = await apiClient.get('/notifications');
-      return res.data.data ?? res.data;
+      // Handle paginated response { data, total, page, limit } or direct array
+      const payload = res.data.data ?? res.data;
+      return Array.isArray(payload) ? payload : payload?.data ?? [];
     },
     staleTime: 30_000,
   });
@@ -26,7 +29,7 @@ export function useMarkNotificationsRead() {
 
   return useMutation({
     mutationFn: async () => {
-      const res = await apiClient.post('/notifications/mark-read');
+      const res = await apiClient.patch('/notifications/read-all');
       return res.data;
     },
     onSuccess: () => {

@@ -15,6 +15,7 @@ import { DailyReportsModule } from './modules/daily-reports/daily-reports.module
 import { DocumentsModule } from './modules/documents/documents.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     DocumentsModule,
     FinanceModule,
     NotificationsModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
