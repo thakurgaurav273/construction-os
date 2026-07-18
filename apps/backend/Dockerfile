@@ -8,7 +8,7 @@ WORKDIR /app
 COPY . .
 RUN pnpm install --frozen-lockfile
 # Generate Prisma Client (needed before build)
-RUN pnpm --filter=@sitepilot/backend prisma generate
+RUN pnpm --filter=@sitepilot/backend run prisma:generate
 RUN pnpm --filter=@sitepilot/backend build
 
 FROM base AS runner
