@@ -123,6 +123,37 @@ async function seedOrg(orgId: string, ownerId: string) {
     members.push({ id: user.id, name: m.name, role: m.role });
   }
 
+  // Create pending invitations
+  const pendingInvites = [
+    { email: 'newengineer@company.com', role: 'ENGINEER' },
+    { email: 'contractor@vendor.com', role: 'VIEWER' },
+    { email: 'finance@partner.com', role: 'FINANCE' },
+  ];
+
+  for (const inv of pendingInvites) {
+    const token = (Math.random() * 1e10).toString(36);
+    const hashedToken = require('crypto').createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const existing = await prisma.invitation.findFirst({
+      where: { email: inv.email, organizationId: orgId, status: 'PENDING' },
+    });
+
+    if (!existing) {
+      await prisma.invitation.create({
+        data: {
+          email: inv.email,
+          token: hashedToken,
+          role: inv.role as any,
+          organizationId: orgId,
+          invitedBy: ownerId,
+          expiresAt,
+          status: 'PENDING',
+        },
+      });
+    }
+  }
+
   // Create projects
   for (const p of PROJECTS) {
     const existing = await prisma.project.findFirst({

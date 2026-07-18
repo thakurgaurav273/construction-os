@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 
-const num = (d: any): number => d == null ? 0 : Number(d);
-
 @Injectable()
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -77,7 +75,6 @@ export class ReportsService {
   }
 
   private async getFinanceSummary(orgId: string, projectIds?: string[]) {
-    const projectFilter = projectIds?.length ? { id: { in: projectIds } } : { organizationId: orgId };
     const [budgetItems, invoices, payments] = await Promise.all([
       this.prisma.budgetItem.findMany({ where: { organizationId: orgId, ...(projectIds?.length ? { projectId: { in: projectIds } } : {}) } }),
       this.prisma.invoice.findMany({ where: { organizationId: orgId, ...(projectIds?.length ? { projectId: { in: projectIds } } : {}) } }),
@@ -124,19 +121,71 @@ export class ReportsService {
   }
 
   // Schedule a report
-  async createSchedule(input: { reportId: string; name: string; frequency: string; projects?: string[]; recipients: string[]; nextRunAt: Date }, organizationId: string, userId: string) {
+  async createSchedule(input: {
+    reportType: string;
+    name: string;
+    frequency: string;
+    time?: string;
+    timezone?: string;
+    projects?: string[];
+    recipients?: string[];
+    emails?: string[];
+    outputFormat?: string;
+    includeAiSummary?: boolean;
+    nextRunAt?: string;
+  }, organizationId: string, userId: string) {
+    // Get or create the report template
+    let report = await this.prisma.report.findFirst({ where: { type: input.reportType, organizationId } });
+    if (!report) {
+      report = await this.prisma.report.create({
+        data: { name: input.name, type: input.reportType, description: `Scheduled ${input.reportType} report`, projects: input.projects ?? [], organizationId, createdBy: userId },
+      });
+    }
+
+    const nextRunAt = input.nextRunAt ? new Date(input.nextRunAt) : this.computeNextRun(input.frequency, input.time ?? '09:00');
+
     return this.prisma.reportSchedule.create({
       data: {
-        reportId: input.reportId,
+        reportId: report.id,
+        reportType: input.reportType,
         name: input.name,
         frequency: input.frequency,
+        time: input.time ?? '09:00',
+        timezone: input.timezone ?? 'Asia/Kolkata',
         projects: input.projects ?? [],
-        recipients: input.recipients,
-        nextRunAt: input.nextRunAt,
+        recipients: input.recipients ?? [],
+        emails: input.emails ?? [],
+        outputFormat: input.outputFormat ?? 'PDF',
+        includeAiSummary: input.includeAiSummary ?? true,
+        nextRunAt,
         organizationId,
         createdBy: userId,
       },
     });
+  }
+
+  // Update schedule
+  async updateSchedule(id: string, input: Record<string, unknown>, organizationId: string) {
+    const schedule = await this.prisma.reportSchedule.findFirst({ where: { id, organizationId } });
+    if (!schedule) return null;
+    const { reportType: _rt, ...rest } = input; // eslint-disable-line @typescript-eslint/no-unused-vars
+    return this.prisma.reportSchedule.update({ where: { id }, data: rest as Record<string, unknown> });
+  }
+
+  private computeNextRun(frequency: string, time: string): Date {
+    const now = new Date();
+    const [h, m] = time.split(':').map(Number);
+    const next = new Date(now);
+    next.setHours(h, m, 0, 0);
+    if (next <= now) {
+      switch (frequency) {
+        case 'DAILY': next.setDate(next.getDate() + 1); break;
+        case 'WEEKLY': next.setDate(next.getDate() + 7); break;
+        case 'MONTHLY': next.setMonth(next.getMonth() + 1); break;
+        default: next.setDate(next.getDate() + 1); break;
+      }
+    }
+    return next;
   }
 
   // Get schedules

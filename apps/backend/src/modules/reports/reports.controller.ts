@@ -16,18 +16,18 @@ export class ReportsController {
   }
 
   @Post('generate')
-  async generate(@CurrentUser() user: AuthUser, @Body() body: any) {
-    return this.reports.generate({ ...body, userId: user.id }, user.organizationId);
+  async generate(@CurrentUser() user: AuthUser, @Body() body: Record<string, unknown>) {
+    return this.reports.generate({ ...(body as { type: string; name: string; format: string; projectIds?: string[] }), userId: user.id }, user.organizationId);
   }
 
   @Get('history')
-  getHistory(@CurrentUser() user: AuthUser, @Query() query: any) {
+  getHistory(@CurrentUser() user: AuthUser, @Query() query: Record<string, string>) {
     return this.reports.getHistory(user.organizationId, query);
   }
 
   @Post('schedule')
-  createSchedule(@CurrentUser() user: AuthUser, @Body() body: any) {
-    return this.reports.createSchedule(body, user.organizationId, user.id);
+  createSchedule(@CurrentUser() user: AuthUser, @Body() body: Record<string, unknown>) {
+    return this.reports.createSchedule(body as Parameters<ReportsService['createSchedule']>[0], user.organizationId, user.id);
   }
 
   @Get('schedule')
@@ -38,6 +38,11 @@ export class ReportsController {
   @Delete('schedule/:id')
   deleteSchedule(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.reports.deleteSchedule(id, user.organizationId);
+  }
+
+  @Patch('schedule/:id')
+  updateSchedule(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: Record<string, unknown>) {
+    return this.reports.updateSchedule(id, body, user.organizationId);
   }
 
   @Patch('schedule/:id/toggle')

@@ -16,6 +16,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     FinanceModule,
     NotificationsModule,
     ReportsModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}

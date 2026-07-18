@@ -24,12 +24,19 @@ export interface GeneratedReport {
 export interface ReportSchedule {
   id: string;
   name: string;
+  reportType: string;
   frequency: string;
+  time: string;
+  timezone: string;
   projects: string[];
   recipients: string[];
+  emails: string[];
+  outputFormat: string;
+  includeAiSummary: boolean;
   enabled: boolean;
   lastRunAt?: string;
   nextRunAt: string;
+  report?: { id: string; name: string; type: string };
 }
 
 export function useReportTemplates() {
@@ -78,8 +85,32 @@ export function useGenerateReport() {
 export function useCreateSchedule() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { reportId: string; name: string; frequency: string; recipients: string[]; nextRunAt: string }) => {
+    mutationFn: async (data: {
+      reportType: string;
+      name: string;
+      frequency: string;
+      time?: string;
+      timezone?: string;
+      projects?: string[];
+      recipients?: string[];
+      emails?: string[];
+      outputFormat?: string;
+      includeAiSummary?: boolean;
+    }) => {
       const res = await apiClient.post('/reports/schedule', data);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reports', 'schedules'] });
+    },
+  });
+}
+
+export function useToggleSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiClient.patch(`/reports/schedule/${id}/toggle`);
       return res.data;
     },
     onSuccess: () => {

@@ -1151,19 +1151,26 @@ model GeneratedReport {
 }
 
 model ReportSchedule {
-  id          String   @id @default(uuid())
-  reportId    String
-  name        String
-  frequency   String   // DAILY, WEEKLY, MONTHLY
-  projects    String[]
-  recipients  String[] // email addresses
-  enabled     Boolean  @default(true)
-  lastRunAt   DateTime?
-  nextRunAt   DateTime
-  organizationId String
-  createdBy   String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(uuid())
+  reportId        String
+  reportType      String
+  name            String
+  frequency       String   // ONCE, DAILY, WEEKLY, MONTHLY
+  cronExpression  String?
+  time            String   @default("09:00")
+  timezone        String   @default("Asia/Kolkata")
+  projects        String[]
+  recipients      String[] // role labels
+  emails          String[] // custom email addresses
+  outputFormat    String   @default("PDF") // PDF, EXCEL, BOTH
+  includeAiSummary Boolean @default(true)
+  enabled         Boolean  @default(true)
+  lastRunAt       DateTime?
+  nextRunAt       DateTime
+  organizationId  String
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   report    Report     @relation(fields: [reportId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id])

@@ -3,18 +3,31 @@
 import React, { useRef, useState } from 'react';
 import Image from 'next/image';
 import { toast } from 'sonner';
-import { Building2, Users, Shield, Palette, Plug, Key, History, Save, Upload, Trash2, CheckCircle2, Settings2 } from 'lucide-react';
+import { Building2, Users, Shield, Palette, Plug, Key, History, Save, Upload, Trash2, CheckCircle2, Settings2, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@sitepilot/ui';
 import { Button } from '@sitepilot/ui';
 import { Input } from '@sitepilot/ui';
 import { Badge } from '@sitepilot/ui';
 import { Label } from '@sitepilot/ui';
+import { Skeleton } from '@sitepilot/ui';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@sitepilot/ui';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@sitepilot/ui';
+import { format } from 'date-fns';
+import {
+  useMembers,
+  useInvitations,
+  useInviteMember,
+  useChangeMemberRole,
+  useRemoveMember,
+  useResendInvitation,
+  useCancelInvitation,
+  type Member,
+  type Invitation,
+} from '@/hooks/api/use-settings';
 
 const INITIAL_ORG = {
   companyName: 'Nexus Construction Group',
@@ -23,7 +36,7 @@ const INITIAL_ORG = {
   headquarters: '100 Construction Way, NY 10001',
 };
 
-const INVITE_ROLES = ['Admin', 'Editor', 'Viewer'] as const;
+const ROLES = ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'ENGINEER', 'FINANCE', 'PROCUREMENT', 'VIEWER'] as const;
 
 const tabs = [
   { id: 'organization', name: 'Organization', icon: Building2 },
@@ -43,7 +56,19 @@ export default function SettingsPage() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<string>('Editor');
+  const [inviteRole, setInviteRole] = useState<string>('VIEWER');
+
+  const [deleteAlert, setDeleteAlert] = useState<{ open: boolean; memberId: string | null }>({ open: false, memberId: null });
+  const [roleChangeAlert, setRoleChangeAlert] = useState<{ open: boolean; memberId: string | null; newRole: string | null }>({ open: false, memberId: null, newRole: null });
+
+  // API hooks
+  const { data: members = [], isLoading: loadingMembers } = useMembers();
+  const { data: invitations = [], isLoading: loadingInvitations } = useInvitations();
+  const inviteMutation = useInviteMember();
+  const changeMemberRoleMutation = useChangeMemberRole();
+  const removeMemberMutation = useRemoveMember();
+  const resendInvitationMutation = useResendInvitation();
+  const cancelInvitationMutation = useCancelInvitation();
 
   const updateOrgField = (field: keyof typeof INITIAL_ORG, value: string): void => {
     setOrg((prev) => ({ ...prev, [field]: value }));
@@ -66,16 +91,49 @@ export default function SettingsPage() {
     setOrg(INITIAL_ORG);
   };
 
-  const handleInviteSubmit = (event: React.FormEvent): void => {
+  const handleInviteSubmit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
     if (!inviteEmail) {
       toast.error('Enter an email address to invite.');
       return;
     }
-    toast.success(`Invitation sent to ${inviteEmail}`);
-    setInviteEmail('');
-    setInviteRole('Editor');
-    setInviteOpen(false);
+    try {
+      await inviteMutation.mutateAsync({ email: inviteEmail, role: inviteRole });
+      toast.success(`Invitation sent to ${inviteEmail}`);
+      setInviteEmail('');
+      setInviteRole('VIEWER');
+      setInviteOpen(false);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to send invitation');
+    }
+  };
+
+  const handleChangeRole = (memberId: string, newRole: string): void => {
+    setRoleChangeAlert({ open: true, memberId, newRole });
+  };
+
+  const confirmRoleChange = async (): Promise<void> => {
+    if (roleChangeAlert.memberId && roleChangeAlert.newRole) {
+      try {
+        await changeMemberRoleMutation.mutateAsync({ memberId: roleChangeAlert.memberId, role: roleChangeAlert.newRole });
+        toast.success('Member role updated');
+        setRoleChangeAlert({ open: false, memberId: null, newRole: null });
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to update role');
+      }
+    }
+  };
+
+  const confirmDeleteMember = async (): Promise<void> => {
+    if (deleteAlert.memberId) {
+      try {
+        await removeMemberMutation.mutateAsync(deleteAlert.memberId);
+        toast.success('Member removed');
+        setDeleteAlert({ open: false, memberId: null });
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Failed to remove member');
+      }
+    }
   };
 
   return (
@@ -171,51 +229,119 @@ export default function SettingsPage() {
           )}
 
           {activeTab === 'members' && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Members</CardTitle>
-                  <CardDescription>Manage who has access to this workspace.</CardDescription>
-                </div>
-                <Button onClick={() => setInviteOpen(true)}>Invite Member</Button>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-xl border overflow-x-auto w-full">
-                  <table className="w-full text-sm text-left min-w-[500px]">
-                    <thead className="bg-muted/50 text-muted-foreground">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">User</th>
-                        <th className="px-4 py-3 font-medium">Role</th>
-                        <th className="px-4 py-3 font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {['Alex Manager', 'Sarah Engineer', 'John Safety'].map((user, i) => (
-                        <tr key={i} className="hover:bg-muted/20">
-                          <td className="px-4 py-3 flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-xs">
-                              {user.charAt(0)}
-                            </div>
-                            <div>
-                              <p className="font-medium">{user}</p>
-                              <p className="text-xs text-muted-foreground">{user.toLowerCase().replace(' ', '.')}@nexus.com</p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge variant="secondary">{i === 0 ? 'Admin' : 'Editor'}</Badge>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="flex items-center text-emerald-600 text-xs font-medium">
-                              <CheckCircle2 className="mr-1 h-3 w-3" /> Active
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              {/* Members Section */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Members</CardTitle>
+                    <CardDescription>Manage who has access to this workspace.</CardDescription>
+                  </div>
+                  <Button onClick={() => setInviteOpen(true)}><Mail className="mr-2 h-4 w-4" /> Invite Member</Button>
+                </CardHeader>
+                <CardContent>
+                  {loadingMembers ? (
+                    <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
+                  ) : members.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">No members yet.</div>
+                  ) : (
+                    <div className="rounded-xl border overflow-x-auto w-full">
+                      <table className="w-full text-sm text-left min-w-[600px]">
+                        <thead className="bg-muted/50 text-muted-foreground">
+                          <tr>
+                            <th className="px-4 py-3 font-medium">User</th>
+                            <th className="px-4 py-3 font-medium">Role</th>
+                            <th className="px-4 py-3 font-medium">Status</th>
+                            <th className="px-4 py-3 font-medium">Joined</th>
+                            <th className="px-4 py-3 font-medium text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {members.map((member: Member) => (
+                            <tr key={member.id} className="hover:bg-muted/20">
+                              <td className="px-4 py-3 flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-xs">
+                                  {(member.name || member.email).charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="font-medium">{member.name || member.email}</p>
+                                  <p className="text-xs text-muted-foreground">{member.email}</p>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <Select value={member.role} onValueChange={(role) => handleChangeRole(member.id, role)}>
+                                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {ROLES.map((r) => <SelectItem key={r} value={r}>{r.replace(/_/g, ' ')}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="flex items-center text-emerald-600 text-xs font-medium">
+                                  <CheckCircle2 className="mr-1 h-3 w-3" /> {member.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-muted-foreground">{format(new Date(member.joinedAt), 'MMM dd, yyyy')}</td>
+                              <td className="px-4 py-3 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-500 hover:text-red-600"
+                                  onClick={() => setDeleteAlert({ open: true, memberId: member.id })}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Pending Invitations Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pending Invitations</CardTitle>
+                  <CardDescription>Invitations awaiting response.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loadingInvitations ? (
+                    <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+                  ) : invitations.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">No pending invitations.</div>
+                  ) : (
+                    <div className="rounded-xl border overflow-x-auto w-full">
+                      <table className="w-full text-sm text-left min-w-[500px]">
+                        <thead className="bg-muted/50 text-muted-foreground">
+                          <tr>
+                            <th className="px-4 py-3 font-medium">Email</th>
+                            <th className="px-4 py-3 font-medium">Role</th>
+                            <th className="px-4 py-3 font-medium">Expires</th>
+                            <th className="px-4 py-3 font-medium text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {invitations.map((inv: Invitation) => (
+                            <tr key={inv.id} className="hover:bg-muted/20">
+                              <td className="px-4 py-3 font-medium">{inv.email}</td>
+                              <td className="px-4 py-3"><Badge variant="outline">{inv.role.replace(/_/g, ' ')}</Badge></td>
+                              <td className="px-4 py-3 text-xs text-muted-foreground">{format(new Date(inv.expiresAt), 'MMM dd, yyyy')}</td>
+                              <td className="px-4 py-3 text-right space-x-2">
+                                <Button variant="ghost" size="sm" onClick={() => resendInvitationMutation.mutate(inv.id)}>Resend</Button>
+                                <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={() => cancelInvitationMutation.mutate(inv.id)}>Cancel</Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {activeTab !== 'organization' && activeTab !== 'members' && (
@@ -233,6 +359,7 @@ export default function SettingsPage() {
         </main>
       </div>
 
+      {/* Invite Dialog */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
         <DialogContent className="sm:max-w-[440px]">
           <DialogHeader>
@@ -256,17 +383,49 @@ export default function SettingsPage() {
                   <SelectValue placeholder="Role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {INVITE_ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                  {ROLES.map((r) => (
+                    <SelectItem key={r} value={r}>{r.replace(/_/g, ' ')}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
-              <Button type="submit">Send Invitation</Button>
+              <Button type="submit" disabled={inviteMutation.isPending}>{inviteMutation.isPending ? 'Sending...' : 'Send Invitation'}</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Member Dialog */}
+      <Dialog open={deleteAlert.open} onOpenChange={(open) => setDeleteAlert({ open, memberId: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Member</DialogTitle>
+            <DialogDescription>Are you sure? This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteAlert({ open: false, memberId: null })}>Cancel</Button>
+            <Button className="bg-red-600 hover:bg-red-700" onClick={confirmDeleteMember} disabled={removeMemberMutation.isPending}>
+              {removeMemberMutation.isPending ? 'Removing...' : 'Remove'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Role Change Dialog */}
+      <Dialog open={roleChangeAlert.open} onOpenChange={(open) => setRoleChangeAlert({ open, memberId: null, newRole: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Member Role</DialogTitle>
+            <DialogDescription>Update role to {roleChangeAlert.newRole?.replace(/_/g, ' ')}?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRoleChangeAlert({ open: false, memberId: null, newRole: null })}>Cancel</Button>
+            <Button onClick={confirmRoleChange} disabled={changeMemberRoleMutation.isPending}>
+              {changeMemberRoleMutation.isPending ? 'Updating...' : 'Confirm'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
