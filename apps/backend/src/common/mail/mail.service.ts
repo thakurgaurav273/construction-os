@@ -26,7 +26,7 @@ export class MailService {
 
     try {
       await this.resend.emails.send({
-        from: 'noreply@sitepilot.dev',
+        from: process.env.EMAIL_FROM || 'noreply@sitepilot.dev',
         to,
         subject: `Invitation to join ${organizationName}`,
         html: `
@@ -51,7 +51,7 @@ export class MailService {
     }
 
     try {
-      await this.resend.emails.send({ from: 'noreply@sitepilot.dev', to, subject, html });
+      await this.resend.emails.send({ from: process.env.EMAIL_FROM || 'noreply@sitepilot.dev', to, subject, html });
       return true;
     } catch (error) {
       this.logger.error(`Failed to send email to ${to}:`, error);
