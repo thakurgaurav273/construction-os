@@ -71,7 +71,7 @@ interface VendorDrawerProps {
 }
 
 export function VendorDrawer({ vendor, open, onClose }: VendorDrawerProps): React.ReactElement {
-  const { data: allOrders } = usePurchaseOrders();
+  const { data: allOrders = [] } = usePurchaseOrders();
   const vendorOrders = useMemo(
     () => (vendor ? allOrders.filter((o) => o.vendorId === vendor.id).slice(0, 5) : []),
     [allOrders, vendor],

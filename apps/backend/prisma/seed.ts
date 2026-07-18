@@ -947,6 +947,42 @@ async function seedProcurement(orgId: string) {
   console.log(`  → Seeded ${VENDORS.length} vendors, ${PURCHASE_ORDERS.length} purchase orders, ${RFQS.length} RFQs, ${DELIVERIES.length} deliveries`);
 }
 
+async function seedInventory(orgId: string) {
+  const count = await prisma.warehouse.count({ where: { organizationId: orgId } });
+  if (count > 0) {
+    console.log('  → Inventory already seeded, skipping');
+    return;
+  }
+
+  const w1 = await prisma.warehouse.create({
+    data: { name: 'Central Store', code: 'WH-CEN-01', type: 'CENTRAL', organizationId: orgId }
+  });
+  const w2 = await prisma.warehouse.create({
+    data: { name: 'Site Store - Whitefield', code: 'WH-SIT-01', type: 'SITE_STORE', organizationId: orgId }
+  });
+  
+  const materials = await prisma.material.findMany({ where: { organizationId: orgId } });
+  
+  for (const mat of materials) {
+    const isSite = mat.name.includes('Site');
+    const whId = isSite ? w2.id : w1.id;
+    
+    await prisma.inventoryItem.create({
+      data: {
+        materialId: mat.id,
+        warehouseId: whId,
+        quantity: mat.quantity,
+        reserved: mat.reserved,
+        incoming: mat.incoming,
+        reorderLevel: mat.minStock,
+        organizationId: orgId,
+      }
+    });
+  }
+  
+  console.log(`  → Seeded 2 warehouses and ${materials.length} inventory items`);
+}
+
 async function main() {
   const orgs = await prisma.userOrganization.findMany({
     where: { role: 'OWNER' },
@@ -960,6 +996,8 @@ async function main() {
     await seedMaterials(membership.organization.id);
     await seedDailyReports(membership.organization.id);
     await seedNotifications(membership.organization.id);
+    await seedProcurement(membership.organization.id);
+    await seedInventory(membership.organization.id);
     console.log(`  ✓ Done`);
   }
 }

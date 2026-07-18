@@ -5,6 +5,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { MaterialQueryDto } from './dto/material-query.dto';
 import { MovementQueryDto } from './dto/movement-query.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
+import { CreateMaterialDto } from './dto/create-material.dto';
 
 const LIST_INCLUDE = {
   category: { select: { id: true, name: true } },
@@ -32,6 +33,20 @@ function deriveStatus(quantity: number, reserved: number, minStock: number, maxS
 @Injectable()
 export class MaterialsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async create(organizationId: string, dto: CreateMaterialDto) {
+    const material = await this.prisma.material.create({
+      data: {
+        ...dto,
+        organizationId,
+      },
+      include: LIST_INCLUDE,
+    });
+    return {
+      message: 'Material created successfully',
+      data: this.mapMaterial(material),
+    };
+  }
 
   private mapMaterial(m: MaterialWithRels) {
     const quantity = num(m.quantity);

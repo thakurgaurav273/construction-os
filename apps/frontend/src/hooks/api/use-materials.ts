@@ -219,15 +219,30 @@ export function useMaterialLowStock() {
 }
 
 export function useUpdateMaterial() {
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<MaterialListItem> }) => {
       const res = await apiClient.patch(`/materials/${id}`, data);
-      return res.data.data ?? res.data;
+      return res.data;
     },
-    onSuccess: (_result, variables) => {
-      qc.invalidateQueries({ queryKey: ['materials'] });
-      qc.invalidateQueries({ queryKey: ['material', variables.id] });
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ['materials'] });
+      queryClient.invalidateQueries({ queryKey: ['materials', id] });
+    },
+  });
+}
+
+export function useCreateMaterial() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: Record<string, any>) => {
+      const res = await apiClient.post('/materials', data);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['materials'] });
     },
   });
 }

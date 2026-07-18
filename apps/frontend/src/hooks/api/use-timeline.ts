@@ -1,24 +1,24 @@
 import { useQuery } from '@tanstack/react-query';
-import { useDemoStore } from '@/store/demo-store';
 import { apiClient } from '@/lib/api/client';
 
-const IS_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
+export interface TimelineEvent {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  date: string;
+  user: string;
+  projectId?: string;
+  module: string;
+}
 
-export function useTimeline() {
-  const demoTimeline = useDemoStore((state) => state.timelineEvents);
-
-  const query = useQuery({
-    queryKey: ['timeline'],
+export function useTimeline(filters?: { projectId?: string; module?: string }) {
+  return useQuery<TimelineEvent[]>({
+    queryKey: ['timeline', filters],
     queryFn: async () => {
-      const res = await apiClient.get('/timeline');
-      return res.data;
+      const res = await apiClient.get('/timeline', { params: filters });
+      return res.data.data ?? res.data;
     },
-    enabled: !IS_DEMO,
+    staleTime: 30_000,
   });
-
-  return {
-    data: IS_DEMO ? demoTimeline : query.data,
-    isLoading: IS_DEMO ? false : query.isLoading,
-    isError: IS_DEMO ? false : query.isError,
-  };
 }

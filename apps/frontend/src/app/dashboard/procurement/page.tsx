@@ -14,13 +14,7 @@ import {
   FileClock, ClipboardCheck, ClipboardList, IndianRupee, Building2, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  procurementProjects,
-  procurementAiInsights,
-  monthlySpendData,
-  type PurchaseOrder,
-  type Vendor,
-} from '@/data/procurement-demo';
+import { type PurchaseOrder, type Vendor } from '@/data/procurement-demo';
 import {
   usePurchaseOrders, useVendors, useRfqs, useDeliveries,
 } from '@/hooks/api/use-procurement';
@@ -78,10 +72,10 @@ export default function ProcurementPage(): React.ReactElement {
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [vendorDrawerOpen, setVendorDrawerOpen] = useState(false);
 
-  const { data: orders } = usePurchaseOrders();
-  const { data: vendors } = useVendors();
-  const { data: rfqs } = useRfqs();
-  const { data: deliveries } = useDeliveries();
+  const { data: orders = [], isLoading: isLoadingOrders } = usePurchaseOrders();
+  const { data: vendors = [], isLoading: isLoadingVendors } = useVendors();
+  const { data: rfqs = [], isLoading: isLoadingRfqs } = useRfqs();
+  const { data: deliveries = [], isLoading: isLoadingDeliveries } = useDeliveries();
 
   useEffect(() => { setIsClient(true); }, []);
 
@@ -89,15 +83,14 @@ export default function ProcurementPage(): React.ReactElement {
     const openRfqs = rfqs.filter((r) => r.status === 'open' || r.status === 'closing_soon' || r.status === 'evaluating').length;
     const pendingPos = orders.filter((o) => o.approvalStatus === 'pending').length;
     const approvedPos = orders.filter((o) => o.approvalStatus === 'approved').length;
-    const monthlyValue = monthlySpendData[monthlySpendData.length - 1]?.spend ?? 0;
+    const monthlyValue = 0; // Fetched from backend in future
     const activeVendors = vendors.filter((v) => v.status === 'active').length;
     const delayedDeliveries = deliveries.filter((d) => d.status === 'delayed').length;
     return { openRfqs, pendingPos, approvedPos, monthlyValue, activeVendors, delayedDeliveries };
   }, [orders, rfqs, vendors, deliveries]);
 
-  // Anchor date-range filtering to the newest order so the demo is deterministic.
   const anchorTime = useMemo(() => {
-    return orders.reduce((max, o) => Math.max(max, new Date(o.requestedDate).getTime()), 0);
+    return orders.length ? orders.reduce((max, o) => Math.max(max, new Date(o.requestedDate).getTime()), 0) : Date.now();
   }, [orders]);
 
   const filteredOrders = useMemo(() => {
@@ -122,6 +115,7 @@ export default function ProcurementPage(): React.ReactElement {
   }, [orders, search, projectFilter, vendorFilter, statusFilter, dateRange, anchorTime]);
 
   if (!isClient) return <></>;
+  if (isLoadingOrders || isLoadingVendors || isLoadingRfqs || isLoadingDeliveries) return <div className="p-8">Loading procurement data...</div>;
 
   function handleSelectOrder(order: PurchaseOrder): void {
     setSelectedOrder(order);
@@ -267,9 +261,7 @@ export default function ProcurementPage(): React.ReactElement {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Projects</SelectItem>
-                    {procurementProjects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
+                    {/* Projects should be fetched from backend */}
                   </SelectContent>
                 </Select>
                 <Select value={vendorFilter} onValueChange={setVendorFilter}>
@@ -337,7 +329,7 @@ export default function ProcurementPage(): React.ReactElement {
           transition={{ delay: 0.3 }}
           className="xl:col-span-1"
         >
-          <AiInsightPanel insights={procurementAiInsights} className="sticky top-6" />
+          <AiInsightPanel insights={[]} className="sticky top-6" />
         </motion.div>
       </div>
 

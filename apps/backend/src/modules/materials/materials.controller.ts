@@ -1,10 +1,11 @@
-import { Controller, Get, Param, Patch, Query, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Post, Query, Body, UseGuards } from '@nestjs/common';
 import { MaterialsService } from './materials.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MaterialQueryDto } from './dto/material-query.dto';
 import { MovementQueryDto } from './dto/movement-query.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
+import { CreateMaterialDto } from './dto/create-material.dto';
 
 interface AuthUser {
   id: string;
@@ -16,6 +17,11 @@ interface AuthUser {
 @UseGuards(JwtAuthGuard)
 export class MaterialsController {
   constructor(private readonly materialsService: MaterialsService) {}
+
+  @Post()
+  create(@Body() dto: CreateMaterialDto, @CurrentUser() user: AuthUser) {
+    return this.materialsService.create(user.organizationId, dto);
+  }
 
   @Get()
   findAll(@Query() query: MaterialQueryDto, @CurrentUser() user: AuthUser) {
