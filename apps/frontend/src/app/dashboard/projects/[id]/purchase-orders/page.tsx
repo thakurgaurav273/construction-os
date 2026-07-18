@@ -39,8 +39,8 @@ export default function PurchaseOrdersPage() {
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
 
   const filteredPOs = purchaseOrders.filter((po: any) => 
-    po.number.toLowerCase().includes(search.toLowerCase()) ||
-    po.vendor.toLowerCase().includes(search.toLowerCase())
+    po.number?.toLowerCase().includes(search.toLowerCase()) ||
+    po.vendor?.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleApprove = (poId: string) => {

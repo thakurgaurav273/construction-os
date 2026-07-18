@@ -2,79 +2,88 @@
 
 import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { File, FileText, Image as ImageIcon, LayoutGrid, List, Search, Upload, Filter, MoreVertical, Download, Eye, Trash2, FileArchive, Clock } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@sitepilot/ui';
+import { File, FileText, Image as ImageIcon, LayoutGrid, List, Search, Upload, Filter, MoreVertical, Download, Eye, Trash2, FileArchive } from 'lucide-react';
+import { Card, CardContent } from '@sitepilot/ui';
 import { Button } from '@sitepilot/ui';
 import { Input } from '@sitepilot/ui';
 import { Badge } from '@sitepilot/ui';
 import { Progress } from '@sitepilot/ui';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@sitepilot/ui';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@sitepilot/ui';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@sitepilot/ui';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@sitepilot/ui';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@sitepilot/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sitepilot/ui';
+import { useDocuments, useUploadDocument, useDeleteDocument, useDocumentDownloadUrl, type ProjectDocument } from '@/hooks/api/use-documents';
 
-const categories = ['All Documents', 'Drawings', 'Permits', 'Safety', 'Contracts'];
+const categories = ['All Documents', 'pdf', 'doc', 'image', 'file'];
+const categoryLabels: Record<string, string> = { pdf: 'PDF', doc: 'Document', image: 'Image', file: 'Other' };
 
-const mockDocuments = [
-  { id: 1, name: 'Architectural_Plans_v3.pdf', type: 'pdf', size: '12.4 MB', category: 'Drawings', date: '2023-10-14', author: 'Alex Manager', version: 'v3' },
-  { id: 2, name: 'Structural_Analysis_Report.docx', type: 'doc', size: '2.1 MB', category: 'Drawings', date: '2023-10-12', author: 'Sarah Engineer', version: 'v1' },
-  { id: 3, name: 'Site_Safety_Protocol_Q3.pdf', type: 'pdf', size: '4.8 MB', category: 'Safety', date: '2023-10-10', author: 'John Safety', version: 'v2' },
-  { id: 4, name: 'Foundation_Permit_Approved.pdf', type: 'pdf', size: '1.2 MB', category: 'Permits', date: '2023-10-05', author: 'Alex Manager', version: 'v1' },
-  { id: 5, name: 'Subcontractor_Agreement_Steel.pdf', type: 'pdf', size: '3.4 MB', category: 'Contracts', date: '2023-10-01', author: 'Legal Dept', version: 'v1' },
-  { id: 6, name: 'Site_Map_Overview.png', type: 'image', size: '5.6 MB', category: 'Drawings', date: '2023-09-28', author: 'Surveyor', version: 'v4' },
-];
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
-export default function DocumentsPage() {
+function getFileIcon(type: string) {
+  switch (type) {
+    case 'pdf': return <FileText className="h-8 w-8 text-red-500" />;
+    case 'doc': return <File className="h-8 w-8 text-blue-500" />;
+    case 'image': return <ImageIcon className="h-8 w-8 text-emerald-500" />;
+    default: return <FileArchive className="h-8 w-8 text-muted-foreground" />;
+  }
+}
+
+export default function DocumentsPage({ params }: { params: { id: string } }) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeCategory, setActiveCategory] = useState('All Documents');
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [documents, setDocuments] = useState(mockDocuments);
-  const [selectedDoc, setSelectedDoc] = useState<(typeof mockDocuments)[number] | null>(null);
+  const [selectedDoc, setSelectedDoc] = useState<ProjectDocument | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const filteredDocs = documents.filter(doc => {
+  const { data: documents = [], isLoading } = useDocuments(params.id);
+  const uploadMutation = useUploadDocument(params.id);
+  const deleteMutation = useDeleteDocument(params.id);
+  const downloadMutation = useDocumentDownloadUrl(params.id);
+
+  const filteredDocs = documents.filter((doc) => {
     const matchesSearch = doc.name.toLowerCase().includes(search.toLowerCase());
-    const matchesCat = activeCategory === 'All Documents' || doc.category === activeCategory;
-    const matchesType = typeFilter === 'all' || doc.type === typeFilter;
-    return matchesSearch && matchesCat && matchesType;
+    const matchesCat = activeCategory === 'All Documents' || doc.type === activeCategory;
+    return matchesSearch && matchesCat;
   });
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleUploadClick = () => fileInputRef.current?.click();
 
-  const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
+    if (!file) return;
+    try {
+      await uploadMutation.mutateAsync(file);
       toast.success(`${file.name} uploaded`);
+    } catch {
+      toast.error('Upload failed');
     }
     event.target.value = '';
   };
 
-  const handleDelete = (doc: (typeof mockDocuments)[number]) => {
-    setDocuments((docs) => docs.filter((d) => d.id !== doc.id));
-    toast.success(`${doc.name} deleted`);
-  };
-
-  const getFileIcon = (type: string) => {
-    switch(type) {
-      case 'pdf': return <FileText className="h-8 w-8 text-red-500" />;
-      case 'doc': return <File className="h-8 w-8 text-blue-500" />;
-      case 'image': return <ImageIcon className="h-8 w-8 text-emerald-500" />;
-      default: return <FileArchive className="h-8 w-8 text-muted-foreground" />;
+  const handleDelete = async (doc: ProjectDocument) => {
+    try {
+      await deleteMutation.mutateAsync(doc.id);
+      toast.success(`${doc.name} deleted`);
+      if (selectedDoc?.id === doc.id) setSelectedDoc(null);
+    } catch {
+      toast.error('Delete failed');
     }
   };
+
+  const handleDownload = async (doc: ProjectDocument) => {
+    try {
+      const { url } = await downloadMutation.mutateAsync(doc.id);
+      window.open(url, '_blank');
+    } catch {
+      toast.error('Download failed');
+    }
+  };
+
+  const totalBytes = documents.reduce((sum, d) => sum + d.size, 0);
+  const totalGB = totalBytes / (1024 * 1024 * 1024);
 
   return (
     <div className="space-y-6">
@@ -84,89 +93,61 @@ export default function DocumentsPage() {
           <p className="text-muted-foreground">Manage and track all project documentation.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[150px]">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Filter" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
-              <SelectItem value="pdf">PDF</SelectItem>
-              <SelectItem value="doc">Document</SelectItem>
-              <SelectItem value="image">Image</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={handleUploadClick}><Upload className="mr-2 h-4 w-4" /> Upload</Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            onChange={handleFileSelected}
-          />
+          <Button onClick={handleUploadClick} disabled={uploadMutation.isPending}>
+            <Upload className="mr-2 h-4 w-4" />
+            {uploadMutation.isPending ? 'Uploading…' : 'Upload'}
+          </Button>
+          <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
         </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-6">
-        {/* Sidebar Categories */}
         <div className="w-full sm:w-48 shrink-0 space-y-1">
-          {categories.map((cat) => (
+          {['All Documents', 'pdf', 'doc', 'image', 'file'].map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
               className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${activeCategory === cat ? 'bg-primary text-primary-foreground font-medium' : 'text-muted-foreground hover:bg-muted'}`}
             >
-              {cat}
+              {cat === 'All Documents' ? 'All Documents' : (categoryLabels[cat] ?? cat)}
             </button>
           ))}
-          
           <div className="pt-6 mt-6 border-t">
             <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Storage</p>
             <div className="px-3 space-y-2">
               <div className="flex justify-between text-xs">
-                <span>14.2 GB</span>
+                <span>{totalGB < 0.01 ? `${formatBytes(totalBytes)}` : `${totalGB.toFixed(2)} GB`}</span>
                 <span className="text-muted-foreground">100 GB</span>
               </div>
-              <Progress value={14.2} className="h-1.5" />
+              <Progress value={Math.min(totalGB, 100)} className="h-1.5" />
             </div>
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="flex-1 space-y-4 min-w-0">
           <div className="flex items-center justify-between gap-4">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search documents..." 
-                className="pl-9 bg-muted/50" 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <Input placeholder="Search documents..." className="pl-9 bg-muted/50" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
             <div className="flex items-center border rounded-md p-1 bg-muted/30">
-              <button 
-                className={`p-1.5 rounded-sm transition-colors ${viewMode === 'grid' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                onClick={() => setViewMode('grid')}
-              >
+              <button className={`p-1.5 rounded-sm transition-colors ${viewMode === 'grid' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`} onClick={() => setViewMode('grid')}>
                 <LayoutGrid className="h-4 w-4" />
               </button>
-              <button 
-                className={`p-1.5 rounded-sm transition-colors ${viewMode === 'list' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                onClick={() => setViewMode('list')}
-              >
+              <button className={`p-1.5 rounded-sm transition-colors ${viewMode === 'list' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`} onClick={() => setViewMode('list')}>
                 <List className="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          {filteredDocs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-16 border border-dashed border-border/60 bg-gradient-to-b from-muted/10 to-muted/30 rounded-xl text-muted-foreground transition-all duration-300 shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)]">
-              <div className="h-16 w-16 rounded-2xl bg-background border shadow-sm flex items-center justify-center mb-6">
-                <FileArchive className="h-8 w-8 text-primary/40" />
-              </div>
-              <h3 className="font-semibold text-lg text-foreground mb-2">No documents found</h3>
-              <p className="text-sm max-w-sm text-center mb-6">We couldn&apos;t find any documents matching your current filters or search query.</p>
-              <Button variant="outline" onClick={() => {setSearch(''); setActiveCategory('All Documents');}}><Filter className="mr-2 h-4 w-4" /> Clear Filters</Button>
+          {isLoading ? (
+            <div className="py-16 text-center text-muted-foreground text-sm">Loading documents…</div>
+          ) : filteredDocs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-16 border border-dashed rounded-xl text-muted-foreground">
+              <FileArchive className="h-12 w-12 mb-4 text-primary/30" />
+              <h3 className="font-semibold text-lg text-foreground mb-1">No documents yet</h3>
+              <p className="text-sm text-center mb-4">Upload your first document using the Upload button above.</p>
+              <Button variant="outline" onClick={handleUploadClick}><Upload className="mr-2 h-4 w-4" /> Upload Document</Button>
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -176,9 +157,9 @@ export default function DocumentsPage() {
                     <div className="mb-4 mt-2">{getFileIcon(doc.type)}</div>
                     <p className="font-medium text-sm truncate w-full mb-1">{doc.name}</p>
                     <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mb-3">
-                      <span>{doc.size}</span> • <span>{doc.date}</span>
+                      <span>{formatBytes(doc.size)}</span> • <span>{new Date(doc.createdAt).toLocaleDateString()}</span>
                     </div>
-                    <Badge variant="outline" className="text-[10px]">{doc.version}</Badge>
+                    <Badge variant="outline" className="text-[10px] capitalize">{doc.type}</Badge>
                   </CardContent>
                 </Card>
               ))}
@@ -189,9 +170,9 @@ export default function DocumentsPage() {
                 <thead className="bg-muted/50 text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Category</th>
+                    <th className="px-4 py-3 font-medium">Type</th>
                     <th className="px-4 py-3 font-medium">Size</th>
-                    <th className="px-4 py-3 font-medium">Date Modified</th>
+                    <th className="px-4 py-3 font-medium">Uploaded</th>
                     <th className="px-4 py-3 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
@@ -199,17 +180,22 @@ export default function DocumentsPage() {
                   {filteredDocs.map((doc) => (
                     <tr key={doc.id} className="hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => setSelectedDoc(doc)}>
                       <td className="px-4 py-3 font-medium flex items-center gap-3">
-                        <div className="h-8 w-8 rounded bg-muted/50 flex items-center justify-center shrink-0">
-                          {getFileIcon(doc.type)}
-                        </div>
+                        <div className="h-8 w-8 rounded bg-muted/50 flex items-center justify-center shrink-0">{getFileIcon(doc.type)}</div>
                         <span className="truncate max-w-[200px] sm:max-w-[300px]">{doc.name}</span>
-                        <Badge variant="secondary" className="ml-2 text-[10px] h-4 px-1 py-0">{doc.version}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{doc.category}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{doc.size}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{doc.date}</td>
-                      <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                      <td className="px-4 py-3 text-muted-foreground capitalize">{doc.type}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{formatBytes(doc.size)}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{new Date(doc.createdAt).toLocaleDateString()}</td>
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDownload(doc)}><Download className="mr-2 h-4 w-4" /> Download</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(doc)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   ))}
@@ -231,61 +217,36 @@ export default function DocumentsPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-lg leading-tight break-all">{selectedDoc.name}</h3>
-                    <p className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                      {selectedDoc.size} <span className="h-1 w-1 rounded-full bg-muted-foreground/30" /> {selectedDoc.date}
-                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">{formatBytes(selectedDoc.size)} · {new Date(selectedDoc.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button className="flex-1" variant="default"><Download className="mr-2 h-4 w-4" /> Download</Button>
-                  <Button className="flex-1" variant="outline"><Eye className="mr-2 h-4 w-4" /> Preview</Button>
+                  <Button className="flex-1" onClick={() => handleDownload(selectedDoc)} disabled={downloadMutation.isPending}>
+                    <Download className="mr-2 h-4 w-4" /> Download
+                  </Button>
+                  <Button className="flex-1" variant="destructive" onClick={() => handleDelete(selectedDoc)} disabled={deleteMutation.isPending}>
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  </Button>
                 </div>
               </div>
-              
-              <div className="p-6 space-y-6 overflow-y-auto">
-                <div>
-                  <h4 className="text-sm font-semibold mb-3">Document Details</h4>
-                  <div className="space-y-3 text-sm">
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="text-muted-foreground">Version</span>
-                      <span className="col-span-2 font-medium"><Badge>{selectedDoc.version}</Badge></span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="text-muted-foreground">Category</span>
-                      <span className="col-span-2 font-medium">{selectedDoc.category}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="text-muted-foreground">Uploaded By</span>
-                      <span className="col-span-2 font-medium">{selectedDoc.author}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <span className="text-muted-foreground">Status</span>
-                      <span className="col-span-2 font-medium text-emerald-600">Approved</span>
-                    </div>
+              <div className="p-6 space-y-4 overflow-y-auto">
+                <h4 className="text-sm font-semibold">Document Details</h4>
+                <div className="space-y-3 text-sm">
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-muted-foreground">Type</span>
+                    <span className="col-span-2 font-medium capitalize">{selectedDoc.type}</span>
                   </div>
-                </div>
-
-                <div className="border-t pt-6">
-                  <h4 className="text-sm font-semibold mb-3">Recent Activity</h4>
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
-                        <Eye className="h-3 w-3 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-foreground">Viewed by <strong>Alex Manager</strong></p>
-                        <p className="text-xs text-muted-foreground">2 hours ago</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="h-6 w-6 rounded-full bg-emerald-500/10 flex items-center justify-center mt-0.5">
-                        <Download className="h-3 w-3 text-emerald-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-foreground">Downloaded by <strong>Sarah Engineer</strong></p>
-                        <p className="text-xs text-muted-foreground">Yesterday</p>
-                      </div>
-                    </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-muted-foreground">Uploaded by</span>
+                    <span className="col-span-2 font-medium">{selectedDoc.uploadedBy?.name ?? '—'}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-muted-foreground">Date</span>
+                    <span className="col-span-2 font-medium">{new Date(selectedDoc.createdAt).toLocaleString()}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-muted-foreground">Size</span>
+                    <span className="col-span-2 font-medium">{formatBytes(selectedDoc.size)}</span>
                   </div>
                 </div>
               </div>

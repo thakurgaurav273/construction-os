@@ -983,6 +983,74 @@ async function seedInventory(orgId: string) {
   console.log(`  → Seeded 2 warehouses and ${materials.length} inventory items`);
 }
 
+// ─── Finance Seed Data ────────────────────────────────────────────────────────
+
+async function seedFinance(orgId: string) {
+  const count = await prisma.invoice.count({ where: { organizationId: orgId } });
+  if (count > 0) { console.log('  → Finance already seeded, skipping'); return; }
+
+  const projects = await prisma.project.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } });
+  const projIdByCode: Record<string, string> = Object.fromEntries(projects.map((p) => [p.code, p.id]));
+
+  const CATS = ['Steel & Rebar', 'Cement & Concrete', 'Electrical', 'Mechanical', 'Labour', 'Equipment Hire', 'Overheads'];
+  const BD: Record<string, number[][]> = {
+    'GRV-001': [[28e6,14.2e6,4.8e6],[18e6,9.4e6,2.2e6],[12e6,5.8e6,1.9e6],[10e6,4.2e6,2.1e6],[14e6,8.64e6,1.2e6],[6e6,3.4e6,.8e6],[4e6,2.2e6,.4e6]],
+    'GRV-002': [[6e6,2.1e6,.9e6],[5e6,1.8e6,.6e6],[4e6,1.2e6,.5e6],[3e6,.8e6,.4e6],[5e6,2.02e6,.3e6],[3e6,1e6,.2e6],[2e6,.6e6,.1e6]],
+    'GRV-003': [[96e6,74.88e6,8e6],[64e6,49.92e6,5.2e6],[42e6,32.76e6,3.8e6],[38e6,29.64e6,2.6e6],[48e6,37.44e6,4e6],[18e6,14.04e6,1.5e6],[14e6,10.92e6,.9e6]],
+    'GRV-004': [[16e6,3.52e6,.5e6],[10e6,2.2e6,.3e6],[8e6,1.76e6,.2e6],[6e6,1.32e6,.1e6],[8e6,1.76e6,.2e6],[4e6,.88e6,.1e6],[3e6,.66e6,.05e6]],
+  };
+  for (const [code, items] of Object.entries(BD)) {
+    const pid = projIdByCode[code]; if (!pid) continue;
+    for (let i = 0; i < items.length; i++) {
+      await prisma.budgetItem.create({ data: { projectId: pid, organizationId: orgId, category: CATS[i], allocated: items[i][0], spent: items[i][1], committed: items[i][2] } });
+    }
+  }
+
+  type IS = { n: string; v: string; pc: string; cat: string; amt: number; tax: number; st: 'DRAFT'|'SENT'|'APPROVED'|'PAID'|'OVERDUE'; io: number; duo: number; po: number|null; d: string };
+  const INV: IS[] = [
+    { n:'INV-001', v:'Tata Steel Ltd', pc:'GRV-001', cat:'Steel', amt:5610000, tax:1009800, st:'PAID', io:30, duo:-15, po:12, d:'TMT Steel 85MT - Floors 3-4' },
+    { n:'INV-002', v:'UltraTech Cement', pc:'GRV-001', cat:'Concrete', amt:1364000, tax:245520, st:'PAID', io:22, duo:-8, po:5, d:'RMC M30 - 220 cum slab pour' },
+    { n:'INV-003', v:'Bhagwati RMC', pc:'GRV-003', cat:'Concrete', amt:2132000, tax:383760, st:'APPROVED', io:8, duo:7, po:null, d:'M35 RMC - Tower C Floor 12' },
+    { n:'INV-004', v:'Havells India', pc:'GRV-001', cat:'Electrical', amt:866000, tax:155880, st:'SENT', io:5, duo:25, po:null, d:'LT Panel + XLPE Cable' },
+    { n:'INV-005', v:'Tata Steel Ltd', pc:'GRV-002', cat:'Steel', amt:732000, tax:131760, st:'OVERDUE', io:45, duo:-15, po:null, d:'Manhole covers and gratings' },
+    { n:'INV-006', v:'Asian Paints', pc:'GRV-003', cat:'Paint', amt:450000, tax:81000, st:'PAID', io:12, duo:-2, po:3, d:'Premium emulsion + primer' },
+    { n:'INV-007', v:'Blue Star Ltd', pc:'GRV-003', cat:'HVAC', amt:2116000, tax:380880, st:'DRAFT', io:2, duo:30, po:null, d:'VRF system clubhouse' },
+    { n:'INV-008', v:'Polycab Wires', pc:'GRV-001', cat:'Electrical', amt:620000, tax:111600, st:'APPROVED', io:6, duo:14, po:null, d:'Electrical cabling Floors 11-13' },
+    { n:'INV-009', v:'Supreme Pipes', pc:'GRV-003', cat:'Plumbing', amt:340000, tax:61200, st:'SENT', io:4, duo:20, po:null, d:'PVC drainage stack' },
+    { n:'INV-010', v:'Kajaria Ceramics', pc:'GRV-003', cat:'Finishes', amt:864000, tax:155520, st:'PAID', io:18, duo:-4, po:8, d:'Vitrified tiles Tower A' },
+  ];
+  const invIds: Record<string, string> = {};
+  for (const inv of INV) {
+    const c = await prisma.invoice.create({ data: { invoiceNumber: inv.n, vendorName: inv.v, projectId: projIdByCode[inv.pc]??null, organizationId: orgId, category: inv.cat, description: inv.d, amount: inv.amt, taxAmount: inv.tax, totalAmount: inv.amt+inv.tax, status: inv.st, issuedDate: subDays(new Date(), inv.io), dueDate: subDays(new Date(), inv.duo), paidDate: inv.po!=null ? subDays(new Date(), inv.po) : null } });
+    invIds[inv.n] = c.id;
+  }
+
+  type PS = { n: string; inv: string|null; v: string; pc: string; cat: string; amt: number; st: 'PENDING'|'APPROVED'|'PAID'|'REJECTED'; m: string; duo: number; po: number|null; ref: string };
+  const PAY: PS[] = [
+    { n:'PAY-001', inv:'INV-001', v:'Tata Steel Ltd', pc:'GRV-001', cat:'Steel', amt:6619800, st:'PAID', m:'bank_transfer', duo:-15, po:12, ref:'NEFT/2026/JUL/001' },
+    { n:'PAY-002', inv:'INV-002', v:'UltraTech Cement', pc:'GRV-001', cat:'Concrete', amt:1609520, st:'PAID', m:'bank_transfer', duo:-8, po:5, ref:'NEFT/2026/JUL/002' },
+    { n:'PAY-003', inv:'INV-003', v:'Bhagwati RMC', pc:'GRV-003', cat:'Concrete', amt:2515760, st:'APPROVED', m:'bank_transfer', duo:7, po:null, ref:'' },
+    { n:'PAY-004', inv:'INV-005', v:'Tata Steel Ltd', pc:'GRV-002', cat:'Steel', amt:863760, st:'PENDING', m:'bank_transfer', duo:-15, po:null, ref:'' },
+    { n:'PAY-005', inv:'INV-006', v:'Asian Paints', pc:'GRV-003', cat:'Paint', amt:531000, st:'PAID', m:'cheque', duo:-2, po:3, ref:'CHQ-440125' },
+    { n:'PAY-006', inv:'INV-008', v:'Polycab Wires', pc:'GRV-001', cat:'Electrical', amt:731600, st:'PENDING', m:'bank_transfer', duo:14, po:null, ref:'' },
+    { n:'PAY-007', inv:'INV-010', v:'Kajaria Ceramics', pc:'GRV-003', cat:'Finishes', amt:1019520, st:'PAID', m:'bank_transfer', duo:-4, po:8, ref:'NEFT/2026/JUN/018' },
+    { n:'PAY-008', inv:null, v:'Labour Contractor', pc:'GRV-001', cat:'Labour', amt:2400000, st:'PAID', m:'bank_transfer', duo:-5, po:2, ref:'NEFT/2026/JUL/005' },
+    { n:'PAY-009', inv:null, v:'Labour Contractor', pc:'GRV-003', cat:'Labour', amt:4800000, st:'PAID', m:'bank_transfer', duo:-5, po:2, ref:'NEFT/2026/JUL/006' },
+    { n:'PAY-010', inv:null, v:'Equipment Rental Co', pc:'GRV-002', cat:'Equipment Hire', amt:850000, st:'APPROVED', m:'bank_transfer', duo:10, po:null, ref:'' },
+  ];
+  for (const p of PAY) {
+    await prisma.payment.create({ data: { paymentNumber: p.n, invoiceId: p.inv ? invIds[p.inv]??null : null, vendorName: p.v, projectId: projIdByCode[p.pc]??null, organizationId: orgId, category: p.cat, amount: p.amt, status: p.st, method: p.m, reference: p.ref, dueDate: subDays(new Date(), p.duo), paidDate: p.po!=null ? subDays(new Date(), p.po) : null } });
+  }
+
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = subMonths(now, i);
+    await prisma.cashFlowEntry.create({ data: { organizationId: orgId, month: d.getMonth()+1, year: d.getFullYear(), inflow: i>=2 ? [42e6,38.5e6,45.2e6,51.8e6][i%4] : 0, outflow: i>=2 ? [36.4e6,41.2e6,39.8e6,44.6e6][i%4] : 0, forecastInflow: [40e6,42e6,44e6,48e6,50e6,52e6][i], forecastOutflow: [38e6,40e6,42e6,45e6,47e6,49e6][i] } });
+  }
+
+  console.log(`  → Seeded finance: ${INV.length} invoices, ${PAY.length} payments, 28 budget items, 6 cash flow entries`);
+}
+
 async function main() {
   const orgs = await prisma.userOrganization.findMany({
     where: { role: 'OWNER' },
@@ -998,6 +1066,7 @@ async function main() {
     await seedNotifications(membership.organization.id);
     await seedProcurement(membership.organization.id);
     await seedInventory(membership.organization.id);
+    await seedFinance(membership.organization.id);
     console.log(`  ✓ Done`);
   }
 }

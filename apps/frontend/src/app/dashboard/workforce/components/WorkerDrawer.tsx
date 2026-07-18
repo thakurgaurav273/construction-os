@@ -132,8 +132,8 @@ export function WorkerDrawer({ worker, open, onClose }: WorkerDrawerProps): Reac
   }
 
   const palette = getPalette(worker.id);
-  const presentDays = worker.weeklyAttendance.filter((d) => d.present).length;
-  const lateDays    = worker.weeklyAttendance.filter((d) => d.late).length;
+  const presentDays = (worker.weeklyAttendance ?? []).filter((d) => d.present).length;
+  const lateDays    = (worker.weeklyAttendance ?? []).filter((d) => d.late).length;
   const attInfo     = getAttendancePct(worker.attendancePercent);
 
   return (
@@ -249,7 +249,7 @@ export function WorkerDrawer({ worker, open, onClose }: WorkerDrawerProps): Reac
                 <span className={`text-xs font-semibold ${attInfo.color}`}>{attInfo.label}</span>
               </div>
               <div className="flex gap-1.5 mb-4">
-                {worker.weeklyAttendance.map((day) => (
+                {(worker.weeklyAttendance ?? []).map((day) => (
                   <div key={day.day} className="flex-1 flex flex-col items-center gap-1.5">
                     <div className={`w-full h-10 rounded-lg flex items-center justify-center text-sm font-bold ${
                       !day.present
@@ -349,10 +349,12 @@ export function WorkerDrawer({ worker, open, onClose }: WorkerDrawerProps): Reac
                 </div>
                 <div>
                   <p className="text-sm font-medium">
-                    {worker.emergencyContact.name}
-                    <span className="text-xs text-muted-foreground font-normal ml-1.5">({worker.emergencyContact.relation})</span>
+                    {worker.emergencyContact?.name ?? '—'}
+                    {worker.emergencyContact?.relation && (
+                      <span className="text-xs text-muted-foreground font-normal ml-1.5">({worker.emergencyContact.relation})</span>
+                    )}
                   </p>
-                  <p className="text-xs text-muted-foreground">{worker.emergencyContact.phone}</p>
+                  <p className="text-xs text-muted-foreground">{worker.emergencyContact?.phone ?? '—'}</p>
                 </div>
               </div>
             </div>
@@ -366,7 +368,7 @@ export function WorkerDrawer({ worker, open, onClose }: WorkerDrawerProps): Reac
               <div className="relative">
                 <div className="absolute left-[14px] top-0 bottom-0 w-px bg-border" />
                 <div className="space-y-4">
-                  {worker.recentActivity.map((item, i) => {
+                  {(worker.recentActivity ?? []).map((item, i) => {
                     const cfg = ACTIVITY_CONFIG[item.type] ?? ACTIVITY_CONFIG['general'];
                     return (
                       <div key={i} className="flex items-start gap-3 relative">

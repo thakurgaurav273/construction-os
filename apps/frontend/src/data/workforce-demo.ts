@@ -33,24 +33,24 @@ export interface Worker {
   name: string;
   initials: string;
   role: string;
-  trade: WorkerTrade;
-  type: WorkerType;
-  projectId: string;
-  project: string;
-  phone: string;
-  email: string;
+  trade: string;
+  type: string;
+  projectId: string | null;
+  project: string | null;
+  phone: string | null;
+  email: string | null;
   status: WorkerStatus;
   experienceYears: number;
-  shift: ShiftType;
+  shift: string;
   attendancePercent: number;
-  lastCheckIn: string;
-  supervisor: string;
-  emergencyContact: { name: string; phone: string; relation: string };
+  lastCheckIn: string | null;
+  supervisor: string | null;
+  emergencyContact: { name: string; phone: string; relation: string } | null;
   skills: string[];
   certifications: Certification[];
   ppeCompliant: boolean;
-  weeklyAttendance: WeeklyAttendanceDay[];
-  recentActivity: { action: string; time: string; type: string }[];
+  weeklyAttendance: WeeklyAttendanceDay[] | null;
+  recentActivity: { action: string; time: string; type: string }[] | null;
 }
 
 export interface TradeStats {

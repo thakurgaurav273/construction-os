@@ -29,3 +29,25 @@ export class WorkforceController {
     return this.workforceService.findOne(id, user.organizationId);
   }
 }
+
+@Controller('projects/:projectId/workforce')
+@UseGuards(JwtAuthGuard)
+export class ProjectWorkforceController {
+  constructor(private readonly workforceService: WorkforceService) {}
+
+  @Get()
+  findByProject(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.workforceService.findByProject(projectId, user.organizationId);
+  }
+
+  @Get('stats')
+  getProjectStats(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.workforceService.getProjectStats(projectId, user.organizationId);
+  }
+}

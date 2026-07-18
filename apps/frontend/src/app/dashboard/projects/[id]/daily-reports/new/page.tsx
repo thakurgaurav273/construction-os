@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+import { useCreateDailyReport } from '@/hooks/api/use-daily-reports';
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@sitepilot/ui';
 import { Button } from '@sitepilot/ui';
 import { Input } from '@sitepilot/ui';
@@ -89,6 +91,7 @@ interface EquipmentRow {
 
 export default function NewDailyReportPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const createReport = useCreateDailyReport(params.id);
   const [generatingAi, setGeneratingAi] = useState(false);
   const { content, isTyping, isFinished } = useAiStream(generatingAi);
 
@@ -100,6 +103,11 @@ export default function NewDailyReportPage({ params }: { params: { id: string } 
     { name: 'Tower Crane T1', hours: '8', status: 'Active' },
     { name: 'Concrete Pump', hours: '4', status: 'Active' },
   ]);
+
+  const dateRef = React.useRef<HTMLInputElement>(null);
+  const weatherRef = React.useRef<HTMLInputElement>(null);
+  const progressRef = React.useRef<HTMLInputElement>(null);
+  const workCompletedRef = React.useRef<HTMLTextAreaElement>(null);
 
   const handleGenerate = () => {
     setGeneratingAi(true);
@@ -117,17 +125,39 @@ export default function NewDailyReportPage({ params }: { params: { id: string } 
     setEquipment((rows) => [...rows, { name: '', hours: '', status: 'Active' }]);
   };
 
-  const handleSaveDraft = () => {
-    toast.success('Draft saved');
+  const handleSaveDraft = async () => {
+    try {
+      await createReport.mutateAsync({
+        date: dateRef.current?.value || new Date().toISOString().split('T')[0],
+        weather: weatherRef.current?.value || undefined,
+        overallProgress: progressRef.current?.value ? Number(progressRef.current.value) : undefined,
+        workCompleted: workCompletedRef.current?.value || undefined,
+        status: 'DRAFT',
+      });
+      toast.success('Draft saved');
+    } catch {
+      toast.error('Failed to save draft');
+    }
   };
 
   const handleDiscard = () => {
     router.back();
   };
 
-  const handleSubmit = () => {
-    toast.success('Report submitted');
-    router.push(`/dashboard/projects/${params.id}/daily-reports`);
+  const handleSubmit = async () => {
+    try {
+      await createReport.mutateAsync({
+        date: dateRef.current?.value || new Date().toISOString().split('T')[0],
+        weather: weatherRef.current?.value || undefined,
+        overallProgress: progressRef.current?.value ? Number(progressRef.current.value) : undefined,
+        workCompleted: workCompletedRef.current?.value || undefined,
+        status: 'SUBMITTED',
+      });
+      toast.success('Report submitted');
+      router.push(`/dashboard/projects/${params.id}/daily-reports`);
+    } catch {
+      toast.error('Failed to submit report');
+    }
   };
 
   return (
@@ -166,18 +196,18 @@ export default function NewDailyReportPage({ params }: { params: { id: string } 
           <CardContent className="grid gap-6 md:grid-cols-3">
             <div className="space-y-2">
               <label className="text-sm font-medium">Date</label>
-              <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+              <Input type="date" defaultValue={new Date().toISOString().split('T')[0]} ref={dateRef} />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Weather</label>
               <div className="relative">
                 <CloudRain className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input defaultValue="Morning Showers, 26°C" className="pl-9" />
+                <Input defaultValue="Morning Showers, 26°C" className="pl-9" ref={weatherRef} />
               </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Overall Progress %</label>
-              <Input type="number" defaultValue="45" />
+              <Input type="number" defaultValue="45" ref={progressRef} />
             </div>
           </CardContent>
         </Card>
@@ -253,6 +283,7 @@ export default function NewDailyReportPage({ params }: { params: { id: string } 
           </CardHeader>
           <CardContent className="space-y-4">
             <textarea 
+              ref={workCompletedRef}
               className="w-full min-h-[120px] rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               placeholder="Record any incidents, delays, safety observations, or general notes..."
               defaultValue="Minor slip hazard near the temporary water station on the ground floor. Cleaned up immediately. Glass facade delivery from supplier is delayed by 5 days."

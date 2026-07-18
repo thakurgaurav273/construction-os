@@ -10,6 +10,11 @@ import { WorkforceModule } from './modules/workforce/workforce.module';
 import { MaterialsModule } from './modules/materials/materials.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { ProcurementModule } from './modules/procurement/procurement.module';
+import { StorageModule } from './common/storage/storage.module';
+import { DailyReportsModule } from './modules/daily-reports/daily-reports.module';
+import { DocumentsModule } from './modules/documents/documents.module';
+import { FinanceModule } from './modules/finance/finance.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -31,6 +36,11 @@ import { ProcurementModule } from './modules/procurement/procurement.module';
     MaterialsModule,
     InventoryModule,
     ProcurementModule,
+    StorageModule,
+    DailyReportsModule,
+    DocumentsModule,
+    FinanceModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

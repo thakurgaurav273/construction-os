@@ -139,6 +139,10 @@ model Organization {
   purchaseOrders        PurchaseOrder[]
   rfqs                  Rfq[]
   deliveries            Delivery[]
+  invoices              Invoice[]
+  payments              Payment[]
+  budgetItems           BudgetItem[]
+  cashFlowEntries       CashFlowEntry[]
 
   @@map("organizations")
 }
@@ -231,6 +235,10 @@ model Project {
   stockReservations     StockReservation[]
   purchaseOrders        PurchaseOrder[]
   rfqs                  Rfq[]
+  invoices              Invoice[]
+  payments              Payment[]
+  budgetItems           BudgetItem[]
+  cashFlowEntries       CashFlowEntry[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -936,4 +944,157 @@ model Delivery {
 
   @@index([organizationId])
   @@map("deliveries")
+}
+
+// ─── Finance ─────────────────────────────────────────────────────────────────
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  APPROVED
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+  CANCELLED
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  invoiceNumber  String
+  vendorName     String
+  vendorId       String?
+  projectId      String?
+  organizationId String
+  category       String        @default("General")
+  description    String        @default("")
+  amount         Decimal       @default(0) @db.Decimal(15, 2)
+  taxAmount      Decimal       @default(0) @db.Decimal(15, 2)
+  totalAmount    Decimal       @default(0) @db.Decimal(15, 2)
+  status         InvoiceStatus @default(DRAFT)
+  issuedDate     DateTime      @default(now())
+  dueDate        DateTime
+  paidDate       DateTime?
+  notes          String        @default("")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  project      Project?     @relation(fields: [projectId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  payments     Payment[]
+
+  @@unique([invoiceNumber, organizationId])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  paymentNumber  String
+  invoiceId      String?
+  vendorName     String
+  projectId      String?
+  organizationId String
+  category       String        @default("General")
+  amount         Decimal       @default(0) @db.Decimal(15, 2)
+  status         PaymentStatus @default(PENDING)
+  method         String        @default("bank_transfer")
+  reference      String        @default("")
+  paidDate       DateTime?
+  dueDate        DateTime
+  approvedBy     String?
+  notes          String        @default("")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  invoice      Invoice?     @relation(fields: [invoiceId], references: [id])
+  project      Project?     @relation(fields: [projectId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([paymentNumber, organizationId])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([status])
+  @@map("payments")
+}
+
+model BudgetItem {
+  id             String   @id @default(uuid())
+  projectId      String
+  organizationId String
+  category       String
+  allocated      Decimal  @default(0) @db.Decimal(15, 2)
+  spent          Decimal  @default(0) @db.Decimal(15, 2)
+  committed      Decimal  @default(0) @db.Decimal(15, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([projectId, category])
+  @@index([organizationId])
+  @@index([projectId])
+  @@map("budget_items")
+}
+
+model CashFlowEntry {
+  id             String   @id @default(uuid())
+  organizationId String
+  projectId      String?
+  month          Int
+  year           Int
+  inflow         Decimal  @default(0) @db.Decimal(15, 2)
+  outflow        Decimal  @default(0) @db.Decimal(15, 2)
+  forecastInflow  Decimal  @default(0) @db.Decimal(15, 2)
+  forecastOutflow Decimal  @default(0) @db.Decimal(15, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project      Project?     @relation(fields: [projectId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, projectId, month, year])
+  @@index([organizationId])
+  @@map("cash_flow_entries")
+}
+model PushDevice {
+  token       String   @id
+  userId      String
+  organizationId String
+  platform    String   // ANDROID, IOS, WEB
+  browser     String?
+  deviceName  String?
+  active      Boolean  @default(true)
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, active])
+  @@index([organizationId])
+  @@map("push_devices")
+}
+
+model NotificationPreference {
+  userId              String  @id
+  checkIns            Boolean @default(true)
+  checkInBlockers     Boolean @default(true)
+  reviews             Boolean @default(true)
+  recognition         Boolean @default(true)
+  goals               Boolean @default(true)
+  systemAnnouncements Boolean @default(true)
+  workspace           Boolean @default(true)
+  weeklyDigest        Boolean @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("notification_preferences")
 }
