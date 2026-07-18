@@ -125,7 +125,7 @@ async function seedOrg(orgId: string, ownerId: string) {
 
   // Create pending invitations
   const pendingInvites = [
-    { email: 'newengineer@company.com', role: 'ENGINEER' },
+    { email: 'newengineer@company.com', role: 'SITE_ENGINEER' },
     { email: 'contractor@vendor.com', role: 'VIEWER' },
     { email: 'finance@partner.com', role: 'FINANCE' },
   ];
@@ -136,7 +136,7 @@ async function seedOrg(orgId: string, ownerId: string) {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     const existing = await prisma.invitation.findFirst({
-      where: { email: inv.email, organizationId: orgId, status: 'PENDING' },
+      where: { email: inv.email, organizationId: orgId, acceptedAt: null },
     });
 
     if (!existing) {
@@ -146,9 +146,8 @@ async function seedOrg(orgId: string, ownerId: string) {
           token: hashedToken,
           role: inv.role as any,
           organizationId: orgId,
-          invitedBy: ownerId,
+          invitedById: ownerId,
           expiresAt,
-          status: 'PENDING',
         },
       });
     }
@@ -1154,6 +1153,7 @@ async function seedReports(orgId: string) {
   await prisma.reportSchedule.create({
     data: {
       reportId: reports[0].id,
+      reportType: reports[0].type,
       name: 'Weekly Executive Summary',
       frequency: 'WEEKLY',
       projects: [],

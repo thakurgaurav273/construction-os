@@ -1,5 +1,5 @@
 {
-  "extends": "@sitepilot/config/tsconfig/nestjs",
+  "extends": "../../packages/config/tsconfig.nestjs.json",
   "compilerOptions": {
     "outDir": "dist",
     "baseUrl": ".",
