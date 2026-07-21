@@ -16,11 +16,19 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const frontendUrl = config.get<string>('FRONTEND_URL', 'http://localhost:5173');
 
+  // CORS_ORIGINS allows several browser origins (preview deploys, custom domains).
+  // FRONTEND_URL stays the single canonical URL used to build links in emails.
+  const configuredOrigins = (config.get<string>('CORS_ORIGINS') ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const corsOrigins = configuredOrigins.length > 0 ? configuredOrigins : [frontendUrl];
+
   app.use(helmet());
   app.use(cookieParser(config.get<string>('COOKIE_SECRET')));
 
   app.enableCors({
-    origin: frontendUrl,
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

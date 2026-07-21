@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 import { MailService } from '../../common/mail/mail.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -6,7 +7,19 @@ import * as crypto from 'crypto';
 
 @Injectable()
 export class SettingsService {
-  constructor(private readonly prisma: PrismaService, private readonly mail: MailService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private buildInvitationUrl(token: string): string {
+    const frontendUrl = this.config
+      .get<string>('FRONTEND_URL', 'http://localhost:5173')
+      .replace(/\/+$/, '');
+
+    return `${frontendUrl}/accept-invitation/${token}`;
+  }
 
   // Get all members of an organization
   async getMembers(organizationId: string) {
@@ -126,7 +139,7 @@ export class SettingsService {
 
     // Send email
     const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
-    const acceptUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation/${token}`;
+    const acceptUrl = this.buildInvitationUrl(token);
     await this.mail.sendInvitationEmail(email, org?.name || 'Organization', role, acceptUrl);
 
     return invitation;
@@ -168,7 +181,7 @@ export class SettingsService {
       data: { token: hashedToken, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
     });
 
-    const acceptUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation/${newToken}`;
+    const acceptUrl = this.buildInvitationUrl(newToken);
     await this.mail.sendInvitationEmail(inv.email, org?.name || 'Organization', inv.role, acceptUrl);
 
     return updated;

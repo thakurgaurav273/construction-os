@@ -46,6 +46,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-sitepilot}:${POSTGRES_PASSWORD:-sitepilot}@postgres:5432/${POSTGRES_DB:-sitepilot}?schema=public
       - REDIS_URL=redis://redis:6379
       - FRONTEND_URL=${FRONTEND_URL:-https://constructions.grovyn.in}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
       - PORT=5174
       - COOKIE_SECRET=${COOKIE_SECRET}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-.grovyn.in}
