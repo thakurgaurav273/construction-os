@@ -1,0 +1,31 @@
+# Keeps the build context small and prevents host artifacts or secrets from
+# being copied into an image by the `COPY . .` in each Dockerfile.
+
+node_modules
+**/node_modules
+
+.git
+.gitignore
+
+.next
+**/.next
+dist
+**/dist
+out
+**/out
+
+.turbo
+**/.turbo
+coverage
+**/coverage
+*.tsbuildinfo
+
+# Runtime configuration is injected by docker-compose, never baked into a layer.
+.env
+.env.local
+.env.*.local
+
+*.log
+.DS_Store
+.vscode
+.idea

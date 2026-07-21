@@ -12,6 +12,9 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm install --frozen-lockfile
 # Next.js may need API URL at build time if it performs static generation. Since it relies on the backend, we usually mock or pass it.
 RUN pnpm --filter=@sitepilot/frontend build
+# Strip dev dependencies before the runner copies the tree. `next`, `react` and the
+# workspace UI packages are runtime dependencies, so `next start` still resolves.
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 FROM base AS runner
 WORKDIR /app
