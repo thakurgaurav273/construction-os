@@ -904,19 +904,19 @@ const SITE_ADDRESSES: Record<string, string> = {
 type VendorSeed = {
   name: string; code: string; categories: string[]; status: VendorStatus; rating: number;
   performanceScore: number; deliveryAccuracy: number; qualityRating: number; responseTimeHours: number;
-  outstandingBalance: number; contactPerson: string; phone: string; email: string; gstNumber: string;
+  contactPerson: string; phone: string; email: string; gstNumber: string;
   paymentTerms: string; city: string; state: string; aiRecommendation: string;
 };
 
 const VENDORS: VendorSeed[] = [
-  { name: 'Tata Steel Ltd', code: 'VN-STL-01', categories: ['Steel', 'Equipment'], status: 'ACTIVE', rating: 4.7, performanceScore: 92, deliveryAccuracy: 96, qualityRating: 4.8, responseTimeHours: 6, outstandingBalance: 1_845_000, contactPerson: 'Anil Bhaskar', phone: '+91 98450 11001', email: 'anil.bhaskar@tatasteel.com', gstNumber: '29AAACT2803M1ZK', paymentTerms: 'Net 45', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: 'Preferred for structural steel — consistently on-time with premium quality.' },
-  { name: 'UltraTech Cement', code: 'VN-CON-02', categories: ['Concrete'], status: 'ACTIVE', rating: 4.5, performanceScore: 88, deliveryAccuracy: 93, qualityRating: 4.6, responseTimeHours: 8, outstandingBalance: 920_000, contactPerson: 'Reena Kapoor', phone: '+91 98450 11002', email: 'reena.k@ultratech.com', gstNumber: '27AAACL6442L1ZM', paymentTerms: 'Net 30', city: 'Mumbai', state: 'Maharashtra', aiRecommendation: 'Reliable RMC supplier; negotiate bulk pricing for Q3 pours.' },
-  { name: 'Havells India', code: 'VN-ELE-03', categories: ['Electrical'], status: 'ACTIVE', rating: 4.3, performanceScore: 84, deliveryAccuracy: 91, qualityRating: 4.4, responseTimeHours: 10, outstandingBalance: 640_000, contactPerson: 'Karthik Iyer', phone: '+91 98450 11003', email: 'karthik.iyer@havells.com', gstNumber: '06AAACH0553P1Z8', paymentTerms: 'Net 30', city: 'Chennai', state: 'Tamil Nadu', aiRecommendation: 'Good for switchgear; watch lead times during festive season.' },
-  { name: 'Blue Star Ltd', code: 'VN-HVAC-04', categories: ['HVAC', 'Mechanical'], status: 'ACTIVE', rating: 4.1, performanceScore: 79, deliveryAccuracy: 88, qualityRating: 4.2, responseTimeHours: 14, outstandingBalance: 1_210_000, contactPerson: 'Deepa Menon', phone: '+91 98450 11004', email: 'deepa.menon@bluestar.com', gstNumber: '27AAACB1234F1Z5', paymentTerms: 'Net 60', city: 'Pune', state: 'Maharashtra', aiRecommendation: 'Competitive on VRF systems; obtain firm delivery commitment before ordering.' },
-  { name: 'Asian Paints', code: 'VN-PNT-05', categories: ['Paint', 'Tiles'], status: 'ACTIVE', rating: 4.6, performanceScore: 90, deliveryAccuracy: 95, qualityRating: 4.7, responseTimeHours: 5, outstandingBalance: 315_000, contactPerson: 'Sanjay Rao', phone: '+91 98450 11005', email: 'sanjay.rao@asianpaints.com', gstNumber: '27AAACA6666G1ZN', paymentTerms: 'Net 30', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: 'Top-rated finish quality; ideal for premium residential handover works.' },
-  { name: 'Kirloskar Equipments', code: 'VN-EQP-06', categories: ['Equipment', 'Mechanical'], status: 'INACTIVE', rating: 3.4, performanceScore: 61, deliveryAccuracy: 74, qualityRating: 3.6, responseTimeHours: 22, outstandingBalance: 0, contactPerson: 'Mahesh Kulkarni', phone: '+91 98450 11006', email: 'mahesh.k@kirloskar.com', gstNumber: '27AAACK5000H1ZP', paymentTerms: 'Advance 50%', city: 'Pune', state: 'Maharashtra', aiRecommendation: 'Under review — recent delays; request performance improvement plan before re-engaging.' },
-  { name: 'Kajaria Ceramics', code: 'VN-TIL-07', categories: ['Tiles'], status: 'ACTIVE', rating: 4.4, performanceScore: 86, deliveryAccuracy: 92, qualityRating: 4.5, responseTimeHours: 9, outstandingBalance: 0, contactPerson: 'Neha Saxena', phone: '+91 98450 11007', email: 'neha.saxena@kajaria.com', gstNumber: '09AAACK1234M1ZQ', paymentTerms: 'Net 30', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: '' },
-  { name: 'JCB India', code: 'VN-EQP-08', categories: ['Equipment'], status: 'ACTIVE', rating: 4.2, performanceScore: 83, deliveryAccuracy: 90, qualityRating: 4.3, responseTimeHours: 12, outstandingBalance: 0, contactPerson: 'Arvind Pillai', phone: '+91 98450 11008', email: 'arvind.pillai@jcb.com', gstNumber: '06AAACJ2345K1ZT', paymentTerms: 'Net 15', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: '' },
+  { name: 'Tata Steel Ltd', code: 'VN-STL-01', categories: ['Steel', 'Equipment'], status: 'ACTIVE', rating: 4.7, performanceScore: 92, deliveryAccuracy: 96, qualityRating: 4.8, responseTimeHours: 6, contactPerson: 'Anil Bhaskar', phone: '+91 98450 11001', email: 'anil.bhaskar@tatasteel.com', gstNumber: '29AAACT2803M1ZK', paymentTerms: 'Net 45', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: 'Preferred for structural steel — consistently on-time with premium quality.' },
+  { name: 'UltraTech Cement', code: 'VN-CON-02', categories: ['Concrete'], status: 'ACTIVE', rating: 4.5, performanceScore: 88, deliveryAccuracy: 93, qualityRating: 4.6, responseTimeHours: 8, contactPerson: 'Reena Kapoor', phone: '+91 98450 11002', email: 'reena.k@ultratech.com', gstNumber: '27AAACL6442L1ZM', paymentTerms: 'Net 30', city: 'Mumbai', state: 'Maharashtra', aiRecommendation: 'Reliable RMC supplier; negotiate bulk pricing for Q3 pours.' },
+  { name: 'Havells India', code: 'VN-ELE-03', categories: ['Electrical'], status: 'ACTIVE', rating: 4.3, performanceScore: 84, deliveryAccuracy: 91, qualityRating: 4.4, responseTimeHours: 10, contactPerson: 'Karthik Iyer', phone: '+91 98450 11003', email: 'karthik.iyer@havells.com', gstNumber: '06AAACH0553P1Z8', paymentTerms: 'Net 30', city: 'Chennai', state: 'Tamil Nadu', aiRecommendation: 'Good for switchgear; watch lead times during festive season.' },
+  { name: 'Blue Star Ltd', code: 'VN-HVAC-04', categories: ['HVAC', 'Mechanical'], status: 'ACTIVE', rating: 4.1, performanceScore: 79, deliveryAccuracy: 88, qualityRating: 4.2, responseTimeHours: 14, contactPerson: 'Deepa Menon', phone: '+91 98450 11004', email: 'deepa.menon@bluestar.com', gstNumber: '27AAACB1234F1Z5', paymentTerms: 'Net 60', city: 'Pune', state: 'Maharashtra', aiRecommendation: 'Competitive on VRF systems; obtain firm delivery commitment before ordering.' },
+  { name: 'Asian Paints', code: 'VN-PNT-05', categories: ['Paint', 'Tiles'], status: 'ACTIVE', rating: 4.6, performanceScore: 90, deliveryAccuracy: 95, qualityRating: 4.7, responseTimeHours: 5, contactPerson: 'Sanjay Rao', phone: '+91 98450 11005', email: 'sanjay.rao@asianpaints.com', gstNumber: '27AAACA6666G1ZN', paymentTerms: 'Net 30', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: 'Top-rated finish quality; ideal for premium residential handover works.' },
+  { name: 'Kirloskar Equipments', code: 'VN-EQP-06', categories: ['Equipment', 'Mechanical'], status: 'INACTIVE', rating: 3.4, performanceScore: 61, deliveryAccuracy: 74, qualityRating: 3.6, responseTimeHours: 22, contactPerson: 'Mahesh Kulkarni', phone: '+91 98450 11006', email: 'mahesh.k@kirloskar.com', gstNumber: '27AAACK5000H1ZP', paymentTerms: 'Advance 50%', city: 'Pune', state: 'Maharashtra', aiRecommendation: 'Under review — recent delays; request performance improvement plan before re-engaging.' },
+  { name: 'Kajaria Ceramics', code: 'VN-TIL-07', categories: ['Tiles'], status: 'ACTIVE', rating: 4.4, performanceScore: 86, deliveryAccuracy: 92, qualityRating: 4.5, responseTimeHours: 9, contactPerson: 'Neha Saxena', phone: '+91 98450 11007', email: 'neha.saxena@kajaria.com', gstNumber: '09AAACK1234M1ZQ', paymentTerms: 'Net 30', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: '' },
+  { name: 'JCB India', code: 'VN-EQP-08', categories: ['Equipment'], status: 'ACTIVE', rating: 4.2, performanceScore: 83, deliveryAccuracy: 90, qualityRating: 4.3, responseTimeHours: 12, contactPerson: 'Arvind Pillai', phone: '+91 98450 11008', email: 'arvind.pillai@jcb.com', gstNumber: '06AAACJ2345K1ZT', paymentTerms: 'Net 15', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: '' },
 ];
 
 type PoItemSeed = { description: string; unit: string; quantity: number; rate: number; taxPercent: number; discountPercent: number };
@@ -1277,6 +1277,10 @@ async function seedFinance(orgId: string) {
 
   const projects = await prisma.project.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } });
   const projIdByCode: Record<string, string> = Object.fromEntries(projects.map((p) => [p.code, p.id]));
+  const vendors = await prisma.vendor.findMany({ where: { organizationId: orgId }, select: { id: true, name: true } });
+  const vendorIdByName: Record<string, string> = Object.fromEntries(vendors.map((v) => [v.name, v.id]));
+  // Bills are entered by the site engineer so the owner can approve them (maker-checker).
+  const clerk = await prisma.user.findUnique({ where: { email: 'rajan.m@grovyn.com' }, select: { id: true } });
 
   const CATS = ['Steel & Rebar', 'Cement & Concrete', 'Electrical', 'Mechanical', 'Labour', 'Equipment Hire', 'Overheads'];
   const BD: Record<string, number[][]> = {
@@ -1292,22 +1296,22 @@ async function seedFinance(orgId: string) {
     }
   }
 
-  type IS = { n: string; v: string; pc: string; cat: string; amt: number; tax: number; st: 'DRAFT'|'SENT'|'APPROVED'|'PAID'|'OVERDUE'; io: number; duo: number; po: number|null; d: string };
+  type IS = { n: string; v: string; pc: string; cat: string; amt: number; tax: number; st: 'DRAFT'|'PENDING_APPROVAL'|'APPROVED'|'PAID'; io: number; duo: number; po: number|null; d: string };
   const INV: IS[] = [
     { n:'INV-001', v:'Tata Steel Ltd', pc:'GRV-001', cat:'Steel', amt:5610000, tax:1009800, st:'PAID', io:30, duo:-15, po:12, d:'TMT Steel 85MT - Floors 3-4' },
     { n:'INV-002', v:'UltraTech Cement', pc:'GRV-001', cat:'Concrete', amt:1364000, tax:245520, st:'PAID', io:22, duo:-8, po:5, d:'RMC M30 - 220 cum slab pour' },
     { n:'INV-003', v:'Bhagwati RMC', pc:'GRV-003', cat:'Concrete', amt:2132000, tax:383760, st:'APPROVED', io:8, duo:7, po:null, d:'M35 RMC - Tower C Floor 12' },
-    { n:'INV-004', v:'Havells India', pc:'GRV-001', cat:'Electrical', amt:866000, tax:155880, st:'SENT', io:5, duo:25, po:null, d:'LT Panel + XLPE Cable' },
-    { n:'INV-005', v:'Tata Steel Ltd', pc:'GRV-002', cat:'Steel', amt:732000, tax:131760, st:'OVERDUE', io:45, duo:-15, po:null, d:'Manhole covers and gratings' },
+    { n:'INV-004', v:'Havells India', pc:'GRV-001', cat:'Electrical', amt:866000, tax:155880, st:'PENDING_APPROVAL', io:5, duo:25, po:null, d:'LT Panel + XLPE Cable' },
+    { n:'INV-005', v:'Tata Steel Ltd', pc:'GRV-002', cat:'Steel', amt:732000, tax:131760, st:'APPROVED', io:45, duo:-15, po:null, d:'Manhole covers and gratings' },
     { n:'INV-006', v:'Asian Paints', pc:'GRV-003', cat:'Paint', amt:450000, tax:81000, st:'PAID', io:12, duo:-2, po:3, d:'Premium emulsion + primer' },
     { n:'INV-007', v:'Blue Star Ltd', pc:'GRV-003', cat:'HVAC', amt:2116000, tax:380880, st:'DRAFT', io:2, duo:30, po:null, d:'VRF system clubhouse' },
     { n:'INV-008', v:'Polycab Wires', pc:'GRV-001', cat:'Electrical', amt:620000, tax:111600, st:'APPROVED', io:6, duo:14, po:null, d:'Electrical cabling Floors 11-13' },
-    { n:'INV-009', v:'Supreme Pipes', pc:'GRV-003', cat:'Plumbing', amt:340000, tax:61200, st:'SENT', io:4, duo:20, po:null, d:'PVC drainage stack' },
+    { n:'INV-009', v:'Supreme Pipes', pc:'GRV-003', cat:'Plumbing', amt:340000, tax:61200, st:'PENDING_APPROVAL', io:4, duo:20, po:null, d:'PVC drainage stack' },
     { n:'INV-010', v:'Kajaria Ceramics', pc:'GRV-003', cat:'Finishes', amt:864000, tax:155520, st:'PAID', io:18, duo:-4, po:8, d:'Vitrified tiles Tower A' },
   ];
   const invIds: Record<string, string> = {};
   for (const inv of INV) {
-    const c = await prisma.invoice.create({ data: { invoiceNumber: inv.n, vendorName: inv.v, projectId: projIdByCode[inv.pc]??null, organizationId: orgId, category: inv.cat, description: inv.d, amount: inv.amt, taxAmount: inv.tax, totalAmount: inv.amt+inv.tax, status: inv.st, issuedDate: subDays(new Date(), inv.io), dueDate: subDays(new Date(), inv.duo), paidDate: inv.po!=null ? subDays(new Date(), inv.po) : null } });
+    const c = await prisma.invoice.create({ data: { invoiceNumber: inv.n, vendorName: inv.v, vendorId: vendorIdByName[inv.v] ?? null, createdById: clerk?.id ?? null, submittedAt: inv.st === 'DRAFT' ? null : subDays(new Date(), inv.io), projectId: projIdByCode[inv.pc]??null, organizationId: orgId, category: inv.cat, description: inv.d, amount: inv.amt, taxAmount: inv.tax, totalAmount: inv.amt+inv.tax, status: inv.st, issuedDate: subDays(new Date(), inv.io), dueDate: subDays(new Date(), inv.duo), paidDate: inv.po!=null ? subDays(new Date(), inv.po) : null } });
     invIds[inv.n] = c.id;
   }
 
@@ -1325,8 +1329,10 @@ async function seedFinance(orgId: string) {
     { n:'PAY-010', inv:null, v:'Equipment Rental Co', pc:'GRV-002', cat:'Equipment Hire', amt:850000, st:'APPROVED', m:'bank_transfer', duo:10, po:null, ref:'' },
   ];
   for (const p of PAY) {
-    await prisma.payment.create({ data: { paymentNumber: p.n, invoiceId: p.inv ? invIds[p.inv]??null : null, vendorName: p.v, projectId: projIdByCode[p.pc]??null, organizationId: orgId, category: p.cat, amount: p.amt, status: p.st, method: p.m, reference: p.ref, dueDate: subDays(new Date(), p.duo), paidDate: p.po!=null ? subDays(new Date(), p.po) : null } });
+    await prisma.payment.create({ data: { paymentNumber: p.n, invoiceId: p.inv ? invIds[p.inv]??null : null, vendorName: p.v, vendorId: vendorIdByName[p.v] ?? null, requestedById: clerk?.id ?? null, projectId: projIdByCode[p.pc]??null, organizationId: orgId, category: p.cat, amount: p.amt, status: p.st, method: p.m, reference: p.ref, dueDate: subDays(new Date(), p.duo), paidDate: p.po!=null ? subDays(new Date(), p.po) : null } });
   }
+
+  const poBills = await seedPurchaseOrderBills(orgId, clerk?.id ?? null);
 
   const now = new Date();
   for (let i = 5; i >= 0; i--) {
@@ -1334,7 +1340,63 @@ async function seedFinance(orgId: string) {
     await prisma.cashFlowEntry.create({ data: { organizationId: orgId, month: d.getMonth()+1, year: d.getFullYear(), inflow: i>=2 ? [42e6,38.5e6,45.2e6,51.8e6][i%4] : 0, outflow: i>=2 ? [36.4e6,41.2e6,39.8e6,44.6e6][i%4] : 0, forecastInflow: [40e6,42e6,44e6,48e6,50e6,52e6][i], forecastOutflow: [38e6,40e6,42e6,45e6,47e6,49e6][i] } });
   }
 
-  console.log(`  → Seeded finance: ${INV.length} invoices, ${PAY.length} payments, 28 budget items, 6 cash flow entries`);
+  console.log(`  → Seeded finance: ${INV.length + poBills} invoices (${poBills} against POs), ${PAY.length} payments, 28 budget items, 6 cash flow entries`);
+}
+
+/**
+ * Bills against received purchase orders, so the 3-way match has something to show:
+ * one priced exactly at the PO (approved), one billed 4% above the PO rate (awaiting approval).
+ */
+async function seedPurchaseOrderBills(orgId: string, clerkId: string | null): Promise<number> {
+  const orders = await prisma.purchaseOrder.findMany({
+    where: { organizationId: orgId, status: 'APPROVED', vendorId: { not: null }, items: { some: { receivedQuantity: { gt: 0 } } } },
+    include: { vendor: true, items: { orderBy: { sortOrder: 'asc' } } },
+    orderBy: { requestedDate: 'desc' },
+    take: 2,
+  });
+  const scenarios = [
+    { status: 'APPROVED' as const, rateUplift: 1, suffix: '0412', issuedAgo: 6, note: '' },
+    { status: 'PENDING_APPROVAL' as const, rateUplift: 1.04, suffix: '0437', issuedAgo: 2, note: 'Vendor applied revised price list.' },
+  ];
+
+  for (const [index, order] of orders.entries()) {
+    const scenario = scenarios[index];
+    const vendor = order.vendor!;
+    const lines = order.items
+      .filter((item) => Number(item.receivedQuantity) > 0)
+      .map((item, sortOrder) => {
+        const rate = Math.round(Number(item.rate) * (1 - item.discountPercent / 100) * scenario.rateUplift * 100) / 100;
+        const quantity = Number(item.receivedQuantity);
+        return { poLineItemId: item.id, description: item.description, unit: item.unit, quantity, rate, taxPercent: item.taxPercent, sortOrder };
+      });
+    const amount = Math.round(lines.reduce((sum, line) => sum + line.quantity * line.rate, 0) * 100) / 100;
+    const taxAmount = Math.round(lines.reduce((sum, line) => sum + line.quantity * line.rate * (line.taxPercent / 100), 0) * 100) / 100;
+    const issuedDate = subDays(new Date(), scenario.issuedAgo);
+
+    await prisma.invoice.create({
+      data: {
+        invoiceNumber: `${vendor.code}/26-27/${scenario.suffix}`,
+        vendorName: vendor.name,
+        vendorId: vendor.id,
+        purchaseOrderId: order.id,
+        projectId: order.projectId,
+        organizationId: orgId,
+        category: order.category,
+        description: `Supply against ${order.poNumber}`,
+        notes: scenario.note,
+        amount,
+        taxAmount,
+        totalAmount: Math.round((amount + taxAmount) * 100) / 100,
+        status: scenario.status,
+        issuedDate,
+        dueDate: subDays(new Date(), scenario.issuedAgo - 30),
+        submittedAt: issuedDate,
+        createdById: clerkId,
+        items: { create: lines },
+      },
+    });
+  }
+  return orders.length;
 }
 
 async function main() {

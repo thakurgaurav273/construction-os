@@ -101,6 +101,10 @@ model User {
   reviewedPurchaseOrders  PurchaseOrder[] @relation("PurchaseOrderReviewer")
   createdRfqs             Rfq[]           @relation("RfqCreator")
   receivedDeliveries      Delivery[]      @relation("DeliveryReceiver")
+  createdInvoices         Invoice[]       @relation("InvoiceCreator")
+  reviewedInvoices        Invoice[]       @relation("InvoiceReviewer")
+  requestedPayments       Payment[]       @relation("PaymentRequester")
+  reviewedPayments        Payment[]       @relation("PaymentReviewer")
   documents            Document[]
   activities           Activity[]
   notifications        Notification[]
@@ -895,7 +899,6 @@ model Vendor {
   deliveryAccuracy   Float        @default(0)
   qualityRating      Float        @default(0)
   responseTimeHours  Float        @default(0)
-  outstandingBalance Decimal      @default(0) @db.Decimal(15, 2)
   contactPerson      String?
   phone              String?
   email              String?
@@ -912,6 +915,8 @@ model Vendor {
   purchaseOrders PurchaseOrder[]
   rfqInvitations RfqInvitation[]
   awardedRfqs    Rfq[]           @relation("RfqAwardedVendor")
+  invoices       Invoice[]
+  payments       Payment[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -949,6 +954,7 @@ model PurchaseOrder {
   timeline     PoApprovalStep[]
   deliveries   Delivery[]
   sourceRfq    Rfq?             @relation("RfqPurchaseOrder")
+  invoices     Invoice[]
 
   @@unique([poNumber, organizationId])
   @@index([organizationId])
@@ -974,6 +980,7 @@ model PoLineItem {
 
   purchaseOrder PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   deliveryItems DeliveryItem[]
+  invoiceItems  InvoiceItem[]
 
   @@index([purchaseOrderId])
   @@map("po_line_items")
@@ -1122,12 +1129,14 @@ model DeliveryItem {
 
 // ─── Finance ─────────────────────────────────────────────────────────────────
 
+/// Vendor bills (payables): DRAFT → PENDING_APPROVAL → APPROVED → PARTIALLY_PAID → PAID, or REJECTED. Overdue is derived from dueDate.
 enum InvoiceStatus {
   DRAFT
-  SENT
+  PENDING_APPROVAL
   APPROVED
+  PARTIALLY_PAID
   PAID
-  OVERDUE
+  REJECTED
   CANCELLED
 }
 
@@ -1140,41 +1149,77 @@ enum PaymentStatus {
 }
 
 model Invoice {
-  id             String        @id @default(uuid())
-  invoiceNumber  String
-  vendorName     String
-  vendorId       String?
-  projectId      String?
-  organizationId String
-  category       String        @default("General")
-  description    String        @default("")
-  amount         Decimal       @default(0) @db.Decimal(15, 2)
-  taxAmount      Decimal       @default(0) @db.Decimal(15, 2)
-  totalAmount    Decimal       @default(0) @db.Decimal(15, 2)
-  status         InvoiceStatus @default(DRAFT)
-  issuedDate     DateTime      @default(now())
-  dueDate        DateTime
-  paidDate       DateTime?
-  notes          String        @default("")
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id              String        @id @default(uuid())
+  /// The vendor's own bill number, unique per vendor within an organization.
+  invoiceNumber   String
+  vendorName      String
+  vendorId        String?
+  purchaseOrderId String?
+  projectId       String?
+  organizationId  String
+  category        String        @default("General")
+  description     String        @default("")
+  amount          Decimal       @default(0) @db.Decimal(15, 2)
+  taxAmount       Decimal       @default(0) @db.Decimal(15, 2)
+  totalAmount     Decimal       @default(0) @db.Decimal(15, 2)
+  status          InvoiceStatus @default(DRAFT)
+  issuedDate      DateTime      @default(now())
+  dueDate         DateTime
+  paidDate        DateTime?
+  notes           String        @default("")
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  reviewNote      String?
+  createdById     String?
+  reviewedById    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  project      Project?     @relation(fields: [projectId], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id])
-  payments     Payment[]
+  project       Project?       @relation(fields: [projectId], references: [id])
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  vendor        Vendor?        @relation(fields: [vendorId], references: [id])
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  createdBy     User?          @relation("InvoiceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  reviewedBy    User?          @relation("InvoiceReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  items         InvoiceItem[]
+  payments      Payment[]
 
-  @@unique([invoiceNumber, organizationId])
+  @@unique([organizationId, vendorName, invoiceNumber])
   @@index([organizationId])
+  @@index([organizationId, status])
   @@index([projectId])
-  @@index([status])
+  @@index([vendorId])
+  @@index([purchaseOrderId])
   @@map("invoices")
 }
 
+model InvoiceItem {
+  id           String  @id @default(uuid())
+  invoiceId    String
+  /// Set when the line bills goods from a purchase order; drives the 3-way match.
+  poLineItemId String?
+  description  String
+  unit         String
+  quantity     Decimal @db.Decimal(15, 3)
+  rate         Decimal @db.Decimal(15, 2)
+  taxPercent   Float   @default(0)
+  sortOrder    Int     @default(0)
+
+  invoice    Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  poLineItem PoLineItem? @relation(fields: [poLineItemId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId])
+  @@index([poLineItemId])
+  @@map("invoice_items")
+}
+
+/// PENDING → APPROVED → PAID, or REJECTED / CANCELLED. Paid payments roll up into the invoice status.
 model Payment {
   id             String        @id @default(uuid())
   paymentNumber  String
   invoiceId      String?
   vendorName     String
+  vendorId       String?
   projectId      String?
   organizationId String
   category       String        @default("General")
@@ -1184,19 +1229,27 @@ model Payment {
   reference      String        @default("")
   paidDate       DateTime?
   dueDate        DateTime
-  approvedBy     String?
   notes          String        @default("")
+  requestedById  String?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  reviewNote     String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   invoice      Invoice?     @relation(fields: [invoiceId], references: [id])
+  vendor       Vendor?      @relation(fields: [vendorId], references: [id])
   project      Project?     @relation(fields: [projectId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
+  requestedBy  User?        @relation("PaymentRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewedBy   User?        @relation("PaymentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@unique([paymentNumber, organizationId])
   @@index([organizationId])
   @@index([projectId])
   @@index([status])
+  @@index([invoiceId])
+  @@index([vendorId])
   @@map("payments")
 }
 

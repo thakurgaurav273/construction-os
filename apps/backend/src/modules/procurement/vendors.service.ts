@@ -15,6 +15,7 @@ interface VendorAccumulator {
   lastOrderDate: Date | null;
   deliveriesReceived: number;
   onTimeDeliveries: number;
+  outstandingBalance: number;
 }
 
 @Injectable()
@@ -85,7 +86,7 @@ export class VendorsService {
   }
 
   private async computeStats(organizationId: string, vendorId?: string): Promise<Map<string, VendorStats>> {
-    const [orders, receipts] = await Promise.all([
+    const [orders, receipts, payableInvoices] = await Promise.all([
       this.prisma.purchaseOrder.findMany({
         where: { organizationId, status: 'APPROVED', vendorId: vendorId ?? { not: null } },
         select: { vendorId: true, projectId: true, amount: true, requestedDate: true },
@@ -93,6 +94,11 @@ export class VendorsService {
       this.prisma.delivery.findMany({
         where: { organizationId, status: 'RECEIVED', purchaseOrder: { vendorId: vendorId ?? { not: null } } },
         select: { scheduledDate: true, receivedAt: true, purchaseOrder: { select: { vendorId: true } } },
+      }),
+      // Approved bills still owing money; mirrors PAYABLE_INVOICE_STATUSES in the finance module.
+      this.prisma.invoice.findMany({
+        where: { organizationId, status: { in: ['APPROVED', 'PARTIALLY_PAID'] }, vendorId: vendorId ?? { not: null } },
+        select: { vendorId: true, totalAmount: true, payments: { where: { status: 'PAID' }, select: { amount: true } } },
       }),
     ]);
 
@@ -102,6 +108,7 @@ export class VendorsService {
       if (existing) return existing;
       const created: VendorAccumulator = {
         totalOrders: 0, projects: new Set(), totalSpend: 0, lastOrderDate: null, deliveriesReceived: 0, onTimeDeliveries: 0,
+        outstandingBalance: 0,
       };
       accumulators.set(id, created);
       return created;
@@ -123,6 +130,12 @@ export class VendorsService {
       if (wholeDaysBetween(receipt.scheduledDate, receipt.receivedAt) <= 0) stats.onTimeDeliveries += 1;
     }
 
+    for (const invoice of payableInvoices) {
+      if (!invoice.vendorId) continue;
+      const paid = invoice.payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0);
+      accumulatorFor(invoice.vendorId).outstandingBalance += Math.max(0, toNumber(invoice.totalAmount) - paid);
+    }
+
     return new Map([...accumulators].map(([id, stats]) => [id, {
       totalOrders: stats.totalOrders,
       projectCount: stats.projects.size,
@@ -132,6 +145,7 @@ export class VendorsService {
       onTimeDeliveryPercent: stats.deliveriesReceived
         ? Math.round((stats.onTimeDeliveries / stats.deliveriesReceived) * 100)
         : null,
+      outstandingBalance: roundMoney(stats.outstandingBalance),
     }]));
   }
 

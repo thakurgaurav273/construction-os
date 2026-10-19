@@ -41,6 +41,14 @@ export function wholeDaysBetween(from: Date, to: Date): number {
   return Math.round((startOfUtcDay(to).getTime() - startOfUtcDay(from).getTime()) / DAY_MS);
 }
 
+/**
+ * True when a user-entered calendar day is after today. Dates are compared in UTC but entered in the user's
+ * local zone, so one day of slack keeps "today" valid for users ahead of UTC (e.g. India before 05:30 IST).
+ */
+export function isFutureDay(date: Date, today: Date = new Date()): boolean {
+  return wholeDaysBetween(today, date) > 1;
+}
+
 export function addUtcDays(date: Date, days: number): Date {
   return new Date(startOfUtcDay(date).getTime() + days * DAY_MS);
 }

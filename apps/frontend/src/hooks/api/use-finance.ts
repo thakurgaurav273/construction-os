@@ -1,147 +1,133 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { QueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
+import type {
+  BillableLine, BudgetLine, CashFlowEntry, FinanceSummary, Invoice, InvoiceDetail, InvoiceInput, InvoiceStatus,
+  MarkPaidInput, Payment, PaymentInput, PaymentStatus,
+} from '@/features/finance/types';
 
-export interface FinanceStats {
-  totalBudget: number;
-  totalSpent: number;
-  remainingBudget: number;
-  totalCommitted: number;
-  pendingPayments: number;
-  overdueInvoices: number;
-  netCashFlow: number;
-  budgetVariance: number;
+function unwrap<T>(res: { data: { data?: T } & T }): T {
+  return res.data.data ?? res.data;
 }
 
-export interface Invoice {
-  id: string;
-  invoiceNumber: string;
-  vendorName: string;
-  projectId: string | null;
-  projectName: string;
-  category: string;
-  description: string;
-  amount: number;
-  taxAmount: number;
-  totalAmount: number;
-  status: string;
-  issuedDate: string | null;
-  dueDate: string | null;
-  paidDate: string | null;
-  notes: string;
+/** Bills and payments move KPIs, budgets and vendor balances (shown in procurement), so refresh both namespaces. */
+function invalidateFinance(qc: QueryClient): void {
+  qc.invalidateQueries({ queryKey: ['finance'] });
+  qc.invalidateQueries({ queryKey: ['procurement', 'vendors'] });
+  qc.invalidateQueries({ queryKey: ['dashboard-stats'] });
+  qc.invalidateQueries({ queryKey: ['timeline'] });
 }
 
-export interface Payment {
-  id: string;
-  paymentNumber: string;
-  invoiceNumber: string | null;
-  vendorName: string;
-  projectId: string | null;
-  projectName: string;
-  category: string;
-  amount: number;
-  status: string;
-  method: string;
-  reference: string;
-  dueDate: string | null;
-  paidDate: string | null;
-  approvedBy: string | null;
-  notes: string;
+function useFinanceMutation<TInput, TResult>(request: (input: TInput) => Promise<TResult>) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: request, onSuccess: () => invalidateFinance(qc) });
 }
 
-export interface BudgetItem {
-  id: string;
-  projectId: string;
-  projectName: string;
-  category: string;
-  allocated: number;
-  spent: number;
-  committed: number;
-  remaining: number;
-  variance: number;
-  utilizationPercent: number;
-}
+/* ---------- Queries ---------- */
 
-export interface CashFlowEntry {
-  id: string;
-  month: number;
-  year: number;
-  inflow: number;
-  outflow: number;
-  net: number;
-  forecastInflow: number;
-  forecastOutflow: number;
-  forecastNet: number;
-}
-
-export interface FinanceInsight {
-  id: string;
-  tone: string;
-  title: string;
-  body: string;
-}
-
-export function useFinanceStats() {
-  return useQuery<FinanceStats>({
-    queryKey: ['finance', 'stats'],
-    queryFn: async () => {
-      const res = await apiClient.get('/finance/stats');
-      return res.data.data ?? res.data;
-    },
+export function useFinanceSummary() {
+  return useQuery<FinanceSummary>({
+    queryKey: ['finance', 'summary'],
+    queryFn: async () => unwrap(await apiClient.get('/finance/summary')),
     staleTime: 30_000,
   });
 }
 
-export function useInvoices() {
+export interface InvoiceFilters {
+  status?: InvoiceStatus;
+  vendorId?: string;
+  projectId?: string;
+  purchaseOrderId?: string;
+}
+
+export function useInvoices(filters: InvoiceFilters = {}) {
   return useQuery<Invoice[]>({
-    queryKey: ['finance', 'invoices'],
-    queryFn: async () => {
-      const res = await apiClient.get('/finance/invoices');
-      return res.data.data ?? res.data;
-    },
+    queryKey: ['finance', 'invoices', filters],
+    queryFn: async () => unwrap(await apiClient.get('/finance/invoices', { params: filters })),
     staleTime: 30_000,
   });
 }
 
-export function usePayments() {
+export function useInvoice(id: string | null) {
+  return useQuery<InvoiceDetail>({
+    queryKey: ['finance', 'invoice', id],
+    queryFn: async () => unwrap(await apiClient.get(`/finance/invoices/${id}`)),
+    enabled: !!id,
+    staleTime: 15_000,
+  });
+}
+
+export function useBillableLines(purchaseOrderId: string | null) {
+  return useQuery<BillableLine[]>({
+    queryKey: ['finance', 'billable-lines', purchaseOrderId],
+    queryFn: async () => unwrap(await apiClient.get('/finance/invoices/billable-lines', { params: { purchaseOrderId } })),
+    enabled: !!purchaseOrderId,
+    staleTime: 0,
+  });
+}
+
+export function usePayments(filters: { status?: PaymentStatus; invoiceId?: string; vendorId?: string } = {}) {
   return useQuery<Payment[]>({
-    queryKey: ['finance', 'payments'],
-    queryFn: async () => {
-      const res = await apiClient.get('/finance/payments');
-      return res.data.data ?? res.data;
-    },
+    queryKey: ['finance', 'payments', filters],
+    queryFn: async () => unwrap(await apiClient.get('/finance/payments', { params: filters })),
     staleTime: 30_000,
   });
 }
 
 export function useBudget() {
-  return useQuery<BudgetItem[]>({
+  return useQuery<BudgetLine[]>({
     queryKey: ['finance', 'budget'],
-    queryFn: async () => {
-      const res = await apiClient.get('/finance/budget');
-      return res.data.data ?? res.data;
-    },
-    staleTime: 30_000,
+    queryFn: async () => unwrap(await apiClient.get('/finance/budget')),
+    staleTime: 60_000,
   });
 }
 
 export function useCashFlow() {
   return useQuery<CashFlowEntry[]>({
     queryKey: ['finance', 'cash-flow'],
-    queryFn: async () => {
-      const res = await apiClient.get('/finance/cash-flow');
-      return res.data.data ?? res.data;
-    },
-    staleTime: 30_000,
+    queryFn: async () => unwrap(await apiClient.get('/finance/cash-flow')),
+    staleTime: 60_000,
   });
 }
 
-export function useFinanceInsights() {
-  return useQuery<FinanceInsight[]>({
-    queryKey: ['finance', 'insights'],
-    queryFn: async () => {
-      const res = await apiClient.get('/finance/insights');
-      return res.data.data ?? res.data;
-    },
-    staleTime: 60_000,
-  });
+/* ---------- Invoices ---------- */
+
+export function useCreateInvoice() {
+  return useFinanceMutation(async (input: InvoiceInput): Promise<InvoiceDetail> =>
+    unwrap(await apiClient.post('/finance/invoices', input)));
+}
+
+export function useUpdateInvoice() {
+  return useFinanceMutation(async ({ id, input }: { id: string; input: InvoiceInput }): Promise<InvoiceDetail> =>
+    unwrap(await apiClient.patch(`/finance/invoices/${id}`, input)));
+}
+
+export type InvoiceTransition = 'submit' | 'approve' | 'reject' | 'cancel';
+
+export function useInvoiceTransition() {
+  return useFinanceMutation(
+    async ({ id, transition, note }: { id: string; transition: InvoiceTransition; note?: string }): Promise<InvoiceDetail> =>
+      unwrap(await apiClient.post(`/finance/invoices/${id}/${transition}`, note ? { note } : {})),
+  );
+}
+
+/* ---------- Payments ---------- */
+
+export function useCreatePayment() {
+  return useFinanceMutation(async (input: PaymentInput): Promise<Payment> =>
+    unwrap(await apiClient.post('/finance/payments', input)));
+}
+
+export type PaymentTransition = 'approve' | 'reject' | 'cancel';
+
+export function usePaymentTransition() {
+  return useFinanceMutation(
+    async ({ id, transition, note }: { id: string; transition: PaymentTransition; note?: string }): Promise<Payment> =>
+      unwrap(await apiClient.post(`/finance/payments/${id}/${transition}`, note ? { note } : {})),
+  );
+}
+
+export function useMarkPaymentPaid() {
+  return useFinanceMutation(async ({ id, input }: { id: string; input: MarkPaidInput }): Promise<Payment> =>
+    unwrap(await apiClient.post(`/finance/payments/${id}/paid`, input)));
 }

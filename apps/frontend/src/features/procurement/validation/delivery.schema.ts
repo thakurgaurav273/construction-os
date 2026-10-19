@@ -38,12 +38,3 @@ export const receiveGoodsSchema = z
   });
 
 export type ReceiveGoodsFormValues = z.infer<typeof receiveGoodsSchema>;
-
-export const reviewNoteSchema = (required: boolean) =>
-  z.object({
-    note: required
-      ? z.string().trim().min(3, 'Add a note explaining the decision').max(MAX_NOTE_LENGTH)
-      : z.string().trim().max(MAX_NOTE_LENGTH),
-  });
-
-export type ReviewNoteFormValues = { note: string };

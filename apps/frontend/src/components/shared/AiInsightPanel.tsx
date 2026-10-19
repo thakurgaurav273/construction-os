@@ -3,7 +3,17 @@
 import React from 'react';
 import { Skeleton } from '@sitepilot/ui';
 import { AlertTriangle, TrendingUp, Sparkles, Info, ChevronRight } from 'lucide-react';
-import type { InsightTone, ProcurementInsight } from '@/features/procurement/utils/insights';
+
+export type InsightTone = 'critical' | 'warning' | 'positive' | 'info';
+
+/** A short, actionable call-out. `target` is whatever clicking it should open (an order, an invoice…). */
+export interface Insight<TTarget = never> {
+  id: string;
+  tone: InsightTone;
+  title: string;
+  body: string;
+  target?: TTarget;
+}
 
 const TONE_ICON: Record<InsightTone, React.ComponentType<{ className?: string }>> = {
   critical: AlertTriangle,
@@ -19,12 +29,12 @@ const TONE_ICON_COLOR: Record<InsightTone, string> = {
   info: 'text-blue-500',
 };
 
-interface AiInsightCardProps {
-  insight: ProcurementInsight;
-  onSelect?: (insight: ProcurementInsight) => void;
+interface AiInsightCardProps<TTarget> {
+  insight: Insight<TTarget>;
+  onSelect?: (insight: Insight<TTarget>) => void;
 }
 
-export function AiInsightCard({ insight, onSelect }: AiInsightCardProps): React.ReactElement {
+export function AiInsightCard<TTarget>({ insight, onSelect }: AiInsightCardProps<TTarget>): React.ReactElement {
   const Icon = TONE_ICON[insight.tone];
   const content = (
     <>
@@ -51,22 +61,22 @@ export function AiInsightCard({ insight, onSelect }: AiInsightCardProps): React.
   return <div className="bg-card border rounded-lg p-3 shadow-sm">{content}</div>;
 }
 
-interface AiInsightPanelProps {
-  insights: ProcurementInsight[] | undefined;
-  onSelect?: (insight: ProcurementInsight) => void;
-  title?: string;
+interface AiInsightPanelProps<TTarget> {
+  insights: Insight<TTarget>[] | undefined;
+  onSelect?: (insight: Insight<TTarget>) => void;
+  title: string;
   subtitle?: string;
   className?: string;
 }
 
 /** Sticky right-rail panel that matches the Workforce "AI Insights" signature block. */
-export function AiInsightPanel({
+export function AiInsightPanel<TTarget>({
   insights,
   onSelect,
-  title = 'AI Procurement Insights',
+  title,
   subtitle = 'What needs your attention right now',
   className = '',
-}: AiInsightPanelProps): React.ReactElement {
+}: AiInsightPanelProps<TTarget>): React.ReactElement {
   return (
     <div className={`border border-primary/20 bg-primary/5 rounded-xl overflow-hidden relative ${className}`}>
       <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
@@ -81,7 +91,7 @@ export function AiInsightPanel({
       </div>
       <div className="p-4 pt-2 space-y-3 relative z-10">
         {insights
-          ? insights.map((insight) => <AiInsightCard key={insight.id} insight={insight} onSelect={onSelect} />)
+          ? insights.map((insight) => <AiInsightCard<TTarget> key={insight.id} insight={insight} onSelect={onSelect} />)
           : Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-20 w-full rounded-lg" />)}
       </div>
     </div>

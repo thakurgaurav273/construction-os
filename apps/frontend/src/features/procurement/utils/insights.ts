@@ -1,16 +1,8 @@
+import type { Insight } from '@/components/shared/AiInsightPanel';
 import { formatCompactINR } from './format';
 import type { ProcurementSummary } from '../types';
 
-export type InsightTone = 'critical' | 'warning' | 'positive' | 'info';
-
-export interface ProcurementInsight {
-  id: string;
-  tone: InsightTone;
-  title: string;
-  body: string;
-  /** What clicking the insight opens. */
-  target?: { kind: 'order' | 'rfq'; id: string };
-}
+export type ProcurementInsight = Insight<{ kind: 'order' | 'rfq'; id: string }>;
 
 const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? '' : 's'}`;
 

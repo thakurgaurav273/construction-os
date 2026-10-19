@@ -18,7 +18,7 @@ import { PurchaseOrderFormDialog } from '@/features/procurement/components/Purch
 import { RfqFormDialog } from '@/features/procurement/components/RfqFormDialog';
 import { VendorFormDialog } from '@/features/procurement/components/VendorFormDialog';
 import { ProcurementKpis } from './components/ProcurementKpis';
-import { AiInsightPanel } from './components/AiInsightCard';
+import { AiInsightPanel } from '@/components/shared/AiInsightPanel';
 import { PurchaseOrderFilters, DEFAULT_PO_FILTERS, filterPurchaseOrders } from './components/PurchaseOrderFilters';
 import { PurchaseOrderTable } from './components/PurchaseOrderTable';
 import { PurchaseOrderDrawer } from './components/PurchaseOrderDrawer';
@@ -192,7 +192,7 @@ export default function ProcurementPage(): React.ReactElement {
           transition={{ delay: 0.3 }}
           className="xl:col-span-1"
         >
-          <AiInsightPanel insights={insights} onSelect={handleInsight} className="sticky top-6" />
+          <AiInsightPanel title="AI Procurement Insights" insights={insights} onSelect={handleInsight} className="sticky top-6" />
         </motion.div>
       </div>
 

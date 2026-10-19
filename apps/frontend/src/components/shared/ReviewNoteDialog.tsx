@@ -6,14 +6,26 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Textarea,
 } from '@sitepilot/ui';
-import { FormField } from '@/components/shared/FormField';
-import { reviewNoteSchema, type ReviewNoteFormValues } from '../validation/delivery.schema';
+import { z } from 'zod';
+import { FormField } from './FormField';
+
+/** Matches the backend's note limit for approvals, rejections and cancellations. */
+const MAX_NOTE_LENGTH = 1000;
+
+const reviewNoteSchema = (required: boolean) =>
+  z.object({
+    note: required
+      ? z.string().trim().min(3, 'Add a note explaining the decision').max(MAX_NOTE_LENGTH)
+      : z.string().trim().max(MAX_NOTE_LENGTH),
+  });
+
+type ReviewNoteFormValues = { note: string };
 
 export interface ReviewNoteRequest {
   title: string;
   description: string;
   confirmLabel: string;
-  /** Rejections and change requests must explain themselves to the requester. */
+  /** Rejections, change requests and approval overrides must explain themselves. */
   noteRequired: boolean;
   destructive?: boolean;
   onConfirm: (note: string) => Promise<void>;

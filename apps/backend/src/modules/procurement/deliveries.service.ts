@@ -6,7 +6,7 @@ import { DELIVERY_INCLUDE, DeliveryView, toDeliveryView } from './delivery.mappe
 import { nextDocumentNumber, withDocumentNumberRetry } from './document-numbers';
 import { DeliveryQueryDto, ReceiveGoodsDto, ReceivedItemDto, ScheduleDeliveryDto } from './dto/delivery.dto';
 import { DOCUMENT_PREFIX, OPEN_DELIVERY_STATUSES, PO_EVENTS } from './procurement.constants';
-import { formatDay, toNumber, wholeDaysBetween } from './procurement-math';
+import { formatDay, isFutureDay, toNumber } from './procurement-math';
 import { PurchaseOrderHistoryService } from './purchase-order-history.service';
 import { isFullyReceived } from './purchase-order.mapper';
 import { PurchaseOrderWithItems, PurchaseOrdersService, parseFutureDate } from './purchase-orders.service';
@@ -97,7 +97,7 @@ export class DeliveriesService {
     assertReceivable(order);
     const receivedItems = validateReceivedItems(order, dto.items);
     const receivedAt = dto.receivedAt ? new Date(dto.receivedAt) : new Date();
-    if (wholeDaysBetween(new Date(), receivedAt) > 0) throw new BadRequestException("Received date can't be in the future.");
+    if (isFutureDay(receivedAt)) throw new BadRequestException("Received date can't be in the future.");
     if (dto.deliveryId) await this.findOpenDelivery(dto.deliveryId, purchaseOrderId, organizationId);
 
     const delivery = await withDocumentNumberRetry(() => this.prisma.$transaction(async (tx) => {

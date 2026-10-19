@@ -95,6 +95,8 @@ export interface VendorStats {
   lastOrderDate: string | null;
   onTimeDeliveryPercent: number | null;
   deliveriesReceived: number;
+  /** Approved vendor bills not yet paid (from finance). */
+  outstandingBalance: number;
 }
 
 export interface Vendor {

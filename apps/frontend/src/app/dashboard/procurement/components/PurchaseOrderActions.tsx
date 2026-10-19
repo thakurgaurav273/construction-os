@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@sitepilot/ui';
 import {
-  Ban, CalendarPlus, CheckCircle2, Copy, Loader2, PackageCheck, Pencil, RotateCcw, Send, XCircle,
+  Ban, CalendarPlus, CheckCircle2, Copy, Loader2, PackageCheck, Pencil, Receipt, RotateCcw, Send, XCircle,
 } from 'lucide-react';
 import { usePurchaseOrderTransition, type PurchaseOrderTransition } from '@/hooks/api/use-procurement';
 import { getApiErrorMessage } from '@/lib/api/errors';
@@ -12,8 +12,9 @@ import { useAuthStore } from '@/store/auth.store';
 import { getOrderPermissions } from '@/features/procurement/utils/order-rules';
 import type { PurchaseOrderDetail } from '@/features/procurement/types';
 import { PurchaseOrderFormDialog } from '@/features/procurement/components/PurchaseOrderFormDialog';
-import { ReviewNoteDialog, type ReviewNoteRequest } from '@/features/procurement/components/ReviewNoteDialog';
+import { ReviewNoteDialog, type ReviewNoteRequest } from '@/components/shared/ReviewNoteDialog';
 import { ScheduleDeliveryDialog } from '@/features/procurement/components/ScheduleDeliveryDialog';
+import { InvoiceFormDialog } from '@/features/finance/components/InvoiceFormDialog';
 
 interface PurchaseOrderActionsProps {
   order: PurchaseOrderDetail;
@@ -27,8 +28,11 @@ export function PurchaseOrderActions({ order, onReceive, onOpenOrder }: Purchase
   const transition = usePurchaseOrderTransition();
   const [editOpen, setEditOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [noteRequest, setNoteRequest] = useState<ReviewNoteRequest | null>(null);
   const permissions = getOrderPermissions(order, currentUserId);
+  // Vendors bill for what arrived, so billing opens once anything has been received.
+  const canRecordInvoice = order.status === 'APPROVED' && order.receivedPercent > 0 && !!order.vendor;
 
   async function runTransition(kind: PurchaseOrderTransition, successMessage: string, note?: string): Promise<void> {
     try {
@@ -128,6 +132,12 @@ export function PurchaseOrderActions({ order, onReceive, onOpenOrder }: Purchase
         </div>
       )}
 
+      {canRecordInvoice && (
+        <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => setInvoiceOpen(true)}>
+          <Receipt className="h-3.5 w-3.5" /> Record vendor invoice
+        </Button>
+      )}
+
       <div className="flex items-center justify-between gap-2">
         <Button
           size="sm"
@@ -159,6 +169,13 @@ export function PurchaseOrderActions({ order, onReceive, onOpenOrder }: Purchase
 
       <PurchaseOrderFormDialog open={editOpen} onOpenChange={setEditOpen} order={order} />
       <ScheduleDeliveryDialog order={scheduleOpen ? order : null} onClose={() => setScheduleOpen(false)} />
+      {order.vendor && (
+        <InvoiceFormDialog
+          open={invoiceOpen}
+          onOpenChange={setInvoiceOpen}
+          defaults={{ vendorId: order.vendor.id, purchaseOrderId: order.id }}
+        />
+      )}
       <ReviewNoteDialog request={noteRequest} onClose={() => setNoteRequest(null)} />
     </div>
   );

@@ -1,5 +1,4 @@
 import { Vendor, VendorStatus } from '@prisma/client';
-import { toNumber } from './procurement-math';
 
 /** Derived from approved purchase orders and received deliveries, never stored. */
 export interface VendorStats {
@@ -10,6 +9,8 @@ export interface VendorStats {
   /** Share of received deliveries that arrived on or before the scheduled day; null until one arrives. */
   onTimeDeliveryPercent: number | null;
   deliveriesReceived: number;
+  /** Approved vendor bills not yet paid. */
+  outstandingBalance: number;
 }
 
 export const EMPTY_VENDOR_STATS: VendorStats = {
@@ -19,6 +20,7 @@ export const EMPTY_VENDOR_STATS: VendorStats = {
   lastOrderDate: null,
   onTimeDeliveryPercent: null,
   deliveriesReceived: 0,
+  outstandingBalance: 0,
 };
 
 export interface VendorView {
@@ -57,7 +59,7 @@ export function toVendorView(vendor: Vendor, stats: VendorStats): VendorView {
     deliveryAccuracy: vendor.deliveryAccuracy,
     qualityRating: vendor.qualityRating,
     responseTimeHours: vendor.responseTimeHours,
-    outstandingBalance: toNumber(vendor.outstandingBalance),
+    outstandingBalance: stats.outstandingBalance,
     contactPerson: vendor.contactPerson,
     phone: vendor.phone,
     email: vendor.email,

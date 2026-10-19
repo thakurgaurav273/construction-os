@@ -661,6 +661,51 @@ Approvals and receipts carry financial weight, so the rules must hold regardless
 
 ---
 
+# ADR-018 - Payables and Three-Way Match
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-20
+
+---
+
+## Context
+
+Finance was read-only seeded data. Vendor bills weren't linked to vendors, purchase orders or receipts. "Overdue" was a stored status, and the vendor outstanding balance was a stored number that never changed.
+
+---
+
+## Decision
+
+- Invoices are vendor bills (accounts payable): `DRAFT → PENDING_APPROVAL → APPROVED → PARTIALLY_PAID → PAID`, or `REJECTED` / `CANCELLED`. The bill number is unique per vendor.
+- A bill may be raised against an approved purchase order. Its vendor and project come from the PO, and its lines may reference PO lines.
+- **Three-way match** per line, computed on read: billed qty must not exceed received-but-unbilled qty, the rate must not exceed the PO's effective (post-discount) rate by more than 1%, and GST must match. A bill with a variance can still be approved, but only with a note explaining the override.
+- Payments are requested against approved bills: `PENDING → APPROVED → PAID`. A payment can't exceed the bill's balance not already covered by pending, approved or paid payments; the invoice row is locked while checking. Marking a payment paid updates the bill's status in the same transaction.
+- Maker-checker applies twice: whoever enters a bill can't approve it, and whoever requests a payment can't approve it.
+- Overdue, balance due and vendor outstanding balance are derived, never stored (`vendors.outstandingBalance` was dropped).
+- Invoice and payment history is written to the shared `Activity` feed against the invoice. No separate audit table.
+- User-entered "can't be in the future" dates allow one day of slack. Dates are compared in UTC, but users ahead of UTC (India) enter them in local time.
+
+---
+
+## Alternatives
+
+- Header-level matching (invoice total vs PO total): rejected, because it hides over-billing on one line behind under-billing on another.
+- Blocking approval of mismatched bills: rejected. Price escalations and approved substitutions are normal in construction, so an explained override is more realistic than a hard stop.
+
+---
+
+## Consequences
+
+- New payments always belong to an invoice. Older payments without one can still be approved and paid, but have no linked bill or history entry.
+- Budgets (`spent`, `committed`) and the cash flow ledger are still entered data, not derived from POs and payments. Mapping PO categories to budget categories is follow-up work.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.
