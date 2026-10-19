@@ -16,6 +16,8 @@ import { InventoryItemsService } from './inventory-items.service';
 import { InventoryTransactionsService } from './inventory-transactions.service';
 import { InventoryTransfersService } from './inventory-transfers.service';
 import { InventoryWarehousesService } from './inventory-warehouses.service';
+import { InventoryReorderService, ReorderSuggestion } from './inventory-reorder.service';
+import { ReorderQueryDto } from './dto/reorder-query.dto';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
 interface AuthUser {
@@ -34,7 +36,14 @@ export class InventoryController {
     private readonly transactions: InventoryTransactionsService,
     private readonly adjustments: InventoryAdjustmentsService,
     private readonly dashboard: InventoryDashboardService,
+    private readonly reorder: InventoryReorderService,
   ) {}
+
+  /** Suggested quantity, vendor and rate for restocking a material, used to prefill a draft purchase order. */
+  @Get('reorder-suggestion')
+  getReorderSuggestion(@Query() query: ReorderQueryDto, @CurrentUser() user: AuthUser): Promise<ReorderSuggestion> {
+    return this.reorder.suggest(user.organizationId, query.materialId, query.warehouseId);
+  }
 
   @Get('dashboard')
   getDashboard(@CurrentUser() user: AuthUser) {

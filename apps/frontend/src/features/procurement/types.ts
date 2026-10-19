@@ -15,6 +15,8 @@ export interface NamedRef {
 
 export interface PoLineItem {
   id: string;
+  /** Catalogue material whose stock this line replenishes; null for services and unlinked lines. */
+  material: { id: string; name: string; unit: string } | null;
   description: string;
   category: string;
   unit: string;
@@ -76,6 +78,8 @@ export interface Delivery {
   vendor: NamedRef | null;
   project: NamedRef | null;
   receivedBy: NamedRef | null;
+  /** Store the goods were posted into; null when nothing received was a stocked material. */
+  warehouse: NamedRef | null;
   items: ReceivedItem[];
 }
 
@@ -229,6 +233,7 @@ export interface ProcurementAnalytics {
 /* ---------- Request payloads (match the backend DTOs) ---------- */
 
 export interface PurchaseOrderItemInput {
+  materialId?: string;
   description: string;
   category?: string;
   unit: string;
@@ -290,8 +295,31 @@ export interface ScheduleDeliveryInput {
 
 export interface ReceiveGoodsInput {
   deliveryId?: string;
+  warehouseId?: string;
   receivedAt?: string;
   trackingId?: string;
   notes?: string;
-  items: { poLineItemId: string; quantity: number }[];
+  items: { poLineItemId: string; quantity: number; materialId?: string }[];
+}
+
+export interface ReorderSuggestion {
+  material: { id: string; name: string; sku: string; unit: string; unitCost: number };
+  warehouse: { id: string; name: string; projectId: string | null } | null;
+  available: number;
+  reorderLevel: number;
+  targetLevel: number;
+  onOrder: number;
+  inApproval: number;
+  suggestedQuantity: number;
+  lastPurchase: {
+    poNumber: string;
+    date: string;
+    vendor: NamedRef | null;
+    rate: number;
+    taxPercent: number;
+    category: string;
+  } | null;
+  projectId: string | null;
+  deliveryAddress: string;
+  category: string;
 }

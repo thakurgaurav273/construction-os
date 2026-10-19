@@ -147,6 +147,7 @@ export function PurchaseOrderDrawer({ orderId, open, onClose, onOpenOrder }: Pur
                           <tr key={item.id} className="border-b last:border-0">
                             <td className="py-2 pr-2">
                               <p className="font-medium text-foreground">{item.description}</p>
+                              {item.material && <p className="text-muted-foreground">Stock item · {item.material.name}</p>}
                               {order.status === 'APPROVED' && (
                                 <p className="text-muted-foreground">{item.receivedQuantity} of {item.quantity} {item.unit} received</p>
                               )}

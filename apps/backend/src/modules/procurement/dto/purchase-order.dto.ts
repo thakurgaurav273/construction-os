@@ -8,6 +8,11 @@ import {
 import { MAX_LINE_ITEMS } from '../procurement.constants';
 
 export class PurchaseOrderItemDto {
+  @ApiPropertyOptional({ description: 'Catalogue material; receipts of this line are posted to stock' })
+  @IsOptional()
+  @IsUUID()
+  materialId?: string;
+
   @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(200) description!: string;
   @ApiPropertyOptional({ description: "Defaults to the order's category" })
   @IsOptional()

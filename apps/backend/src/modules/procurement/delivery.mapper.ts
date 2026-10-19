@@ -9,6 +9,7 @@ export const DELIVERY_INCLUDE = {
     select: { id: true, poNumber: true, category: true, vendor: NAME_REF, project: NAME_REF },
   },
   receivedBy: NAME_REF,
+  warehouse: NAME_REF,
   items: {
     include: { poLineItem: { select: { id: true, description: true, unit: true, sortOrder: true } } },
   },
@@ -43,6 +44,8 @@ export interface DeliveryView {
   vendor: NamedRef | null;
   project: NamedRef | null;
   receivedBy: NamedRef | null;
+  /** Store the goods were posted into; null when nothing received was a stocked material. */
+  warehouse: NamedRef | null;
   items: ReceivedItemView[];
 }
 
@@ -66,6 +69,7 @@ export function toDeliveryView(delivery: DeliveryRecord, today: Date): DeliveryV
     vendor: purchaseOrder.vendor,
     project: purchaseOrder.project,
     receivedBy: delivery.receivedBy,
+    warehouse: delivery.warehouse,
     items: [...delivery.items]
       .sort((a, b) => a.poLineItem.sortOrder - b.poLineItem.sortOrder)
       .map((item) => ({

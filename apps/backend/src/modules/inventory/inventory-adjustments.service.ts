@@ -1,12 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { InventoryTransactionType, Prisma, StockAdjustmentReason } from '@prisma/client';
+import { InventoryTransactionType, MaterialMovementType, Prisma, StockAdjustmentReason } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
 import { buildCode, num, round2 } from './inventory.helpers';
+import { StockLedgerService } from './stock-ledger.service';
 
 @Injectable()
 export class InventoryAdjustmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ledger: StockLedgerService,
+  ) {}
 
   /**
    * Correct the on-hand quantity of a material at a warehouse. Writes a StockAdjustment
@@ -89,6 +93,16 @@ export class InventoryAdjustmentsService {
           warehouseId: dto.warehouseId,
           organizationId,
         },
+      });
+
+      // Keep the material's organization-wide total equal to the sum of its warehouse quantities.
+      await this.ledger.changeMaterialTotal(tx, {
+        organizationId,
+        materialId: dto.materialId,
+        delta,
+        type: MaterialMovementType.ADJUSTMENT,
+        reference: code,
+        note: dto.note ?? `${reason} adjustment`,
       });
 
       return {

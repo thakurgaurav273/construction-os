@@ -53,6 +53,7 @@ export function PurchaseOrderDeliveries({ order, onReceive }: PurchaseOrderDeliv
                     ? `Received ${format(new Date(delivery.receivedAt), 'dd MMM yyyy')}${delivery.receivedBy ? ` by ${delivery.receivedBy.name}` : ''}`
                     : `Due ${format(new Date(delivery.scheduledDate), 'dd MMM yyyy')}`}
                   {delivery.trackingId && ` · ${delivery.trackingId}`}
+                  {delivery.warehouse && ` · into ${delivery.warehouse.name}`}
                 </p>
                 {delivery.items.length > 0 && (
                   <p className="text-xs text-muted-foreground truncate">

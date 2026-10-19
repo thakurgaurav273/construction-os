@@ -3,8 +3,8 @@ import type { QueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import type {
   Delivery, ProcurementAnalytics, ProcurementSummary, PurchaseOrder, PurchaseOrderDetail, PurchaseOrderInput,
-  PurchaseOrderStatus, QuoteInput, ReceiveGoodsInput, Rfq, RfqDetail, RfqInput, ScheduleDeliveryInput, Vendor,
-  VendorInput,
+  PurchaseOrderStatus, QuoteInput, ReceiveGoodsInput, ReorderSuggestion, Rfq, RfqDetail, RfqInput, ScheduleDeliveryInput,
+  Vendor, VendorInput,
 } from '@/features/procurement/types';
 
 function unwrap<T>(res: { data: { data?: T } & T }): T {
@@ -17,6 +17,10 @@ function unwrap<T>(res: { data: { data?: T } & T }): T {
  */
 function invalidateProcurement(qc: QueryClient): void {
   qc.invalidateQueries({ queryKey: ['procurement'] });
+  // Goods receipts post to stock.
+  qc.invalidateQueries({ queryKey: ['inventory'] });
+  qc.invalidateQueries({ queryKey: ['materials'] });
+  qc.invalidateQueries({ queryKey: ['material'] });
   qc.invalidateQueries({ queryKey: ['dashboard-stats'] });
   qc.invalidateQueries({ queryKey: ['timeline'] });
 }
@@ -186,4 +190,12 @@ export function useRfqTransition() {
 export function useAwardRfq() {
   return useProcurementMutation(async ({ id, invitationId }: { id: string; invitationId: string }): Promise<RfqDetail> =>
     unwrap(await apiClient.post(`/rfqs/${id}/award`, { invitationId })));
+}
+
+/* ---------- Reorders ---------- */
+
+export function fetchReorderSuggestion(materialId: string, warehouseId?: string): Promise<ReorderSuggestion> {
+  return apiClient
+    .get('/inventory/reorder-suggestion', { params: { materialId, warehouseId } })
+    .then((res) => unwrap<ReorderSuggestion>(res));
 }

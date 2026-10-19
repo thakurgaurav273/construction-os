@@ -14,6 +14,12 @@ export class ScheduleDeliveryDto {
 
 export class ReceivedItemDto {
   @ApiProperty() @IsUUID() poLineItemId!: string;
+
+  @ApiPropertyOptional({ description: 'Links an unlinked PO line to a catalogue material so the receipt is posted to stock' })
+  @IsOptional()
+  @IsUUID()
+  materialId?: string;
+
   @ApiProperty() @Type(() => Number) @IsNumber({ maxDecimalPlaces: 3 }) @Min(0) quantity!: number;
 }
 
@@ -22,6 +28,11 @@ export class ReceiveGoodsDto {
   @IsOptional()
   @IsUUID()
   deliveryId?: string;
+
+  @ApiPropertyOptional({ description: "Store receiving stocked materials; defaults to the project's site store" })
+  @IsOptional()
+  @IsUUID()
+  warehouseId?: string;
 
   @ApiPropertyOptional({ description: 'Defaults to now' }) @IsOptional() @IsISO8601() receivedAt?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(80) trackingId?: string;

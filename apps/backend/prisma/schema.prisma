@@ -535,6 +535,7 @@ model Material {
   inventoryTransactions InventoryTransaction[]
   stockTransferItems    StockTransferItem[]
   stockAdjustments      StockAdjustment[]
+  poLineItems           PoLineItem[]
 
   @@unique([sku, organizationId])
   @@index([organizationId])
@@ -655,6 +656,7 @@ model Warehouse {
   adjustments   StockAdjustment[]
   transfersFrom StockTransfer[]        @relation("TransferFrom")
   transfersTo   StockTransfer[]        @relation("TransferTo")
+  deliveries    Delivery[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -977,12 +979,16 @@ model PoLineItem {
   /// Running total of goods received against this line across all GRNs.
   receivedQuantity Decimal @default(0) @db.Decimal(15, 3)
   sortOrder        Int     @default(0)
+  /// Catalogue material this line buys; receipts of linked lines are posted to stock. Null for services and hire.
+  materialId       String?
 
   purchaseOrder PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  material      Material?      @relation(fields: [materialId], references: [id], onDelete: SetNull)
   deliveryItems DeliveryItem[]
   invoiceItems  InvoiceItem[]
 
   @@index([purchaseOrderId])
+  @@index([materialId])
   @@map("po_line_items")
 }
 
@@ -1098,12 +1104,15 @@ model Delivery {
   trackingId      String?
   notes           String?
   receivedById    String?
+  /// Store the received goods were posted into (null when nothing on the GRN is a stocked material).
+  warehouseId     String?
   organizationId  String
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
   organization  Organization   @relation(fields: [organizationId], references: [id])
   purchaseOrder PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id])
+  warehouse     Warehouse?     @relation(fields: [warehouseId], references: [id])
   receivedBy    User?          @relation("DeliveryReceiver", fields: [receivedById], references: [id], onDelete: SetNull)
   items         DeliveryItem[]
 

@@ -18,6 +18,7 @@ import {
   formatCurrency, formatCompactINR, getMovementMeta,
 } from './materials-format';
 import { MaterialStatusBadge } from './MaterialStatusBadge';
+import { ReorderButton } from '@/features/procurement/components/ReorderButton';
 
 interface MaterialDrawerProps {
   materialId: string | null;
@@ -256,9 +257,7 @@ function MaterialDrawerBody({ material }: { material: MaterialDetail }): React.R
         >
           <SlidersHorizontal className="h-3.5 w-3.5" /> Adjust Stock
         </Button>
-        <Button size="sm" variant="outline" onClick={() => toast(`Reorder drafted for ${material.name} (demo)`)} className="gap-1.5">
-          <Truck className="h-3.5 w-3.5" /> Reorder
-        </Button>
+        <ReorderButton materialId={material.id} className="w-full" />
       </div>
     </>
   );

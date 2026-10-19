@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoLineItem, Prisma, ProcurementPriority, PurchaseOrder } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { sameUnit } from '../inventory/units';
 import { nextDocumentNumber, withDocumentNumberRetry } from './document-numbers';
 import {
   CreatePurchaseOrderDto, PurchaseOrderItemDto, PurchaseOrderQueryDto, UpdatePurchaseOrderDto,
@@ -15,6 +16,7 @@ import {
 import { VendorsService } from './vendors.service';
 
 export interface DraftLineItem {
+  materialId?: string | null;
   description: string;
   category: string;
   unit: string;
@@ -71,6 +73,7 @@ export class PurchaseOrdersService {
   async create(organizationId: string, userId: string, dto: CreatePurchaseOrderDto): Promise<PurchaseOrderDetailView> {
     await this.assertProjectInOrganization(dto.projectId, organizationId);
     await this.vendors.findActiveVendor(dto.vendorId, organizationId);
+    await assertMaterialLinks(this.prisma, organizationId, dto.items);
     const category = dto.category.trim();
 
     const order = await withDocumentNumberRetry(() => this.prisma.$transaction((tx) => this.createDraft(tx, {
@@ -94,6 +97,7 @@ export class PurchaseOrdersService {
     assertEditable(existing);
     if (dto.projectId) await this.assertProjectInOrganization(dto.projectId, organizationId);
     if (dto.vendorId) await this.vendors.findActiveVendor(dto.vendorId, organizationId);
+    if (dto.items) await assertMaterialLinks(this.prisma, organizationId, dto.items);
     const category = dto.category?.trim() ?? existing.category;
 
     await this.prisma.$transaction(async (tx) => {
@@ -142,6 +146,7 @@ export class PurchaseOrdersService {
       deliveryAddress: source.deliveryAddress,
       notes: source.notes,
       items: source.items.map((item) => ({
+        materialId: item.materialId,
         description: item.description,
         category: item.category,
         unit: item.unit,
@@ -224,6 +229,7 @@ export function parseFutureDate(value: string, label = 'Expected delivery'): Dat
 
 function toDraftLineItems(items: PurchaseOrderItemDto[], category: string): DraftLineItem[] {
   return items.map((item) => ({
+    materialId: item.materialId ?? null,
     description: item.description.trim(),
     category: item.category?.trim() || category,
     unit: item.unit.trim(),
@@ -232,4 +238,38 @@ function toDraftLineItems(items: PurchaseOrderItemDto[], category: string): Draf
     taxPercent: item.taxPercent ?? 0,
     discountPercent: item.discountPercent ?? 0,
   }));
+}
+
+interface MaterialLink {
+  materialId?: string | null;
+  unit: string;
+  description: string;
+}
+
+/**
+ * A line may only point at a catalogue material in the same organization, bought in the unit the material is
+ * stocked in. Otherwise receipts would post e.g. 2 MT of steel as 2 kg.
+ */
+export async function assertMaterialLinks(
+  db: PrismaService | Prisma.TransactionClient,
+  organizationId: string,
+  lines: MaterialLink[],
+): Promise<void> {
+  const ids = [...new Set(lines.map((line) => line.materialId).filter((id): id is string => !!id))];
+  if (ids.length === 0) return;
+  const materials = await db.material.findMany({
+    where: { id: { in: ids }, organizationId, deletedAt: null },
+    select: { id: true, name: true, unit: true },
+  });
+  const byId = new Map(materials.map((material) => [material.id, material]));
+  for (const line of lines) {
+    if (!line.materialId) continue;
+    const material = byId.get(line.materialId);
+    if (!material) throw new BadRequestException(`"${line.description}" is linked to a material that doesn't exist.`);
+    if (!sameUnit(material.unit, line.unit)) {
+      throw new BadRequestException(
+        `${material.name} is stocked in ${material.unit}, but "${line.description}" is ordered in ${line.unit}. Use the same unit or pick another material.`,
+      );
+    }
+  }
 }

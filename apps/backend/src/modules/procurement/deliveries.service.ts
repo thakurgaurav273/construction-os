@@ -1,7 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DeliveryStatus, Prisma } from '@prisma/client';
+import { DeliveryStatus, PoLineItem, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { normalizeOptionalText } from '../../common/utils/normalize-text';
+import { ReceiptLine, StockLedgerService } from '../inventory/stock-ledger.service';
 import { DELIVERY_INCLUDE, DeliveryView, toDeliveryView } from './delivery.mapper';
 import { nextDocumentNumber, withDocumentNumberRetry } from './document-numbers';
 import { DeliveryQueryDto, ReceiveGoodsDto, ReceivedItemDto, ScheduleDeliveryDto } from './dto/delivery.dto';
@@ -9,7 +10,7 @@ import { DOCUMENT_PREFIX, OPEN_DELIVERY_STATUSES, PO_EVENTS } from './procuremen
 import { formatDay, isFutureDay, toNumber } from './procurement-math';
 import { PurchaseOrderHistoryService } from './purchase-order-history.service';
 import { isFullyReceived } from './purchase-order.mapper';
-import { PurchaseOrderWithItems, PurchaseOrdersService, parseFutureDate } from './purchase-orders.service';
+import { PurchaseOrderWithItems, PurchaseOrdersService, assertMaterialLinks, parseFutureDate } from './purchase-orders.service';
 
 /** Quantities carry three decimals; anything smaller is rounding noise. */
 const QUANTITY_EPSILON = 0.0005;
@@ -20,6 +21,7 @@ export class DeliveriesService {
     private readonly prisma: PrismaService,
     private readonly orders: PurchaseOrdersService,
     private readonly history: PurchaseOrderHistoryService,
+    private readonly ledger: StockLedgerService,
   ) {}
 
   async findAll(organizationId: string, query: DeliveryQueryDto): Promise<DeliveryView[]> {
@@ -108,7 +110,12 @@ export class DeliveriesService {
       assertWithinOutstanding(lines, receivedByLine);
 
       const grnNumber = await this.nextGrnNumber(tx, organizationId);
+      const stockLines = await linkStockLines(tx, organizationId, lines, dto.items);
+      const warehouseId = stockLines.length
+        ? await resolveReceivingStore(tx, organizationId, order.projectId, dto.warehouseId)
+        : null;
       const receipt = {
+        warehouseId,
         status: 'RECEIVED' as const,
         grnNumber,
         receivedAt,
@@ -129,6 +136,17 @@ export class DeliveriesService {
         await tx.poLineItem.update({
           where: { id: item.poLineItemId },
           data: { receivedQuantity: { increment: item.quantity } },
+        });
+      }
+      if (warehouseId) {
+        await this.ledger.receive(tx, {
+          organizationId,
+          warehouseId,
+          projectId: order.projectId,
+          reference: grnNumber,
+          note: `Received against ${order.poNumber}`,
+          occurredAt: receivedAt,
+          lines: stockLines,
         });
       }
 
@@ -227,4 +245,59 @@ function assertWithinOutstanding(
       );
     }
   }
+}
+
+/**
+ * Received lines that replenish stock. A line already linked to a material keeps its link; an unlinked line can be
+ * linked on first receipt (saved on the PO line so later GRNs and the 3-way match see it). Unlinked lines with no
+ * material chosen (services, hire, one-off items) are received without touching stock.
+ */
+async function linkStockLines(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  lines: PoLineItem[],
+  received: ReceivedItemDto[],
+): Promise<ReceiptLine[]> {
+  const lineById = new Map(lines.map((line) => [line.id, line]));
+  const newLinks = received.filter((item) => item.materialId && !lineById.get(item.poLineItemId)?.materialId);
+  for (const item of received) {
+    const line = lineById.get(item.poLineItemId);
+    if (item.materialId && line?.materialId && line.materialId !== item.materialId) {
+      throw new BadRequestException(`"${line.description}" is already linked to a different material.`);
+    }
+  }
+  await assertMaterialLinks(tx, organizationId, newLinks.map((item) => {
+    const line = lineById.get(item.poLineItemId);
+    return { materialId: item.materialId, unit: line?.unit ?? '', description: line?.description ?? 'A line' };
+  }));
+  for (const item of newLinks) {
+    await tx.poLineItem.update({ where: { id: item.poLineItemId }, data: { materialId: item.materialId } });
+  }
+
+  return received.flatMap((item) => {
+    const line = lineById.get(item.poLineItemId);
+    const materialId = line?.materialId ?? item.materialId;
+    if (!line || !materialId || item.quantity <= 0) return [];
+    // Stock is carried at the agreed rate after discount, before GST.
+    return [{ materialId, quantity: item.quantity, unitCost: toNumber(line.rate) * (1 - line.discountPercent / 100) }];
+  });
+}
+
+/** The chosen store, or the project's own site store when it has exactly one. */
+async function resolveReceivingStore(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  projectId: string | null,
+  warehouseId: string | undefined,
+): Promise<string> {
+  if (warehouseId) {
+    const store = await tx.warehouse.findFirst({ where: { id: warehouseId, organizationId, deletedAt: null }, select: { id: true } });
+    if (!store) throw new NotFoundException('Store not found.');
+    return store.id;
+  }
+  const siteStores = projectId
+    ? await tx.warehouse.findMany({ where: { organizationId, projectId, deletedAt: null }, select: { id: true } })
+    : [];
+  if (siteStores.length === 1) return siteStores[0].id;
+  throw new BadRequestException('Choose the store receiving these goods.');
 }

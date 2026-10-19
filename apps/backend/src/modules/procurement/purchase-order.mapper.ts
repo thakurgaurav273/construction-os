@@ -8,7 +8,7 @@ export const PO_LIST_INCLUDE = {
   project: NAME_REF,
   vendor: NAME_REF,
   requestedBy: NAME_REF,
-  items: { orderBy: { sortOrder: 'asc' } },
+  items: { orderBy: { sortOrder: 'asc' }, include: { material: { select: { id: true, name: true, unit: true } } } },
   deliveries: { select: { status: true } },
 } satisfies Prisma.PurchaseOrderInclude;
 
@@ -26,6 +26,8 @@ type LineItemRecord = PurchaseOrderListRecord['items'][number];
 
 export interface PoLineItemView {
   id: string;
+  /** Catalogue material whose stock this line replenishes; null for services and unlinked lines. */
+  material: { id: string; name: string; unit: string } | null;
   description: string;
   category: string;
   unit: string;
@@ -112,6 +114,7 @@ function toLineItemView(item: LineItemRecord): PoLineItemView {
   };
   return {
     id: item.id,
+    material: item.material,
     description: item.description,
     category: item.category,
     unit: item.unit,

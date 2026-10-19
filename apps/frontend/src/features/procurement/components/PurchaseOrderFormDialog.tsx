@@ -28,31 +28,35 @@ interface PurchaseOrderFormDialogProps {
   vendor?: Vendor;
   /** Pre-selects the project when raising an order from a project page. */
   projectId?: string;
+  /** Prefilled values for a new order, e.g. a reorder suggestion. */
+  prefill?: Partial<PurchaseOrderFormValues>;
+  /** Short explanation shown above the form, e.g. why this quantity was suggested. */
+  context?: React.ReactNode;
   /** Called with the saved order, e.g. to open it in the drawer. */
   onSaved?: (orderId: string) => void;
 }
 
-export function PurchaseOrderFormDialog({ open, onOpenChange, order, vendor, projectId, onSaved }: PurchaseOrderFormDialogProps): React.ReactElement {
+export function PurchaseOrderFormDialog({
+  open, onOpenChange, order, vendor, projectId, prefill, context, onSaved,
+}: PurchaseOrderFormDialogProps): React.ReactElement {
   const { data: projects = [] } = useProjects();
   const { data: vendors = [] } = useVendors();
   const createOrder = useCreatePurchaseOrder();
   const updateOrder = useUpdatePurchaseOrder();
-  const { register, control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<PurchaseOrderFormValues>({
+  const { register, control, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<PurchaseOrderFormValues>({
     resolver: zodResolver(purchaseOrderSchema),
-    defaultValues: toPurchaseOrderFormValues(order, vendor, projectId),
+    defaultValues: { ...toPurchaseOrderFormValues(order, vendor, projectId), ...prefill },
   });
 
   const activeVendors = vendors.filter((option) => option.status === 'ACTIVE' || option.id === order?.vendor?.id);
-  const categories = order && !PROCUREMENT_CATEGORIES.includes(order.category)
-    ? [order.category, ...PROCUREMENT_CATEGORIES]
-    : PROCUREMENT_CATEGORIES;
+  const categories = [...new Set([order?.category, prefill?.category, ...PROCUREMENT_CATEGORIES].filter((value): value is string => !!value))];
 
   // Reset only as the dialog opens; background refetches must not wipe in-progress edits.
   const wasOpen = useRef(false);
   useEffect(() => {
-    if (open && !wasOpen.current) reset(toPurchaseOrderFormValues(order, vendor, projectId));
+    if (open && !wasOpen.current) reset({ ...toPurchaseOrderFormValues(order, vendor, projectId), ...prefill });
     wasOpen.current = open;
-  }, [open, order, vendor, projectId, reset]);
+  }, [open, order, vendor, projectId, prefill, reset]);
 
   async function onSubmit(values: PurchaseOrderFormValues): Promise<void> {
     const input = toPurchaseOrderInput(values);
@@ -79,6 +83,8 @@ export function PurchaseOrderFormDialog({ open, onOpenChange, order, vendor, pro
             {order ? 'Update the order, then resubmit it for approval.' : 'Saved as a draft. Submit it for approval from the order drawer.'}
           </DialogDescription>
         </DialogHeader>
+
+        {context && <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">{context}</div>}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -130,7 +136,7 @@ export function PurchaseOrderFormDialog({ open, onOpenChange, order, vendor, pro
             </FormField>
           </div>
 
-          <LineItemsEditor control={control} register={register} errors={errors} />
+          <LineItemsEditor control={control} register={register} errors={errors} setValue={setValue} />
 
           <FormField label="Notes (optional)" htmlFor="po-notes" error={errors.notes?.message}>
             <Textarea id="po-notes" rows={2} placeholder="Context for the approver" {...register('notes')} />

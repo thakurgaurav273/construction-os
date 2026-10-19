@@ -8,7 +8,11 @@ const percent = (label: string) =>
     .min(0, "Can't be negative")
     .max(100, 'Max 100%');
 
+/** Radix Select can't hold an empty value, so "not a stock item" uses a sentinel. */
+export const NOT_STOCKED = 'none';
+
 export const lineItemSchema = z.object({
+  materialId: z.string(),
   description: z.string().trim().min(2, 'Describe the item').max(200),
   unit: z.string().trim().min(1, 'Unit').max(20),
   quantity: z.coerce.number({ invalid_type_error: 'Enter a quantity' }).positive('Must be more than 0'),
@@ -32,7 +36,7 @@ export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 export type LineItemFormValues = z.infer<typeof lineItemSchema>;
 
 export function emptyLineItem(): LineItemFormValues {
-  return { description: '', unit: 'nos', quantity: 1, rate: 0, taxPercent: DEFAULT_GST_PERCENT, discountPercent: 0 };
+  return { materialId: NOT_STOCKED, description: '', unit: 'nos', quantity: 1, rate: 0, taxPercent: DEFAULT_GST_PERCENT, discountPercent: 0 };
 }
 
 export function toPurchaseOrderFormValues(order?: PurchaseOrder, vendor?: Vendor, projectId?: string): PurchaseOrderFormValues {
@@ -45,6 +49,7 @@ export function toPurchaseOrderFormValues(order?: PurchaseOrder, vendor?: Vendor
     deliveryAddress: order?.deliveryAddress ?? '',
     notes: order?.notes ?? '',
     items: order?.items.map((item) => ({
+      materialId: item.material?.id ?? NOT_STOCKED,
       description: item.description,
       unit: item.unit,
       quantity: item.quantity,
@@ -64,6 +69,10 @@ export function toPurchaseOrderInput(values: PurchaseOrderFormValues): PurchaseO
     expectedDelivery: values.expectedDelivery,
     deliveryAddress: values.deliveryAddress,
     notes: values.notes,
-    items: values.items.map((item) => ({ ...item, category: values.category })),
+    items: values.items.map(({ materialId, ...item }) => ({
+      ...item,
+      materialId: materialId === NOT_STOCKED ? undefined : materialId,
+      category: values.category,
+    })),
   };
 }

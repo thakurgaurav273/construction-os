@@ -1243,8 +1243,10 @@ async function seedInventory(orgId: string) {
   const w1 = await prisma.warehouse.create({
     data: { name: 'Central Store', code: 'WH-CEN-01', type: 'CENTRAL', organizationId: orgId }
   });
+  // The Whitefield site store serves that project, so goods received on its POs default here.
+  const whitefield = await prisma.project.findFirst({ where: { organizationId: orgId, code: 'GRV-001' }, select: { id: true } });
   const w2 = await prisma.warehouse.create({
-    data: { name: 'Site Store - Whitefield', code: 'WH-SIT-01', type: 'SITE_STORE', organizationId: orgId }
+    data: { name: 'Site Store - Whitefield', code: 'WH-SIT-01', type: 'SITE_STORE', projectId: whitefield?.id ?? null, organizationId: orgId }
   });
   
   const materials = await prisma.material.findMany({ where: { organizationId: orgId } });

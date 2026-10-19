@@ -751,6 +751,50 @@ Every endpoint checked only that the caller was signed in. Any member, including
 
 ---
 
+# ADR-020 - Receipts Post to Stock
+
+**Status**
+
+Accepted (resolves the inventory gap noted in ADR-017)
+
+**Date**
+
+2026-10-20
+
+---
+
+## Context
+
+Goods receipts didn't touch inventory, so stock drifted from reality after every delivery. Stock is tracked at two levels: per store (`InventoryItem` + `InventoryTransaction`) and per material across the organization (`Material.quantity` + `MaterialMovement`, read by the Materials module). Stock adjustments updated only the store level. "Reorder" buttons only showed a toast.
+
+---
+
+## Decision
+
+- **PO lines can link to a catalogue material** (`PoLineItem.materialId`), set when the PO is raised or on first receipt (the link is then saved on the line). Unlinked lines are services, hire or one-off items and never touch stock.
+- **Units must match** (with common aliases: bag/Bags, cum/Cu.m, MT/tonnes). Mismatched units (MT vs kg) are refused instead of converted.
+- **One stock ledger** (`StockLedgerService`) changes quantities. A receipt updates the store item, the material total, both movement logs and the material's moving-average cost (agreed rate after discount, excluding GST) in the GRN's transaction. Adjustments now also keep the material total in step. Invariant: `Material.quantity` = Σ store quantities.
+- **Receiving store:** the chosen store, or the project's site store when it has exactly one; otherwise the user must choose. The GRN records the store (`Delivery.warehouseId`).
+- **Reorder suggestion:** quantity = target level − available − open PO quantity (approved or awaiting approval), never negative. The target is the material maximum or twice the reorder level. Vendor and rate come from the last approved purchase. Reordering opens a prefilled draft PO; nothing is ordered without the normal approval.
+- Procurement depends on Inventory, not the reverse. The reorder service reads PO tables but doesn't import the procurement module.
+
+---
+
+## Alternatives
+
+- Converting between units (MT ↔ kg) automatically: rejected for now. Conversions need per-material factors (bag weight, density), and a wrong guess corrupts stock silently.
+- Auto-linking existing PO lines to materials by name: rejected. Descriptions rarely match catalogue names exactly, so a wrong link would post stock to the wrong item.
+
+---
+
+## Consequences
+
+- Existing PO lines are unlinked until their first receipt asks for the material.
+- Direct edits to `Material.quantity` through the Materials form can still break the invariant. Stock changes should go through receipts, transfers and adjustments.
+- The material and receipt pickers list up to 100 materials; larger catalogues will need a searchable picker.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.
