@@ -1,281 +1,235 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { PoLineItem, Prisma, ProcurementPriority, PurchaseOrder } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { CreatePurchaseOrderDto, PurchaseOrderItemInput } from './dto/create-purchase-order.dto';
+import { nextDocumentNumber, withDocumentNumberRetry } from './document-numbers';
+import {
+  CreatePurchaseOrderDto, PurchaseOrderItemDto, PurchaseOrderQueryDto, UpdatePurchaseOrderDto,
+} from './dto/purchase-order.dto';
+import { DOCUMENT_PREFIX, EDITABLE_PO_STATUSES, PO_EVENTS } from './procurement.constants';
+import { orderTotal, startOfUtcDay, wholeDaysBetween } from './procurement-math';
+import { PurchaseOrderHistoryService } from './purchase-order-history.service';
+import {
+  PO_DETAIL_INCLUDE, PO_LIST_INCLUDE, PurchaseOrderDetailView, PurchaseOrderView,
+  toPurchaseOrderDetailView, toPurchaseOrderView,
+} from './purchase-order.mapper';
+import { VendorsService } from './vendors.service';
 
-const PO_INCLUDE = {
-  project: { select: { id: true, name: true } },
-  vendor: { select: { id: true, name: true } },
-  items: { orderBy: { sortOrder: 'asc' } },
-  timeline: { orderBy: { sortOrder: 'asc' } },
-} satisfies Prisma.PurchaseOrderInclude;
-
-type PurchaseOrderWithRels = Prisma.PurchaseOrderGetPayload<{ include: typeof PO_INCLUDE }>;
-
-type ApprovalAction = 'approve' | 'reject' | 'request-changes';
-
-function num(d: Prisma.Decimal | number | null | undefined): number {
-  if (d == null) return 0;
-  return typeof d === 'number' ? d : Number(d);
+export interface DraftLineItem {
+  description: string;
+  category: string;
+  unit: string;
+  quantity: number;
+  rate: number;
+  taxPercent: number;
+  discountPercent: number;
 }
 
-function iso(d: Date | null | undefined): string | null {
-  return d ? d.toISOString() : null;
+export interface DraftOrderInput {
+  organizationId: string;
+  requesterId: string;
+  projectId: string;
+  vendorId: string;
+  category: string;
+  priority: ProcurementPriority;
+  expectedDelivery: Date;
+  deliveryAddress: string;
+  notes: string;
+  items: DraftLineItem[];
+  /** Timeline entry describing how the order came to exist. */
+  origin: { stage: string; note: string };
 }
 
-function lineTotal(item: { quantity: number; rate: number; taxPercent?: number; discountPercent?: number }): number {
-  const tax = item.taxPercent ?? 0;
-  const discount = item.discountPercent ?? 0;
-  return item.quantity * item.rate * (1 + tax / 100) * (1 - discount / 100);
-}
+export type PurchaseOrderWithItems = PurchaseOrder & { items: PoLineItem[] };
 
 @Injectable()
 export class PurchaseOrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly vendors: VendorsService,
+    private readonly history: PurchaseOrderHistoryService,
+  ) {}
 
-  private mapPurchaseOrder(po: PurchaseOrderWithRels) {
-    return {
-      id: po.id,
-      poNumber: po.poNumber,
-      projectId: po.projectId ?? '',
-      projectName: po.project?.name ?? '',
-      vendorId: po.vendorId ?? '',
-      vendorName: po.vendor?.name ?? '',
-      category: po.category,
-      createdBy: po.createdBy,
-      approver: po.approver,
-      requestedDate: iso(po.requestedDate),
-      expectedDelivery: iso(po.expectedDelivery),
-      amount: num(po.amount),
-      approvalStatus: po.approvalStatus,
-      deliveryStatus: po.deliveryStatus,
-      priority: po.priority,
-      deliveryAddress: po.deliveryAddress,
-      items: po.items.map((it) => ({
-        id: it.id,
-        description: it.description,
-        category: it.category,
-        unit: it.unit,
-        quantity: num(it.quantity),
-        rate: num(it.rate),
-        taxPercent: it.taxPercent,
-        discountPercent: it.discountPercent,
-      })),
-      timeline: po.timeline.map((step) => ({
-        stage: step.stage,
-        actor: step.actor,
-        date: iso(step.date),
-        note: step.note,
-      })),
-      notes: po.notes,
-    };
-  }
-
-  async findAll(organizationId: string) {
-    const rows = await this.prisma.purchaseOrder.findMany({
-      where: { organizationId },
-      include: PO_INCLUDE,
-      orderBy: { createdAt: 'desc' },
+  async findAll(organizationId: string, query: PurchaseOrderQueryDto): Promise<PurchaseOrderView[]> {
+    const orders = await this.prisma.purchaseOrder.findMany({
+      where: { organizationId, projectId: query.projectId, vendorId: query.vendorId, status: query.status },
+      include: PO_LIST_INCLUDE,
+      orderBy: [{ requestedDate: 'desc' }, { poNumber: 'desc' }],
     });
-    return rows.map((po) => this.mapPurchaseOrder(po));
+    const today = new Date();
+    return orders.map((order) => toPurchaseOrderView(order, today));
   }
 
-  async create(organizationId: string, userId: string, dto: CreatePurchaseOrderDto) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
-    const createdBy = user?.name ?? 'Unknown';
+  async findOne(id: string, organizationId: string): Promise<PurchaseOrderDetailView> {
+    const order = await this.prisma.purchaseOrder.findFirst({
+      where: { id, organizationId },
+      include: PO_DETAIL_INCLUDE,
+    });
+    if (!order) throw new NotFoundException('Purchase order not found.');
+    return toPurchaseOrderDetailView(order, new Date());
+  }
 
-    const items = dto.items ?? [];
-    const amount = items.reduce((sum, it) => sum + lineTotal(it), 0);
-    const poNumber = dto.poNumber ?? (await this.generatePoNumber(organizationId));
+  async create(organizationId: string, userId: string, dto: CreatePurchaseOrderDto): Promise<PurchaseOrderDetailView> {
+    await this.assertProjectInOrganization(dto.projectId, organizationId);
+    await this.vendors.findActiveVendor(dto.vendorId, organizationId);
+    const category = dto.category.trim();
 
-    const now = new Date();
-    const expectedDelivery = dto.expectedDelivery ? new Date(dto.expectedDelivery) : now;
+    const order = await withDocumentNumberRetry(() => this.prisma.$transaction((tx) => this.createDraft(tx, {
+      organizationId,
+      requesterId: userId,
+      projectId: dto.projectId,
+      vendorId: dto.vendorId,
+      category,
+      priority: dto.priority ?? 'MEDIUM',
+      expectedDelivery: parseFutureDate(dto.expectedDelivery),
+      deliveryAddress: dto.deliveryAddress?.trim() ?? '',
+      notes: dto.notes?.trim() ?? '',
+      items: toDraftLineItems(dto.items, category),
+      origin: { stage: PO_EVENTS.created, note: '' },
+    })));
+    return this.findOne(order.id, organizationId);
+  }
 
-    let vendorName = '';
-    if (dto.vendorId) {
-      const vendor = await this.prisma.vendor.findFirst({
-        where: { id: dto.vendorId, organizationId },
-        select: { name: true },
+  async update(id: string, organizationId: string, dto: UpdatePurchaseOrderDto): Promise<PurchaseOrderDetailView> {
+    const existing = await this.findOrderOrThrow(id, organizationId);
+    assertEditable(existing);
+    if (dto.projectId) await this.assertProjectInOrganization(dto.projectId, organizationId);
+    if (dto.vendorId) await this.vendors.findActiveVendor(dto.vendorId, organizationId);
+    const category = dto.category?.trim() ?? existing.category;
+
+    await this.prisma.$transaction(async (tx) => {
+      const items = dto.items ? toDraftLineItems(dto.items, category) : undefined;
+      // Guarding on status inside the write keeps a concurrent submit from slipping between check and update.
+      const { count } = await tx.purchaseOrder.updateMany({
+        where: { id, organizationId, status: { in: EDITABLE_PO_STATUSES } },
+        data: {
+          projectId: dto.projectId,
+          vendorId: dto.vendorId,
+          category,
+          priority: dto.priority,
+          expectedDelivery: dto.expectedDelivery ? parseFutureDate(dto.expectedDelivery) : undefined,
+          deliveryAddress: dto.deliveryAddress?.trim(),
+          notes: dto.notes?.trim(),
+          amount: items ? orderTotal(items) : undefined,
+        },
       });
-      vendorName = vendor?.name ?? '';
-    }
+      if (count === 0) throw new ConflictException('This purchase order changed while you were editing. Refresh to see the latest version.');
+      if (!items) return;
 
-    const po = await this.prisma.purchaseOrder.create({
-      data: {
-        poNumber,
-        category: dto.category,
-        createdBy,
-        approver: dto.approver ?? '',
-        requestedDate: now,
-        expectedDelivery,
-        amount,
-        approvalStatus: 'pending',
-        deliveryStatus: 'not_started',
-        priority: dto.priority ?? 'medium',
-        deliveryAddress: dto.deliveryAddress ?? '',
-        notes: dto.notes ?? '',
-        projectId: dto.projectId || null,
-        vendorId: dto.vendorId || null,
-        organizationId,
-        items: {
-          create: items.map((it, index) => this.toLineItemData(it, index)),
-        },
-        timeline: {
-          create: this.defaultTimeline(createdBy, dto.approver ?? '', vendorName, now),
-        },
-      },
-      include: PO_INCLUDE,
-    });
-
-    return this.mapPurchaseOrder(po);
-  }
-
-  async approve(id: string, organizationId: string) {
-    return this.transition(id, organizationId, 'approve');
-  }
-
-  async reject(id: string, organizationId: string) {
-    return this.transition(id, organizationId, 'reject');
-  }
-
-  async requestChanges(id: string, organizationId: string) {
-    return this.transition(id, organizationId, 'request-changes');
-  }
-
-  async duplicate(id: string, organizationId: string) {
-    const source = await this.prisma.purchaseOrder.findFirst({
-      where: { id, organizationId },
-      include: PO_INCLUDE,
-    });
-    if (!source) throw new NotFoundException('Purchase order not found');
-
-    const poNumber = await this.uniquePoNumber(`${source.poNumber}-COPY`, organizationId);
-
-    const clone = await this.prisma.purchaseOrder.create({
-      data: {
-        poNumber,
-        category: source.category,
-        createdBy: source.createdBy,
-        approver: source.approver,
-        requestedDate: new Date(),
-        expectedDelivery: source.expectedDelivery,
-        amount: source.amount,
-        approvalStatus: 'draft',
-        deliveryStatus: 'not_started',
-        priority: source.priority,
-        deliveryAddress: source.deliveryAddress,
-        notes: source.notes,
-        projectId: source.projectId,
-        vendorId: source.vendorId,
-        organizationId,
-        items: {
-          create: source.items.map((it, index) => ({
-            description: it.description,
-            category: it.category,
-            unit: it.unit,
-            quantity: it.quantity,
-            rate: it.rate,
-            taxPercent: it.taxPercent,
-            discountPercent: it.discountPercent,
-            sortOrder: index,
-          })),
-        },
-        timeline: {
-          create: source.timeline.map((step, index) => ({
-            stage: step.stage,
-            actor: step.actor,
-            date: step.stage === 'Created' ? new Date() : null,
-            note: step.stage === 'Created' ? 'Duplicated from ' + source.poNumber : '',
-            sortOrder: index,
-          })),
-        },
-      },
-      include: PO_INCLUDE,
-    });
-
-    return this.mapPurchaseOrder(clone);
-  }
-
-  private async transition(id: string, organizationId: string, action: ApprovalAction) {
-    const existing = await this.prisma.purchaseOrder.findFirst({
-      where: { id, organizationId },
-      include: { timeline: true },
-    });
-    if (!existing) throw new NotFoundException('Purchase order not found');
-
-    const now = new Date();
-    const statusByAction: Record<ApprovalAction, string> = {
-      approve: 'approved',
-      reject: 'rejected',
-      'request-changes': 'changes_requested',
-    };
-
-    await this.prisma.purchaseOrder.update({
-      where: { id },
-      data: { approvalStatus: statusByAction[action] },
-    });
-
-    const targetStage = action === 'request-changes' ? 'Reviewed' : action === 'approve' ? 'Approved' : 'Reviewed';
-    const noteByAction: Record<ApprovalAction, string> = {
-      approve: 'Purchase order approved',
-      reject: 'Purchase order rejected',
-      'request-changes': 'Changes requested',
-    };
-    const step = existing.timeline.find((s) => s.stage === targetStage);
-    if (step) {
-      await this.prisma.poApprovalStep.update({
-        where: { id: step.id },
-        data: { date: now, note: noteByAction[action] },
+      await tx.poLineItem.deleteMany({ where: { purchaseOrderId: id } });
+      await tx.poLineItem.createMany({
+        data: items.map((item, index) => ({ ...item, purchaseOrderId: id, sortOrder: index })),
       });
-    }
-
-    const updated = await this.prisma.purchaseOrder.findFirstOrThrow({
-      where: { id, organizationId },
-      include: PO_INCLUDE,
     });
-    return this.mapPurchaseOrder(updated);
+    return this.findOne(id, organizationId);
   }
 
-  private toLineItemData(it: PurchaseOrderItemInput, index: number): Prisma.PoLineItemCreateWithoutPurchaseOrderInput {
-    return {
-      description: it.description,
-      category: it.category,
-      unit: it.unit,
-      quantity: it.quantity,
-      rate: it.rate,
-      taxPercent: it.taxPercent ?? 0,
-      discountPercent: it.discountPercent ?? 0,
-      sortOrder: index,
-    };
-  }
-
-  private defaultTimeline(
-    createdBy: string,
-    approver: string,
-    vendorName: string,
-    now: Date,
-  ): Prisma.PoApprovalStepCreateWithoutPurchaseOrderInput[] {
-    return [
-      { stage: 'Created', actor: createdBy, date: now, note: 'Purchase order created', sortOrder: 0 },
-      { stage: 'Submitted', actor: createdBy, date: now, note: 'Submitted for approval', sortOrder: 1 },
-      { stage: 'Reviewed', actor: approver, date: null, note: '', sortOrder: 2 },
-      { stage: 'Approved', actor: approver, date: null, note: '', sortOrder: 3 },
-      { stage: 'Delivered', actor: vendorName, date: null, note: '', sortOrder: 4 },
-    ];
-  }
-
-  private async generatePoNumber(organizationId: string): Promise<string> {
-    const count = await this.prisma.purchaseOrder.count({ where: { organizationId } });
-    return this.uniquePoNumber(`PO-${String(count + 1).padStart(4, '0')}`, organizationId);
-  }
-
-  private async uniquePoNumber(base: string, organizationId: string): Promise<string> {
-    let candidate = base;
-    let suffix = 2;
-    while (await this.prisma.purchaseOrder.findFirst({ where: { poNumber: candidate, organizationId }, select: { id: true } })) {
-      candidate = `${base}-${suffix}`;
-      suffix += 1;
+  async duplicate(id: string, organizationId: string, userId: string): Promise<PurchaseOrderDetailView> {
+    const source = await this.findOrderOrThrow(id, organizationId);
+    if (!source.projectId || !source.vendorId) {
+      throw new BadRequestException('This order has no project or vendor to copy.');
     }
-    return candidate;
+    const today = startOfUtcDay(new Date());
+    const { projectId, vendorId } = source;
+
+    const copy = await withDocumentNumberRetry(() => this.prisma.$transaction((tx) => this.createDraft(tx, {
+      organizationId,
+      requesterId: userId,
+      projectId,
+      vendorId,
+      category: source.category,
+      priority: source.priority,
+      expectedDelivery: source.expectedDelivery > today ? source.expectedDelivery : today,
+      deliveryAddress: source.deliveryAddress,
+      notes: source.notes,
+      items: source.items.map((item) => ({
+        description: item.description,
+        category: item.category,
+        unit: item.unit,
+        quantity: item.quantity.toNumber(),
+        rate: item.rate.toNumber(),
+        taxPercent: item.taxPercent,
+        discountPercent: item.discountPercent,
+      })),
+      origin: { stage: PO_EVENTS.created, note: `Duplicated from ${source.poNumber}` },
+    })));
+    return this.findOne(copy.id, organizationId);
   }
+
+  /** Creates a DRAFT order inside the caller's transaction. Callers retry the transaction on a number clash. */
+  async createDraft(tx: Prisma.TransactionClient, input: DraftOrderInput): Promise<PurchaseOrder> {
+    const order = await tx.purchaseOrder.create({
+      data: {
+        poNumber: await this.nextPoNumber(tx, input.organizationId),
+        status: 'DRAFT',
+        category: input.category,
+        priority: input.priority,
+        expectedDelivery: input.expectedDelivery,
+        deliveryAddress: input.deliveryAddress,
+        notes: input.notes,
+        amount: orderTotal(input.items),
+        requestedById: input.requesterId,
+        projectId: input.projectId,
+        vendorId: input.vendorId,
+        organizationId: input.organizationId,
+        items: { create: input.items.map((item, index) => ({ ...item, sortOrder: index })) },
+      },
+    });
+    await this.history.record(tx, {
+      order,
+      actorId: input.requesterId,
+      stage: input.origin.stage,
+      note: input.origin.note,
+    });
+    return order;
+  }
+
+  async findOrderOrThrow(id: string, organizationId: string): Promise<PurchaseOrderWithItems> {
+    const order = await this.prisma.purchaseOrder.findFirst({
+      where: { id, organizationId },
+      include: { items: { orderBy: { sortOrder: 'asc' } } },
+    });
+    if (!order) throw new NotFoundException('Purchase order not found.');
+    return order;
+  }
+
+  async assertProjectInOrganization(projectId: string, organizationId: string): Promise<void> {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!project) throw new NotFoundException('Project not found.');
+  }
+
+  private async nextPoNumber(tx: Prisma.TransactionClient, organizationId: string): Promise<string> {
+    const orders = await tx.purchaseOrder.findMany({
+      where: { organizationId, poNumber: { startsWith: `${DOCUMENT_PREFIX.purchaseOrder}-` } },
+      select: { poNumber: true },
+    });
+    return nextDocumentNumber(DOCUMENT_PREFIX.purchaseOrder, orders.map((order) => order.poNumber));
+  }
+}
+
+function assertEditable(order: PurchaseOrder): void {
+  if (!EDITABLE_PO_STATUSES.includes(order.status)) {
+    throw new ConflictException('Only drafts and orders sent back for changes can be edited.');
+  }
+}
+
+/** Parses a calendar date that must be today or later. */
+export function parseFutureDate(value: string, label = 'Expected delivery'): Date {
+  const date = startOfUtcDay(new Date(value));
+  if (wholeDaysBetween(new Date(), date) < 0) throw new BadRequestException(`${label} can't be in the past.`);
+  return date;
+}
+
+function toDraftLineItems(items: PurchaseOrderItemDto[], category: string): DraftLineItem[] {
+  return items.map((item) => ({
+    description: item.description.trim(),
+    category: item.category?.trim() || category,
+    unit: item.unit.trim(),
+    quantity: item.quantity,
+    rate: item.rate,
+    taxPercent: item.taxPercent ?? 0,
+    discountPercent: item.discountPercent ?? 0,
+  }));
 }

@@ -9,23 +9,19 @@ import {
 import { format } from 'date-fns';
 import { StatusBadge } from './StatusBadge';
 import { formatCurrency } from './procurement-format';
-import type { ProcurementPriority, PurchaseOrder } from '@/data/procurement-demo';
+import { PRIORITY_RANK } from '@/features/procurement/constants';
+import type { PurchaseOrder } from '@/features/procurement/types';
 
 const PAGE_SIZE = 12;
 
 type SortKey = 'poNumber' | 'amount' | 'expectedDelivery' | 'priority';
 type SortDir = 'asc' | 'desc';
 
-const PRIORITY_RANK: Record<ProcurementPriority, number> = {
-  critical: 3,
-  high: 2,
-  medium: 1,
-  low: 0,
-};
-
 interface PurchaseOrderTableProps {
   orders: PurchaseOrder[];
   onSelect: (po: PurchaseOrder) => void;
+  /** Shown when no row matches; the page decides whether filters or an empty book is the reason. */
+  emptyMessage?: string;
 }
 
 function compare(a: PurchaseOrder, b: PurchaseOrder, key: SortKey): number {
@@ -43,7 +39,11 @@ function compare(a: PurchaseOrder, b: PurchaseOrder, key: SortKey): number {
   }
 }
 
-export function PurchaseOrderTable({ orders, onSelect }: PurchaseOrderTableProps): React.ReactElement {
+export function PurchaseOrderTable({
+  orders,
+  onSelect,
+  emptyMessage = 'No purchase orders match your filters.',
+}: PurchaseOrderTableProps): React.ReactElement {
   const [sortKey, setSortKey] = useState<SortKey>('expectedDelivery');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [page, setPage] = useState(1);
@@ -142,7 +142,7 @@ export function PurchaseOrderTable({ orders, onSelect }: PurchaseOrderTableProps
               {paginated.length === 0 ? (
                 <tr>
                   <td colSpan={12} className="py-16 text-center text-muted-foreground">
-                    No purchase orders match your filters.
+                    {emptyMessage}
                   </td>
                 </tr>
               ) : (
@@ -162,16 +162,16 @@ export function PurchaseOrderTable({ orders, onSelect }: PurchaseOrderTableProps
                       <p className="text-xs text-muted-foreground xl:hidden">{po.category}</p>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      <p className="text-xs text-muted-foreground max-w-[160px] truncate">{po.projectName}</p>
+                      <p className="text-xs text-muted-foreground max-w-[160px] truncate">{po.project?.name ?? '—'}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="max-w-[200px] truncate whitespace-nowrap">{po.vendorName}</p>
+                      <p className="max-w-[200px] truncate whitespace-nowrap">{po.vendor?.name ?? '—'}</p>
                     </td>
                     <td className="px-4 py-3 hidden xl:table-cell text-xs text-muted-foreground whitespace-nowrap">
                       {po.category}
                     </td>
                     <td className="px-4 py-3 hidden xl:table-cell text-xs text-muted-foreground whitespace-nowrap">
-                      {po.createdBy}
+                      {po.requestedBy?.name ?? '—'}
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground whitespace-nowrap">
                       {format(new Date(po.requestedDate), 'dd MMM yyyy')}
@@ -183,10 +183,10 @@ export function PurchaseOrderTable({ orders, onSelect }: PurchaseOrderTableProps
                       {formatCurrency(po.amount)}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge kind="approval" value={po.approvalStatus} />
+                      <StatusBadge kind="approval" value={po.status} />
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
-                      <StatusBadge kind="delivery" value={po.deliveryStatus} />
+                      <StatusBadge kind="delivery" value={po.isOverdue ? 'DELAYED' : po.deliveryStatus} />
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       <StatusBadge kind="priority" value={po.priority} />
@@ -195,7 +195,8 @@ export function PurchaseOrderTable({ orders, onSelect }: PurchaseOrderTableProps
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label={`View ${po.poNumber}`}
+                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
                         onClick={(e) => {
                           e.stopPropagation();
                           onSelect(po);

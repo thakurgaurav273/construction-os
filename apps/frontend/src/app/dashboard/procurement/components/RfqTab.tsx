@@ -3,47 +3,41 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
 import {
-  Button, Input, Badge, Progress,
+  Input, Badge, Progress,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@sitepilot/ui';
-import { Search, Filter, Eye, Users, FileText } from 'lucide-react';
+import { Search, Filter, ChevronRight } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { formatCompactINR } from './procurement-format';
-import {
-  PROCUREMENT_CATEGORIES,
-  type ProcurementCategory,
-  type Rfq,
-  type RfqStatus,
-} from '@/data/procurement-demo';
+import { PROCUREMENT_CATEGORIES, RFQ_STATUS_OPTIONS } from '@/features/procurement/constants';
+import type { Rfq } from '@/features/procurement/types';
 
 const COLUMN_COUNT = 10;
 
-const RFQ_STATUSES: { value: RfqStatus; label: string }[] = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'open', label: 'Open' },
-  { value: 'closing_soon', label: 'Closing Soon' },
-  { value: 'evaluating', label: 'Evaluating' },
-  { value: 'awarded', label: 'Awarded' },
-];
-
 interface RfqTabProps {
   rfqs: Rfq[];
+  onSelect: (rfq: Rfq) => void;
 }
 
-export function RfqTab({ rfqs }: RfqTabProps): React.ReactElement {
+export function RfqTab({ rfqs, onSelect }: RfqTabProps): React.ReactElement {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
+  const categories = useMemo(
+    () => [...new Set([...PROCUREMENT_CATEGORIES, ...rfqs.map((rfq) => rfq.category)])],
+    [rfqs],
+  );
+
   const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
     return rfqs.filter((rfq) => {
       const matchesSearch =
-        !search ||
-        rfq.rfqNumber.toLowerCase().includes(search.toLowerCase()) ||
-        rfq.title.toLowerCase().includes(search.toLowerCase()) ||
-        rfq.projectName.toLowerCase().includes(search.toLowerCase());
+        !term ||
+        rfq.rfqNumber.toLowerCase().includes(term) ||
+        rfq.title.toLowerCase().includes(term) ||
+        (rfq.project?.name.toLowerCase().includes(term) ?? false);
 
       const matchesStatus = statusFilter === 'all' || rfq.status === statusFilter;
       const matchesCategory = categoryFilter === 'all' || rfq.category === categoryFilter;
@@ -73,7 +67,7 @@ export function RfqTab({ rfqs }: RfqTabProps): React.ReactElement {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            {RFQ_STATUSES.map((s) => (
+            {RFQ_STATUS_OPTIONS.map((s) => (
               <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
             ))}
           </SelectContent>
@@ -85,7 +79,7 @@ export function RfqTab({ rfqs }: RfqTabProps): React.ReactElement {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {PROCUREMENT_CATEGORIES.map((c: ProcurementCategory) => (
+            {categories.map((c) => (
               <SelectItem key={c} value={c}>{c}</SelectItem>
             ))}
           </SelectContent>
@@ -118,13 +112,13 @@ export function RfqTab({ rfqs }: RfqTabProps): React.ReactElement {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={COLUMN_COUNT} className="py-16 text-center text-muted-foreground">
-                    No RFQs match your filters.
+                    {rfqs.length === 0 ? 'No RFQs yet. Issue one to start collecting vendor quotes.' : 'No RFQs match your filters.'}
                   </td>
                 </tr>
               ) : (
                 filtered.map((rfq, idx) => {
                   const responseRate = rfq.vendorsInvited
-                    ? Math.round((rfq.responsesReceived / rfq.vendorsInvited) * 100)
+                    ? Math.round((rfq.quotesReceived / rfq.vendorsInvited) * 100)
                     : 0;
                   return (
                     <motion.tr
@@ -132,14 +126,18 @@ export function RfqTab({ rfqs }: RfqTabProps): React.ReactElement {
                       initial={{ opacity: 0, y: 4 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.02 }}
-                      className="border-b last:border-0 hover:bg-muted/40 transition-colors group"
+                      onClick={() => onSelect(rfq)}
+                      onKeyDown={(event) => { if (event.key === 'Enter') onSelect(rfq); }}
+                      tabIndex={0}
+                      aria-label={`Open ${rfq.rfqNumber}`}
+                      className="border-b last:border-0 hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none transition-colors group cursor-pointer"
                     >
                       <td className="px-4 py-3">
                         <p className="font-medium whitespace-nowrap">{rfq.rfqNumber}</p>
                         <p className="text-xs text-muted-foreground max-w-[220px] truncate">{rfq.title}</p>
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell">
-                        <p className="text-xs text-muted-foreground max-w-[160px] truncate">{rfq.projectName}</p>
+                        <p className="text-xs text-muted-foreground max-w-[160px] truncate">{rfq.project?.name ?? '—'}</p>
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant="secondary" className="text-xs whitespace-nowrap">{rfq.category}</Badge>
@@ -151,14 +149,14 @@ export function RfqTab({ rfqs }: RfqTabProps): React.ReactElement {
                         <div className="flex items-center gap-2">
                           <Progress value={responseRate} className="h-1.5 w-16" />
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {rfq.responsesReceived}/{rfq.vendorsInvited}
+                            {rfq.quotesReceived}/{rfq.vendorsInvited}
                           </span>
                         </div>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
                         <span
                           className={`text-xs whitespace-nowrap ${
-                            rfq.status === 'closing_soon'
+                            rfq.isClosingSoon || rfq.isPastClosing
                               ? 'text-amber-600 dark:text-amber-400 font-semibold'
                               : 'text-muted-foreground'
                           }`}
@@ -167,7 +165,7 @@ export function RfqTab({ rfqs }: RfqTabProps): React.ReactElement {
                         </span>
                       </td>
                       <td className="px-4 py-3 hidden xl:table-cell text-xs font-medium whitespace-nowrap">
-                        {formatCompactINR(rfq.estimatedValue)}
+                        {rfq.estimatedValue ? formatCompactINR(rfq.estimatedValue) : '—'}
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge kind="rfq" value={rfq.status} />
@@ -176,35 +174,7 @@ export function RfqTab({ rfqs }: RfqTabProps): React.ReactElement {
                         <StatusBadge kind="priority" value={rfq.priority} showIcon={false} />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            title="View RFQ"
-                            onClick={(e) => { e.stopPropagation(); toast('Opening RFQ (demo)'); }}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            title="Invite vendors"
-                            onClick={(e) => { e.stopPropagation(); toast('Invite vendors (demo)'); }}
-                          >
-                            <Users className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            title="Compare quotes"
-                            onClick={(e) => { e.stopPropagation(); toast('Compare quotes (demo)'); }}
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                       </td>
                     </motion.tr>
                   );

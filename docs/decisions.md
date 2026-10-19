@@ -617,6 +617,50 @@ HTTP requests should return quickly and delegate heavy work to background worker
 
 ---
 
+# ADR-017 - Procurement Workflow
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-19
+
+---
+
+## Context
+
+Procurement moved from demo data to real write flows: vendors, RFQs, purchase orders, deliveries and goods receipts.
+Approvals and receipts carry financial weight, so the rules must hold regardless of which client calls the API.
+
+---
+
+## Decision
+
+- Purchase orders follow `DRAFT → PENDING → APPROVED | REJECTED | CHANGES_REQUESTED`. Only drafts and orders sent back for changes are editable. Open orders can be cancelled until goods are received.
+- The requester can't review their own order (segregation of duties). Rejections and change requests require a note.
+- Awarding an RFQ creates a **draft** purchase order at the quoted rates. It still goes through normal approval.
+- Goods are received against approved orders only, never beyond the outstanding quantity. Each receipt gets a GRN number.
+- Totals, delivery status, overdue flags and vendor stats are derived on read, never stored.
+- The backend is authoritative. The frontend mirrors these rules (`features/procurement/utils/order-rules.ts`) only to decide which actions to offer.
+
+---
+
+## Alternatives
+
+- Letting the awarded RFQ auto-approve its purchase order: rejected, because it bypasses approval for the largest orders.
+- Storing computed totals and statuses: rejected, because they drift whenever line items or receipts change.
+
+---
+
+## Consequences
+
+- A single-user organization can't approve its own orders. A second member is needed to review.
+- Receiving goods doesn't update inventory yet. Linking receipts to inventory stock is follow-up work.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

@@ -1,9 +1,12 @@
-import { Prisma, PrismaClient } from '@prisma/client';
+import {
+  Prisma, PrismaClient, ProcurementPriority, PurchaseOrderStatus, RfqInvitationStatus, RfqStatus, VendorStatus,
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { subDays, subMonths, addMonths, addDays } from 'date-fns';
 import {
   dateKeyToDbDate, lastDateKeys, toLocalDateKey,
 } from '../src/modules/workforce/attendance-dates';
+import { orderTotal, startOfUtcDay } from '../src/modules/procurement/procurement-math';
 
 const prisma = new PrismaClient();
 
@@ -887,102 +890,185 @@ async function seedMaterials(orgId: string) {
 }
 
 // ─── Procurement Seed Data ──────────────────────────────────────────────────
+// Day offsets are relative to today: negative is in the past, positive in the future.
+
+const PROCUREMENT_REQUESTER_EMAIL = 'divya.n@grovyn.com';
+const PROCUREMENT_APPROVER_EMAIL = 'suresh.b@grovyn.com';
+
+const SITE_ADDRESSES: Record<string, string> = {
+  'GRV-001': 'Whitefield IT Corridor Site, Block C Stores, Bengaluru 560066',
+  'GRV-002': 'BBMP Zone 4 Yard, Indiranagar, Bengaluru 560038',
+  'GRV-003': 'Sarjapur Smart Township, Central Stores, Bengaluru 562125',
+};
 
 type VendorSeed = {
-  name: string; code: string; categories: string[]; status: string; rating: number;
-  performanceScore: number; onTimeDeliveryPercent: number; deliveryAccuracy: number;
-  qualityRating: number; responseTimeHours: number; projectCount: number; totalOrders: number;
-  outstandingBalance: number; lastOrderOffset: number; contactPerson: string; phone: string;
-  email: string; gstNumber: string; paymentTerms: string; city: string; state: string;
-  aiRecommendation: string;
+  name: string; code: string; categories: string[]; status: VendorStatus; rating: number;
+  performanceScore: number; deliveryAccuracy: number; qualityRating: number; responseTimeHours: number;
+  outstandingBalance: number; contactPerson: string; phone: string; email: string; gstNumber: string;
+  paymentTerms: string; city: string; state: string; aiRecommendation: string;
 };
 
 const VENDORS: VendorSeed[] = [
-  { name: 'Tata Steel Ltd', code: 'VN-STL-01', categories: ['Steel', 'Equipment'], status: 'active', rating: 4.7, performanceScore: 92, onTimeDeliveryPercent: 94, deliveryAccuracy: 96, qualityRating: 4.8, responseTimeHours: 6, projectCount: 3, totalOrders: 42, outstandingBalance: 1_845_000, lastOrderOffset: 4, contactPerson: 'Anil Bhaskar', phone: '+91 98450 11001', email: 'anil.bhaskar@tatasteel.com', gstNumber: '29AAACT2803M1ZK', paymentTerms: 'Net 45', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: 'Preferred for structural steel — consistently on-time with premium quality.' },
-  { name: 'UltraTech Cement', code: 'VN-CON-02', categories: ['Concrete'], status: 'active', rating: 4.5, performanceScore: 88, onTimeDeliveryPercent: 90, deliveryAccuracy: 93, qualityRating: 4.6, responseTimeHours: 8, projectCount: 4, totalOrders: 58, outstandingBalance: 920_000, lastOrderOffset: 2, contactPerson: 'Reena Kapoor', phone: '+91 98450 11002', email: 'reena.k@ultratech.com', gstNumber: '27AAACL6442L1ZM', paymentTerms: 'Net 30', city: 'Mumbai', state: 'Maharashtra', aiRecommendation: 'Reliable RMC supplier; negotiate bulk pricing for Q3 pours.' },
-  { name: 'Havells India', code: 'VN-ELE-03', categories: ['Electrical'], status: 'active', rating: 4.3, performanceScore: 84, onTimeDeliveryPercent: 86, deliveryAccuracy: 91, qualityRating: 4.4, responseTimeHours: 10, projectCount: 2, totalOrders: 27, outstandingBalance: 640_000, lastOrderOffset: 9, contactPerson: 'Karthik Iyer', phone: '+91 98450 11003', email: 'karthik.iyer@havells.com', gstNumber: '06AAACH0553P1Z8', paymentTerms: 'Net 30', city: 'Chennai', state: 'Tamil Nadu', aiRecommendation: 'Good for switchgear; watch lead times during festive season.' },
-  { name: 'Blue Star Ltd', code: 'VN-HVAC-04', categories: ['HVAC', 'Mechanical'], status: 'active', rating: 4.1, performanceScore: 79, onTimeDeliveryPercent: 82, deliveryAccuracy: 88, qualityRating: 4.2, responseTimeHours: 14, projectCount: 2, totalOrders: 18, outstandingBalance: 1_210_000, lastOrderOffset: 15, contactPerson: 'Deepa Menon', phone: '+91 98450 11004', email: 'deepa.menon@bluestar.com', gstNumber: '27AAACB1234F1Z5', paymentTerms: 'Net 60', city: 'Pune', state: 'Maharashtra', aiRecommendation: 'Competitive on VRF systems; obtain firm delivery commitment before ordering.' },
-  { name: 'Asian Paints', code: 'VN-PNT-05', categories: ['Paint', 'Tiles'], status: 'active', rating: 4.6, performanceScore: 90, onTimeDeliveryPercent: 93, deliveryAccuracy: 95, qualityRating: 4.7, responseTimeHours: 5, projectCount: 3, totalOrders: 34, outstandingBalance: 315_000, lastOrderOffset: 6, contactPerson: 'Sanjay Rao', phone: '+91 98450 11005', email: 'sanjay.rao@asianpaints.com', gstNumber: '27AAACA6666G1ZN', paymentTerms: 'Net 30', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: 'Top-rated finish quality; ideal for premium residential handover works.' },
-  { name: 'Kirloskar Equipments', code: 'VN-EQP-06', categories: ['Equipment', 'Mechanical'], status: 'inactive', rating: 3.4, performanceScore: 61, onTimeDeliveryPercent: 68, deliveryAccuracy: 74, qualityRating: 3.6, responseTimeHours: 22, projectCount: 1, totalOrders: 9, outstandingBalance: 0, lastOrderOffset: 78, contactPerson: 'Mahesh Kulkarni', phone: '+91 98450 11006', email: 'mahesh.k@kirloskar.com', gstNumber: '27AAACK5000H1ZP', paymentTerms: 'Advance 50%', city: 'Pune', state: 'Maharashtra', aiRecommendation: 'Under review — recent delays; request performance improvement plan before re-engaging.' },
+  { name: 'Tata Steel Ltd', code: 'VN-STL-01', categories: ['Steel', 'Equipment'], status: 'ACTIVE', rating: 4.7, performanceScore: 92, deliveryAccuracy: 96, qualityRating: 4.8, responseTimeHours: 6, outstandingBalance: 1_845_000, contactPerson: 'Anil Bhaskar', phone: '+91 98450 11001', email: 'anil.bhaskar@tatasteel.com', gstNumber: '29AAACT2803M1ZK', paymentTerms: 'Net 45', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: 'Preferred for structural steel — consistently on-time with premium quality.' },
+  { name: 'UltraTech Cement', code: 'VN-CON-02', categories: ['Concrete'], status: 'ACTIVE', rating: 4.5, performanceScore: 88, deliveryAccuracy: 93, qualityRating: 4.6, responseTimeHours: 8, outstandingBalance: 920_000, contactPerson: 'Reena Kapoor', phone: '+91 98450 11002', email: 'reena.k@ultratech.com', gstNumber: '27AAACL6442L1ZM', paymentTerms: 'Net 30', city: 'Mumbai', state: 'Maharashtra', aiRecommendation: 'Reliable RMC supplier; negotiate bulk pricing for Q3 pours.' },
+  { name: 'Havells India', code: 'VN-ELE-03', categories: ['Electrical'], status: 'ACTIVE', rating: 4.3, performanceScore: 84, deliveryAccuracy: 91, qualityRating: 4.4, responseTimeHours: 10, outstandingBalance: 640_000, contactPerson: 'Karthik Iyer', phone: '+91 98450 11003', email: 'karthik.iyer@havells.com', gstNumber: '06AAACH0553P1Z8', paymentTerms: 'Net 30', city: 'Chennai', state: 'Tamil Nadu', aiRecommendation: 'Good for switchgear; watch lead times during festive season.' },
+  { name: 'Blue Star Ltd', code: 'VN-HVAC-04', categories: ['HVAC', 'Mechanical'], status: 'ACTIVE', rating: 4.1, performanceScore: 79, deliveryAccuracy: 88, qualityRating: 4.2, responseTimeHours: 14, outstandingBalance: 1_210_000, contactPerson: 'Deepa Menon', phone: '+91 98450 11004', email: 'deepa.menon@bluestar.com', gstNumber: '27AAACB1234F1Z5', paymentTerms: 'Net 60', city: 'Pune', state: 'Maharashtra', aiRecommendation: 'Competitive on VRF systems; obtain firm delivery commitment before ordering.' },
+  { name: 'Asian Paints', code: 'VN-PNT-05', categories: ['Paint', 'Tiles'], status: 'ACTIVE', rating: 4.6, performanceScore: 90, deliveryAccuracy: 95, qualityRating: 4.7, responseTimeHours: 5, outstandingBalance: 315_000, contactPerson: 'Sanjay Rao', phone: '+91 98450 11005', email: 'sanjay.rao@asianpaints.com', gstNumber: '27AAACA6666G1ZN', paymentTerms: 'Net 30', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: 'Top-rated finish quality; ideal for premium residential handover works.' },
+  { name: 'Kirloskar Equipments', code: 'VN-EQP-06', categories: ['Equipment', 'Mechanical'], status: 'INACTIVE', rating: 3.4, performanceScore: 61, deliveryAccuracy: 74, qualityRating: 3.6, responseTimeHours: 22, outstandingBalance: 0, contactPerson: 'Mahesh Kulkarni', phone: '+91 98450 11006', email: 'mahesh.k@kirloskar.com', gstNumber: '27AAACK5000H1ZP', paymentTerms: 'Advance 50%', city: 'Pune', state: 'Maharashtra', aiRecommendation: 'Under review — recent delays; request performance improvement plan before re-engaging.' },
+  { name: 'Kajaria Ceramics', code: 'VN-TIL-07', categories: ['Tiles'], status: 'ACTIVE', rating: 4.4, performanceScore: 86, deliveryAccuracy: 92, qualityRating: 4.5, responseTimeHours: 9, outstandingBalance: 0, contactPerson: 'Neha Saxena', phone: '+91 98450 11007', email: 'neha.saxena@kajaria.com', gstNumber: '09AAACK1234M1ZQ', paymentTerms: 'Net 30', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: '' },
+  { name: 'JCB India', code: 'VN-EQP-08', categories: ['Equipment'], status: 'ACTIVE', rating: 4.2, performanceScore: 83, deliveryAccuracy: 90, qualityRating: 4.3, responseTimeHours: 12, outstandingBalance: 0, contactPerson: 'Arvind Pillai', phone: '+91 98450 11008', email: 'arvind.pillai@jcb.com', gstNumber: '06AAACJ2345K1ZT', paymentTerms: 'Net 15', city: 'Bengaluru', state: 'Karnataka', aiRecommendation: '' },
 ];
 
-type PoItemSeed = { description: string; category: string; unit: string; quantity: number; rate: number; taxPercent: number; discountPercent: number };
-type PoStepSeed = { stage: string; actor: string; dayOffset: number | null; note: string };
+type PoItemSeed = { description: string; unit: string; quantity: number; rate: number; taxPercent: number; discountPercent: number };
+type ReceiptSeed = { receivedOn: number; scheduledOn: number; quantities: number[]; trackingId?: string };
+type OpenDeliverySeed = { status: 'SCHEDULED' | 'IN_TRANSIT'; scheduledOn: number; trackingId: string };
 type PoSeed = {
-  poNumber: string; vendorCode: string; projectCode: string; category: string; createdBy: string;
-  approver: string; requestedOffset: number; expectedOffset: number; approvalStatus: string;
-  deliveryStatus: string; priority: string; deliveryAddress: string; notes: string;
-  items: PoItemSeed[]; timeline: PoStepSeed[];
+  vendorCode: string; projectCode: string; category: string; priority: ProcurementPriority;
+  status: PurchaseOrderStatus; requestedOn: number; expectedOn: number; notes: string;
+  reviewedOn?: number; reviewNote?: string; items: PoItemSeed[];
+  receipts?: ReceiptSeed[]; openDelivery?: OpenDeliverySeed;
 };
 
-function poTimeline(created: string, approver: string, vendor: string, reviewedOff: number | null, approvedOff: number | null, deliveredOff: number | null): PoStepSeed[] {
-  return [
-    { stage: 'Created', actor: created, dayOffset: 12, note: 'Purchase order created' },
-    { stage: 'Submitted', actor: created, dayOffset: 11, note: 'Submitted for approval' },
-    { stage: 'Reviewed', actor: approver, dayOffset: reviewedOff, note: reviewedOff != null ? 'Reviewed by procurement' : '' },
-    { stage: 'Approved', actor: approver, dayOffset: approvedOff, note: approvedOff != null ? 'Purchase order approved' : '' },
-    { stage: 'Delivered', actor: vendor, dayOffset: deliveredOff, note: deliveredOff != null ? 'Materials delivered to site' : '' },
-  ];
-}
-
+/** Listed oldest first so PO and GRN numbers follow the calendar. */
 const PURCHASE_ORDERS: PoSeed[] = [
-  { poNumber: 'PO-0001', vendorCode: 'VN-STL-01', projectCode: 'GRV-001', category: 'Steel', createdBy: 'Divya Nair', approver: 'Suresh Babu', requestedOffset: 12, expectedOffset: -3, approvalStatus: 'approved', deliveryStatus: 'delivered', priority: 'high', deliveryAddress: 'Whitefield IT Corridor Site, Bengaluru', notes: 'Structural steel for floors 5-6.', items: [
-    { description: 'TMT Steel Bars Fe500D 16mm', category: 'Steel', unit: 'MT', quantity: 45, rate: 68000, taxPercent: 18, discountPercent: 2 },
-    { description: 'TMT Steel Bars Fe500D 20mm', category: 'Steel', unit: 'MT', quantity: 30, rate: 67500, taxPercent: 18, discountPercent: 2 },
-    { description: 'MS Structural Angles', category: 'Steel', unit: 'MT', quantity: 8, rate: 62000, taxPercent: 18, discountPercent: 0 },
-  ], timeline: poTimeline('Divya Nair', 'Suresh Babu', 'Tata Steel Ltd', 10, 9, 3) },
-  { poNumber: 'PO-0002', vendorCode: 'VN-CON-02', projectCode: 'GRV-003', category: 'Concrete', createdBy: 'Divya Nair', approver: 'Suresh Babu', requestedOffset: 6, expectedOffset: 4, approvalStatus: 'approved', deliveryStatus: 'in_transit', priority: 'high', deliveryAddress: 'Sarjapur Smart Township, Bengaluru', notes: 'M30 RMC for Tower C slab.', items: [
-    { description: 'Ready Mix Concrete M30', category: 'Concrete', unit: 'cum', quantity: 220, rate: 6200, taxPercent: 18, discountPercent: 3 },
-    { description: 'Ready Mix Concrete M25', category: 'Concrete', unit: 'cum', quantity: 90, rate: 5800, taxPercent: 18, discountPercent: 3 },
-  ], timeline: poTimeline('Divya Nair', 'Suresh Babu', 'UltraTech Cement', 5, 4, null) },
-  { poNumber: 'PO-0003', vendorCode: 'VN-ELE-03', projectCode: 'GRV-001', category: 'Electrical', createdBy: 'Divya Nair', approver: 'Suresh Babu', requestedOffset: 3, expectedOffset: 10, approvalStatus: 'pending', deliveryStatus: 'not_started', priority: 'medium', deliveryAddress: 'Whitefield IT Corridor Site, Bengaluru', notes: 'Main LT panel and cabling.', items: [
-    { description: 'LT Distribution Panel 630A', category: 'Electrical', unit: 'nos', quantity: 2, rate: 185000, taxPercent: 18, discountPercent: 0 },
-    { description: 'XLPE Armoured Cable 4C x 95sqmm', category: 'Electrical', unit: 'm', quantity: 800, rate: 620, taxPercent: 18, discountPercent: 5 },
-  ], timeline: poTimeline('Divya Nair', 'Suresh Babu', 'Havells India', null, null, null) },
-  { poNumber: 'PO-0004', vendorCode: 'VN-HVAC-04', projectCode: 'GRV-003', category: 'HVAC', createdBy: 'Divya Nair', approver: 'Suresh Babu', requestedOffset: 8, expectedOffset: 20, approvalStatus: 'changes_requested', deliveryStatus: 'not_started', priority: 'medium', deliveryAddress: 'Sarjapur Smart Township, Bengaluru', notes: 'Clubhouse VRF system — revise BOQ.', items: [
-    { description: 'VRF Outdoor Unit 16HP', category: 'HVAC', unit: 'nos', quantity: 4, rate: 340000, taxPercent: 18, discountPercent: 0 },
-    { description: 'VRF Indoor Cassette Unit', category: 'HVAC', unit: 'nos', quantity: 18, rate: 42000, taxPercent: 18, discountPercent: 2 },
-    { description: 'Refrigerant Copper Piping Kit', category: 'HVAC', unit: 'set', quantity: 18, rate: 8500, taxPercent: 18, discountPercent: 0 },
-  ], timeline: poTimeline('Divya Nair', 'Suresh Babu', 'Blue Star Ltd', 6, null, null) },
-  { poNumber: 'PO-0005', vendorCode: 'VN-PNT-05', projectCode: 'GRV-003', category: 'Paint', createdBy: 'Divya Nair', approver: 'Suresh Babu', requestedOffset: 5, expectedOffset: 2, approvalStatus: 'approved', deliveryStatus: 'delivered', priority: 'low', deliveryAddress: 'Sarjapur Smart Township, Bengaluru', notes: 'Tower A & B interior finishing.', items: [
-    { description: 'Premium Emulsion Paint (Interior)', category: 'Paint', unit: 'ltr', quantity: 1200, rate: 285, taxPercent: 18, discountPercent: 8 },
-    { description: 'Wall Primer', category: 'Paint', unit: 'ltr', quantity: 600, rate: 180, taxPercent: 18, discountPercent: 8 },
-  ], timeline: poTimeline('Divya Nair', 'Suresh Babu', 'Asian Paints', 4, 4, 2) },
-  { poNumber: 'PO-0006', vendorCode: 'VN-STL-01', projectCode: 'GRV-002', category: 'Steel', createdBy: 'Divya Nair', approver: 'Suresh Babu', requestedOffset: 14, expectedOffset: -1, approvalStatus: 'approved', deliveryStatus: 'delayed', priority: 'critical', deliveryAddress: 'BBMP Zone 4 Yard, Indiranagar, Bengaluru', notes: 'Manhole cover frames — urgent.', items: [
-    { description: 'Cast Iron Manhole Cover Heavy Duty', category: 'Steel', unit: 'nos', quantity: 120, rate: 4200, taxPercent: 18, discountPercent: 0 },
-    { description: 'MS Grating Panels', category: 'Steel', unit: 'sqm', quantity: 60, rate: 3800, taxPercent: 18, discountPercent: 0 },
-  ], timeline: poTimeline('Divya Nair', 'Suresh Babu', 'Tata Steel Ltd', 12, 11, null) },
-  { poNumber: 'PO-0007', vendorCode: 'VN-ELE-03', projectCode: 'GRV-002', category: 'Electrical', createdBy: 'Divya Nair', approver: 'Suresh Babu', requestedOffset: 2, expectedOffset: 12, approvalStatus: 'rejected', deliveryStatus: 'not_started', priority: 'low', deliveryAddress: 'BBMP Zone 4 Yard, Indiranagar, Bengaluru', notes: 'Flow sensor wiring — rejected, over budget.', items: [
-    { description: 'Smart Flow Sensor IP68', category: 'Electrical', unit: 'nos', quantity: 24, rate: 28500, taxPercent: 18, discountPercent: 0 },
-    { description: 'Signal Cable Shielded', category: 'Electrical', unit: 'm', quantity: 1500, rate: 95, taxPercent: 18, discountPercent: 0 },
-  ], timeline: poTimeline('Divya Nair', 'Suresh Babu', 'Havells India', 1, null, null) },
-  { poNumber: 'PO-0008', vendorCode: 'VN-CON-02', projectCode: 'GRV-001', category: 'Concrete', createdBy: 'Divya Nair', approver: 'Suresh Babu', requestedOffset: 1, expectedOffset: 6, approvalStatus: 'pending', deliveryStatus: 'not_started', priority: 'medium', deliveryAddress: 'Whitefield IT Corridor Site, Bengaluru', notes: 'Basement raft pour.', items: [
-    { description: 'Ready Mix Concrete M35', category: 'Concrete', unit: 'cum', quantity: 180, rate: 6600, taxPercent: 18, discountPercent: 2 },
-    { description: 'Waterproofing Admixture', category: 'Concrete', unit: 'ltr', quantity: 400, rate: 220, taxPercent: 18, discountPercent: 0 },
-  ], timeline: poTimeline('Divya Nair', 'Suresh Babu', 'UltraTech Cement', null, null, null) },
+  { vendorCode: 'VN-STL-01', projectCode: 'GRV-002', category: 'Steel', priority: 'HIGH', status: 'APPROVED', requestedOn: -150, reviewedOn: -148, expectedOn: -135, notes: 'Reinforcement for drainage culverts, package 1.', items: [
+    { description: 'TMT Steel Bars Fe500D 12mm', unit: 'MT', quantity: 18, rate: 66500, taxPercent: 18, discountPercent: 2 },
+    { description: 'Binding Wire 18 SWG', unit: 'kg', quantity: 450, rate: 78, taxPercent: 18, discountPercent: 0 },
+  ], receipts: [{ receivedOn: -136, scheduledOn: -135, quantities: [18, 450], trackingId: 'TRK-STL-7720' }] },
+  { vendorCode: 'VN-CON-02', projectCode: 'GRV-001', category: 'Concrete', priority: 'HIGH', status: 'APPROVED', requestedOn: -110, reviewedOn: -109, expectedOn: -100, notes: 'Podium slab pour.', items: [
+    { description: 'Ready Mix Concrete M30', unit: 'cum', quantity: 160, rate: 6100, taxPercent: 18, discountPercent: 3 },
+    { description: 'OPC 53 Grade Cement', unit: 'bag', quantity: 600, rate: 410, taxPercent: 28, discountPercent: 0 },
+  ], receipts: [{ receivedOn: -98, scheduledOn: -100, quantities: [160, 600] }] },
+  { vendorCode: 'VN-EQP-06', projectCode: 'GRV-002', category: 'Equipment', priority: 'MEDIUM', status: 'APPROVED', requestedOn: -95, reviewedOn: -93, expectedOn: -80, notes: 'Dewatering for manhole chambers.', items: [
+    { description: 'Dewatering Pump 10 HP', unit: 'nos', quantity: 4, rate: 68000, taxPercent: 18, discountPercent: 0 },
+    { description: 'Suction Hose 100mm', unit: 'm', quantity: 120, rate: 450, taxPercent: 18, discountPercent: 0 },
+  ], receipts: [{ receivedOn: -75, scheduledOn: -80, quantities: [4, 120] }] },
+  { vendorCode: 'VN-ELE-03', projectCode: 'GRV-003', category: 'Electrical', priority: 'MEDIUM', status: 'APPROVED', requestedOn: -75, reviewedOn: -73, expectedOn: -60, notes: 'Tower A & B rising mains.', items: [
+    { description: 'XLPE Armoured Cable 4C x 70sqmm', unit: 'm', quantity: 650, rate: 540, taxPercent: 18, discountPercent: 4 },
+    { description: 'MCB Distribution Board 8-Way', unit: 'nos', quantity: 24, rate: 3400, taxPercent: 18, discountPercent: 0 },
+  ], receipts: [{ receivedOn: -60, scheduledOn: -60, quantities: [650, 24] }] },
+  { vendorCode: 'VN-CON-02', projectCode: 'GRV-003', category: 'Concrete', priority: 'HIGH', status: 'APPROVED', requestedOn: -50, reviewedOn: -49, expectedOn: -42, notes: 'Tower C raft.', items: [
+    { description: 'Ready Mix Concrete M25', unit: 'cum', quantity: 240, rate: 5800, taxPercent: 18, discountPercent: 3 },
+  ], receipts: [{ receivedOn: -42, scheduledOn: -42, quantities: [240] }] },
+  { vendorCode: 'VN-STL-01', projectCode: 'GRV-001', category: 'Steel', priority: 'HIGH', status: 'APPROVED', requestedOn: -40, reviewedOn: -38, expectedOn: -20, notes: 'Structural steel for floors 5-6.', items: [
+    { description: 'TMT Steel Bars Fe500D 16mm', unit: 'MT', quantity: 45, rate: 68000, taxPercent: 18, discountPercent: 2 },
+    { description: 'TMT Steel Bars Fe500D 20mm', unit: 'MT', quantity: 30, rate: 67500, taxPercent: 18, discountPercent: 2 },
+    { description: 'MS Structural Angles', unit: 'MT', quantity: 8, rate: 62000, taxPercent: 18, discountPercent: 0 },
+  ], receipts: [{ receivedOn: -21, scheduledOn: -20, quantities: [45, 30, 8], trackingId: 'TRK-STL-8891' }] },
+  { vendorCode: 'VN-PNT-05', projectCode: 'GRV-003', category: 'Paint', priority: 'LOW', status: 'APPROVED', requestedOn: -20, reviewedOn: -19, expectedOn: -10, notes: 'Tower A & B interior finishing.', items: [
+    { description: 'Premium Emulsion Paint (Interior)', unit: 'ltr', quantity: 1200, rate: 285, taxPercent: 18, discountPercent: 8 },
+    { description: 'Wall Primer', unit: 'ltr', quantity: 600, rate: 180, taxPercent: 18, discountPercent: 8 },
+  ], receipts: [{ receivedOn: -9, scheduledOn: -10, quantities: [1200, 600], trackingId: 'TRK-PNT-2210' }] },
+  { vendorCode: 'VN-STL-01', projectCode: 'GRV-002', category: 'Steel', priority: 'CRITICAL', status: 'APPROVED', requestedOn: -14, reviewedOn: -12, expectedOn: -2, notes: 'Manhole cover frames — urgent, roads reopen next week.', items: [
+    { description: 'Cast Iron Manhole Cover Heavy Duty', unit: 'nos', quantity: 120, rate: 4200, taxPercent: 18, discountPercent: 0 },
+    { description: 'MS Grating Panels', unit: 'sqm', quantity: 60, rate: 3800, taxPercent: 18, discountPercent: 0 },
+  ], receipts: [{ receivedOn: -3, scheduledOn: -4, quantities: [60, 0] }], openDelivery: { status: 'SCHEDULED', scheduledOn: -1, trackingId: 'TRK-STL-9002' } },
+  { vendorCode: 'VN-HVAC-04', projectCode: 'GRV-003', category: 'HVAC', priority: 'MEDIUM', status: 'CHANGES_REQUESTED', requestedOn: -8, reviewedOn: -6, reviewNote: 'Indoor unit count should be 16 per the revised clubhouse layout. Update the BOQ and resubmit.', expectedOn: 20, notes: 'Clubhouse VRF system.', items: [
+    { description: 'VRF Outdoor Unit 16HP', unit: 'nos', quantity: 4, rate: 340000, taxPercent: 18, discountPercent: 0 },
+    { description: 'VRF Indoor Cassette Unit', unit: 'nos', quantity: 18, rate: 42000, taxPercent: 18, discountPercent: 2 },
+    { description: 'Refrigerant Copper Piping Kit', unit: 'set', quantity: 18, rate: 8500, taxPercent: 18, discountPercent: 0 },
+  ] },
+  { vendorCode: 'VN-CON-02', projectCode: 'GRV-003', category: 'Concrete', priority: 'HIGH', status: 'APPROVED', requestedOn: -6, reviewedOn: -5, expectedOn: 4, notes: 'M30 RMC for Tower C slab.', items: [
+    { description: 'Ready Mix Concrete M30', unit: 'cum', quantity: 220, rate: 6200, taxPercent: 18, discountPercent: 3 },
+    { description: 'Ready Mix Concrete M25', unit: 'cum', quantity: 90, rate: 5800, taxPercent: 18, discountPercent: 3 },
+  ], openDelivery: { status: 'IN_TRANSIT', scheduledOn: 2, trackingId: 'TRK-CON-4420' } },
+  { vendorCode: 'VN-ELE-03', projectCode: 'GRV-001', category: 'Electrical', priority: 'MEDIUM', status: 'PENDING', requestedOn: -5, expectedOn: 10, notes: 'Main LT panel and cabling.', items: [
+    { description: 'LT Distribution Panel 630A', unit: 'nos', quantity: 2, rate: 185000, taxPercent: 18, discountPercent: 0 },
+    { description: 'XLPE Armoured Cable 4C x 95sqmm', unit: 'm', quantity: 800, rate: 620, taxPercent: 18, discountPercent: 5 },
+  ] },
+  { vendorCode: 'VN-ELE-03', projectCode: 'GRV-002', category: 'Electrical', priority: 'LOW', status: 'REJECTED', requestedOn: -2, reviewedOn: -1, reviewNote: 'Over budget for this package. Re-quote with an alternative sensor vendor.', expectedOn: 12, notes: 'Flow sensor wiring.', items: [
+    { description: 'Smart Flow Sensor IP68', unit: 'nos', quantity: 24, rate: 28500, taxPercent: 18, discountPercent: 0 },
+    { description: 'Signal Cable Shielded', unit: 'm', quantity: 1500, rate: 95, taxPercent: 18, discountPercent: 0 },
+  ] },
+  { vendorCode: 'VN-CON-02', projectCode: 'GRV-001', category: 'Concrete', priority: 'MEDIUM', status: 'PENDING', requestedOn: -1, expectedOn: 6, notes: 'Basement raft pour.', items: [
+    { description: 'Ready Mix Concrete M35', unit: 'cum', quantity: 180, rate: 6600, taxPercent: 18, discountPercent: 2 },
+    { description: 'Waterproofing Admixture', unit: 'ltr', quantity: 400, rate: 220, taxPercent: 18, discountPercent: 0 },
+  ] },
 ];
 
-type RfqSeed = { rfqNumber: string; projectCode: string; title: string; category: string; vendorsInvited: number; responsesReceived: number; issuedOffset: number; closingOffset: number; status: string; priority: string; estimatedValue: number; createdBy: string };
+type QuoteSeed = { vendorCode: string; status: RfqInvitationStatus; respondedOn?: number; leadTimeDays?: number; taxPercent?: number; rates?: number[] };
+type RfqSeed = {
+  projectCode: string; title: string; description: string; category: string; priority: ProcurementPriority;
+  status: RfqStatus; issuedOn: number; closingOn: number; estimatedValue: number;
+  items: { description: string; unit: string; quantity: number }[];
+  invitations: QuoteSeed[];
+  /** Awarding raises a draft purchase order for this vendor's quote. */
+  awardTo?: string;
+};
 
 const RFQS: RfqSeed[] = [
-  { rfqNumber: 'RFQ-0001', projectCode: 'GRV-001', title: 'Curtain Wall Aluminium Glazing', category: 'Mechanical', vendorsInvited: 5, responsesReceived: 3, issuedOffset: 10, closingOffset: 4, status: 'evaluating', priority: 'high', estimatedValue: 8_500_000, createdBy: 'Divya Nair' },
-  { rfqNumber: 'RFQ-0002', projectCode: 'GRV-003', title: 'Vitrified Floor Tiles Supply', category: 'Tiles', vendorsInvited: 4, responsesReceived: 4, issuedOffset: 8, closingOffset: -1, status: 'awarded', priority: 'medium', estimatedValue: 3_200_000, createdBy: 'Divya Nair' },
-  { rfqNumber: 'RFQ-0003', projectCode: 'GRV-002', title: 'De-silting Machinery Rental', category: 'Equipment', vendorsInvited: 6, responsesReceived: 1, issuedOffset: 2, closingOffset: 5, status: 'open', priority: 'critical', estimatedValue: 1_800_000, createdBy: 'Divya Nair' },
-  { rfqNumber: 'RFQ-0004', projectCode: 'GRV-003', title: 'Solar PV Panels 24MW', category: 'Electrical', vendorsInvited: 7, responsesReceived: 5, issuedOffset: 4, closingOffset: 1, status: 'closing_soon', priority: 'high', estimatedValue: 42_000_000, createdBy: 'Divya Nair' },
+  { projectCode: 'GRV-001', title: 'Curtain Wall Aluminium Glazing', description: 'Unitised double-glazed façade for Block C, levels 1-6.', category: 'Mechanical', priority: 'HIGH', status: 'EVALUATING', issuedOn: -10, closingOn: -1, estimatedValue: 8_500_000,
+    items: [{ description: 'Double-glazed unitised panel', unit: 'sqm', quantity: 1200 }, { description: 'Aluminium mullion & transom', unit: 'm', quantity: 3200 }],
+    invitations: [
+      { vendorCode: 'VN-HVAC-04', status: 'QUOTED', respondedOn: -4, leadTimeDays: 45, taxPercent: 18, rates: [4200, 780] },
+      { vendorCode: 'VN-STL-01', status: 'QUOTED', respondedOn: -3, leadTimeDays: 60, taxPercent: 18, rates: [4450, 720] },
+      { vendorCode: 'VN-ELE-03', status: 'DECLINED', respondedOn: -6 },
+    ] },
+  { projectCode: 'GRV-003', title: 'Vitrified Floor Tiles Supply', description: 'Tower A & B apartment flooring.', category: 'Tiles', priority: 'MEDIUM', status: 'AWARDED', issuedOn: -12, closingOn: -4, estimatedValue: 3_200_000,
+    items: [{ description: 'Vitrified tiles 800x800', unit: 'sqm', quantity: 4200 }, { description: 'Tile adhesive', unit: 'bag', quantity: 1400 }],
+    invitations: [
+      { vendorCode: 'VN-TIL-07', status: 'QUOTED', respondedOn: -6, leadTimeDays: 18, taxPercent: 18, rates: [640, 410] },
+      { vendorCode: 'VN-PNT-05', status: 'QUOTED', respondedOn: -5, leadTimeDays: 25, taxPercent: 18, rates: [655, 395] },
+    ],
+    awardTo: 'VN-TIL-07' },
+  { projectCode: 'GRV-002', title: 'De-silting Machinery Rental', description: 'Super-sucker and jetting machines for 30 working days.', category: 'Equipment', priority: 'CRITICAL', status: 'OPEN', issuedOn: -2, closingOn: 5, estimatedValue: 1_800_000,
+    items: [{ description: 'Super-sucker machine rental', unit: 'day', quantity: 30 }, { description: 'Jetting machine rental', unit: 'day', quantity: 30 }],
+    invitations: [
+      { vendorCode: 'VN-EQP-08', status: 'QUOTED', respondedOn: -1, leadTimeDays: 3, taxPercent: 18, rates: [28000, 16500] },
+      { vendorCode: 'VN-STL-01', status: 'INVITED' },
+    ] },
+  { projectCode: 'GRV-003', title: 'Rooftop Solar PV — 240 kWp', description: 'Clubhouse and amenity block rooftop plant.', category: 'Electrical', priority: 'HIGH', status: 'OPEN', issuedOn: -4, closingOn: 1, estimatedValue: 7_500_000,
+    items: [{ description: 'Mono PERC module 545Wp', unit: 'nos', quantity: 440 }, { description: 'String inverter 80kW', unit: 'nos', quantity: 3 }],
+    invitations: [
+      { vendorCode: 'VN-ELE-03', status: 'QUOTED', respondedOn: -1, leadTimeDays: 30, taxPercent: 12, rates: [14500, 210000] },
+      { vendorCode: 'VN-STL-01', status: 'INVITED' },
+      { vendorCode: 'VN-HVAC-04', status: 'DECLINED', respondedOn: -2 },
+    ] },
 ];
 
-type DeliverySeed = { poNumber: string; vendorName: string; projectName: string; category: string; status: string; scheduledOffset: number; actualOffset: number | null; itemSummary: string; delayDays: number; trackingId: string };
+function dayOffset(days: number): Date {
+  return addDays(new Date(), days);
+}
 
-const DELIVERIES: DeliverySeed[] = [
-  { poNumber: 'PO-0001', vendorName: 'Tata Steel Ltd', projectName: 'Whitefield IT Corridor - Block C', category: 'Steel', status: 'delivered', scheduledOffset: 3, actualOffset: 3, itemSummary: '83 MT TMT + structural steel', delayDays: 0, trackingId: 'TRK-STL-8891' },
-  { poNumber: 'PO-0002', vendorName: 'UltraTech Cement', projectName: 'Sarjapur Smart Township - Phase 1', category: 'Concrete', status: 'in_transit', scheduledOffset: -4, actualOffset: null, itemSummary: '310 cum RMC (M30 + M25)', delayDays: 0, trackingId: 'TRK-CON-4420' },
-  { poNumber: 'PO-0005', vendorName: 'Asian Paints', projectName: 'Sarjapur Smart Township - Phase 1', category: 'Paint', status: 'delivered', scheduledOffset: 2, actualOffset: 2, itemSummary: '1800 ltr paint + primer', delayDays: 0, trackingId: 'TRK-PNT-2210' },
-  { poNumber: 'PO-0006', vendorName: 'Tata Steel Ltd', projectName: 'BBMP Drainage Rehabilitation - Zone 4', category: 'Steel', status: 'delayed', scheduledOffset: 1, actualOffset: null, itemSummary: '120 manhole covers + gratings', delayDays: 5, trackingId: 'TRK-STL-9002' },
-  { poNumber: 'PO-0003', vendorName: 'Havells India', projectName: 'Whitefield IT Corridor - Block C', category: 'Electrical', status: 'pending', scheduledOffset: -10, actualOffset: null, itemSummary: 'LT panels + XLPE cable', delayDays: 0, trackingId: 'TRK-ELE-5567' },
-];
+function calendarDay(days: number): Date {
+  return startOfUtcDay(addDays(new Date(), days));
+}
 
-function poItemTotal(it: PoItemSeed): number {
-  return it.quantity * it.rate * (1 + it.taxPercent / 100) * (1 - it.discountPercent / 100);
+function docNumber(prefix: string, index: number): string {
+  return `${prefix}-${String(index).padStart(4, '0')}`;
+}
+
+type TimelineSeed = { stage: string; actor: string; date: Date; note: string };
+
+const REVIEW_STAGES: Partial<Record<PurchaseOrderStatus, string>> = {
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+  CHANGES_REQUESTED: 'Changes Requested',
+};
+
+function poTimeline(po: PoSeed, requester: string, approver: string, receiptNumbers: string[]): TimelineSeed[] {
+  const events: TimelineSeed[] = [{ stage: 'Created', actor: requester, date: dayOffset(po.requestedOn), note: '' }];
+  if (po.status !== 'DRAFT') events.push({ stage: 'Submitted', actor: requester, date: dayOffset(po.requestedOn), note: '' });
+  const reviewStage = REVIEW_STAGES[po.status];
+  if (po.reviewedOn !== undefined && reviewStage) {
+    events.push({ stage: reviewStage, actor: approver, date: dayOffset(po.reviewedOn), note: po.reviewNote ?? '' });
+  }
+  po.receipts?.forEach((receipt, index) => {
+    const lines = receipt.quantities.filter((quantity) => quantity > 0).length;
+    events.push({ stage: 'Goods Received', actor: requester, date: dayOffset(receipt.receivedOn), note: `${receiptNumbers[index]} · ${lines} line${lines === 1 ? '' : 's'}` });
+  });
+  if (po.openDelivery && po.reviewedOn !== undefined) {
+    events.push({ stage: 'Delivery Scheduled', actor: requester, date: dayOffset(po.reviewedOn + 1), note: `Tracking ${po.openDelivery.trackingId}` });
+  }
+  return events.sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+async function findMemberId(orgId: string, email: string): Promise<string | null> {
+  const membership = await prisma.userOrganization.findFirst({
+    where: { organizationId: orgId, user: { email } },
+    select: { userId: true },
+  });
+  return membership?.userId ?? null;
 }
 
 async function seedProcurement(orgId: string) {
@@ -994,80 +1080,157 @@ async function seedProcurement(orgId: string) {
 
   const vendorIdByCode: Record<string, string> = {};
   for (const v of VENDORS) {
-    const vendor = await prisma.vendor.create({
-      data: {
-        name: v.name, code: v.code, categories: v.categories, status: v.status, rating: v.rating,
-        performanceScore: v.performanceScore, onTimeDeliveryPercent: v.onTimeDeliveryPercent,
-        deliveryAccuracy: v.deliveryAccuracy, qualityRating: v.qualityRating,
-        responseTimeHours: v.responseTimeHours, projectCount: v.projectCount, totalOrders: v.totalOrders,
-        outstandingBalance: v.outstandingBalance, lastOrderDate: subDays(new Date(), v.lastOrderOffset),
-        contactPerson: v.contactPerson, phone: v.phone, email: v.email, gstNumber: v.gstNumber,
-        paymentTerms: v.paymentTerms, city: v.city, state: v.state, aiRecommendation: v.aiRecommendation,
-        organizationId: orgId,
-      },
-    });
+    const vendor = await prisma.vendor.create({ data: { ...v, aiRecommendation: v.aiRecommendation || null, organizationId: orgId } });
     vendorIdByCode[v.code] = vendor.id;
   }
 
-  const projects = await prisma.project.findMany({
-    where: { organizationId: orgId },
-    select: { id: true, code: true },
-  });
+  const projects = await prisma.project.findMany({ where: { organizationId: orgId }, select: { id: true, code: true } });
   const projIdByCode: Record<string, string> = Object.fromEntries(projects.map((p) => [p.code, p.id]));
+  const requesterId = await findMemberId(orgId, PROCUREMENT_REQUESTER_EMAIL);
+  const approverId = await findMemberId(orgId, PROCUREMENT_APPROVER_EMAIL);
+  const requester = TEAM_MEMBERS.find((member) => member.email === PROCUREMENT_REQUESTER_EMAIL)?.name ?? 'Procurement';
+  const approver = TEAM_MEMBERS.find((member) => member.email === PROCUREMENT_APPROVER_EMAIL)?.name ?? 'Finance';
 
-  for (const po of PURCHASE_ORDERS) {
-    const amount = po.items.reduce((sum, it) => sum + poItemTotal(it), 0);
-    await prisma.purchaseOrder.create({
+  let grnCount = 0;
+  for (const [index, po] of PURCHASE_ORDERS.entries()) {
+    const receiptNumbers = (po.receipts ?? []).map(() => docNumber('GRN', ++grnCount));
+    const received = po.items.map((_, line) => (po.receipts ?? []).reduce((sum, receipt) => sum + (receipt.quantities[line] ?? 0), 0));
+    const isReviewed = po.reviewedOn !== undefined;
+
+    const order = await prisma.purchaseOrder.create({
       data: {
-        poNumber: po.poNumber, category: po.category, createdBy: po.createdBy, approver: po.approver,
-        requestedDate: subDays(new Date(), po.requestedOffset),
-        expectedDelivery: subDays(new Date(), po.expectedOffset),
-        amount, approvalStatus: po.approvalStatus, deliveryStatus: po.deliveryStatus,
-        priority: po.priority, deliveryAddress: po.deliveryAddress, notes: po.notes,
+        poNumber: docNumber('PO', index + 1),
+        category: po.category,
+        status: po.status,
+        priority: po.priority,
+        requestedDate: dayOffset(po.requestedOn),
+        expectedDelivery: calendarDay(po.expectedOn),
+        amount: orderTotal(po.items),
+        deliveryAddress: SITE_ADDRESSES[po.projectCode] ?? '',
+        notes: po.notes,
+        submittedAt: po.status === 'DRAFT' ? null : dayOffset(po.requestedOn),
+        reviewedAt: isReviewed ? dayOffset(po.reviewedOn ?? 0) : null,
+        reviewNote: po.reviewNote ?? null,
+        requestedById: requesterId,
+        reviewedById: isReviewed ? approverId : null,
         projectId: projIdByCode[po.projectCode] ?? null,
         vendorId: vendorIdByCode[po.vendorCode] ?? null,
         organizationId: orgId,
         items: {
-          create: po.items.map((it, index) => ({
-            description: it.description, category: it.category, unit: it.unit, quantity: it.quantity,
-            rate: it.rate, taxPercent: it.taxPercent, discountPercent: it.discountPercent, sortOrder: index,
-          })),
+          create: po.items.map((item, line) => ({ ...item, category: po.category, receivedQuantity: received[line], sortOrder: line })),
         },
         timeline: {
-          create: po.timeline.map((step, index) => ({
-            stage: step.stage, actor: step.actor,
-            date: step.dayOffset == null ? null : subDays(new Date(), step.dayOffset),
-            note: step.note, sortOrder: index,
-          })),
+          create: poTimeline(po, requester, approver, receiptNumbers).map((event, position) => ({ ...event, sortOrder: position })),
         },
       },
+      include: { items: { orderBy: { sortOrder: 'asc' } } },
     });
+
+    for (const [receiptIndex, receipt] of (po.receipts ?? []).entries()) {
+      await prisma.delivery.create({
+        data: {
+          grnNumber: receiptNumbers[receiptIndex],
+          purchaseOrderId: order.id,
+          status: 'RECEIVED',
+          scheduledDate: calendarDay(receipt.scheduledOn),
+          receivedAt: dayOffset(receipt.receivedOn),
+          trackingId: receipt.trackingId ?? null,
+          receivedById: requesterId,
+          organizationId: orgId,
+          items: {
+            create: receipt.quantities
+              .map((quantity, line) => ({ poLineItemId: order.items[line].id, quantity }))
+              .filter((item) => item.quantity > 0),
+          },
+        },
+      });
+    }
+
+    if (po.openDelivery) {
+      await prisma.delivery.create({
+        data: {
+          purchaseOrderId: order.id,
+          status: po.openDelivery.status,
+          scheduledDate: calendarDay(po.openDelivery.scheduledOn),
+          trackingId: po.openDelivery.trackingId,
+          organizationId: orgId,
+        },
+      });
+    }
   }
 
-  for (const r of RFQS) {
-    await prisma.rfq.create({
+  let poCount = PURCHASE_ORDERS.length;
+  for (const [index, r] of RFQS.entries()) {
+    const rfq = await prisma.rfq.create({
       data: {
-        rfqNumber: r.rfqNumber, title: r.title, category: r.category, vendorsInvited: r.vendorsInvited,
-        responsesReceived: r.responsesReceived, issuedDate: subDays(new Date(), r.issuedOffset),
-        closingDate: subDays(new Date(), r.closingOffset), status: r.status, priority: r.priority,
-        estimatedValue: r.estimatedValue, createdBy: r.createdBy,
-        projectId: projIdByCode[r.projectCode] ?? null, organizationId: orgId,
+        rfqNumber: docNumber('RFQ', index + 1),
+        title: r.title,
+        description: r.description,
+        category: r.category,
+        status: r.status,
+        priority: r.priority,
+        issuedDate: dayOffset(r.issuedOn),
+        closingDate: calendarDay(r.closingOn),
+        estimatedValue: r.estimatedValue,
+        createdById: requesterId,
+        projectId: projIdByCode[r.projectCode] ?? null,
+        organizationId: orgId,
+        items: { create: r.items.map((item, position) => ({ ...item, sortOrder: position })) },
+      },
+      include: { items: { orderBy: { sortOrder: 'asc' } } },
+    });
+
+    for (const invitation of r.invitations) {
+      const rates = invitation.rates ?? [];
+      const taxPercent = invitation.taxPercent ?? 0;
+      const subtotal = rfq.items.reduce((sum, item, position) => sum + Number(item.quantity) * (rates[position] ?? 0), 0);
+      await prisma.rfqInvitation.create({
+        data: {
+          rfqId: rfq.id,
+          vendorId: vendorIdByCode[invitation.vendorCode],
+          status: invitation.status,
+          invitedAt: dayOffset(r.issuedOn),
+          respondedAt: invitation.respondedOn !== undefined ? dayOffset(invitation.respondedOn) : null,
+          leadTimeDays: invitation.leadTimeDays ?? null,
+          validUntil: invitation.status === 'QUOTED' ? calendarDay(30) : null,
+          taxPercent,
+          quotedAmount: invitation.status === 'QUOTED' ? Math.round(subtotal * (1 + taxPercent / 100) * 100) / 100 : null,
+          quoteItems: { create: rates.length ? rfq.items.map((item, position) => ({ rfqItemId: item.id, rate: rates[position] })) : [] },
+        },
+      });
+    }
+
+    const winner = r.invitations.find((invitation) => invitation.vendorCode === r.awardTo);
+    if (!winner?.rates || !rfq.projectId) continue;
+    const items = r.items.map((item, position) => ({
+      ...item, category: r.category, rate: winner.rates?.[position] ?? 0, taxPercent: winner.taxPercent ?? 0, discountPercent: 0,
+    }));
+    const vendorName = VENDORS.find((vendor) => vendor.code === r.awardTo)?.name ?? '';
+    const draft = await prisma.purchaseOrder.create({
+      data: {
+        poNumber: docNumber('PO', ++poCount),
+        category: r.category,
+        status: 'DRAFT',
+        priority: r.priority,
+        expectedDelivery: calendarDay(winner.leadTimeDays ?? 0),
+        amount: orderTotal(items),
+        deliveryAddress: SITE_ADDRESSES[r.projectCode] ?? '',
+        notes: `Awarded from ${rfq.rfqNumber}: ${r.title}`,
+        requestedById: requesterId,
+        projectId: rfq.projectId,
+        vendorId: vendorIdByCode[winner.vendorCode],
+        organizationId: orgId,
+        items: { create: items.map((item, position) => ({ ...item, sortOrder: position })) },
+        timeline: { create: [{ stage: 'Created from RFQ', actor: requester, date: new Date(), note: `${rfq.rfqNumber} awarded to ${vendorName}`, sortOrder: 0 }] },
       },
     });
-  }
-
-  for (const d of DELIVERIES) {
-    await prisma.delivery.create({
-      data: {
-        poNumber: d.poNumber, vendorName: d.vendorName, projectName: d.projectName, category: d.category,
-        status: d.status, scheduledDate: subDays(new Date(), d.scheduledOffset),
-        actualDate: d.actualOffset == null ? null : subDays(new Date(), d.actualOffset),
-        itemSummary: d.itemSummary, delayDays: d.delayDays, trackingId: d.trackingId, organizationId: orgId,
-      },
+    await prisma.rfq.update({
+      where: { id: rfq.id },
+      data: { awardedAt: new Date(), awardedVendorId: vendorIdByCode[winner.vendorCode], purchaseOrderId: draft.id },
     });
   }
 
-  console.log(`  → Seeded ${VENDORS.length} vendors, ${PURCHASE_ORDERS.length} purchase orders, ${RFQS.length} RFQs, ${DELIVERIES.length} deliveries`);
+  console.log(`  → Seeded ${VENDORS.length} vendors, ${poCount} purchase orders, ${RFQS.length} RFQs, ${grnCount} goods receipts`);
 }
 
 async function seedInventory(orgId: string) {

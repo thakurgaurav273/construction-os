@@ -1,32 +1,33 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
-import {
-  Button, Input,
-  Tabs, TabsList, TabsTrigger, TabsContent,
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-  Skeleton,
-} from '@sitepilot/ui';
-import {
-  Search, Filter, Download, Plus,
-  FileClock, ClipboardCheck, ClipboardList, IndianRupee, Building2, AlertTriangle,
-} from 'lucide-react';
+import { format } from 'date-fns';
+import { Button, Tabs, TabsList, TabsTrigger, TabsContent, Skeleton } from '@sitepilot/ui';
+import { AlertTriangle, Download, Plus, Building2, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
-import { type PurchaseOrder, type Vendor } from '@/data/procurement-demo';
 import {
-  usePurchaseOrders, useVendors, useRfqs, useDeliveries,
+  usePurchaseOrders, useVendors, useRfqs, useDeliveries, useProcurementSummary, useProcurementAnalytics,
 } from '@/hooks/api/use-procurement';
-import { ProcurementKpiCard } from './components/ProcurementKpiCard';
+import { useProjects } from '@/hooks/api/use-projects';
+import { downloadCsv } from '@/lib/download-csv';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { buildProcurementInsights, type ProcurementInsight } from '@/features/procurement/utils/insights';
+import { PurchaseOrderFormDialog } from '@/features/procurement/components/PurchaseOrderFormDialog';
+import { RfqFormDialog } from '@/features/procurement/components/RfqFormDialog';
+import { VendorFormDialog } from '@/features/procurement/components/VendorFormDialog';
+import { ProcurementKpis } from './components/ProcurementKpis';
 import { AiInsightPanel } from './components/AiInsightCard';
+import { PurchaseOrderFilters, DEFAULT_PO_FILTERS, filterPurchaseOrders } from './components/PurchaseOrderFilters';
 import { PurchaseOrderTable } from './components/PurchaseOrderTable';
 import { PurchaseOrderDrawer } from './components/PurchaseOrderDrawer';
 import { RfqTab } from './components/RfqTab';
+import { RfqDrawer } from './components/RfqDrawer';
 import { VendorsTab } from './components/VendorsTab';
 import { VendorDrawer } from './components/VendorDrawer';
 import { DeliveriesTab } from './components/DeliveriesTab';
-import { formatCompactINR } from './components/procurement-format';
+import ProcurementLoading from './loading';
 
 // Analytics is chart-heavy and sits behind a tab, so load it on demand.
 const AnalyticsTab = dynamic(
@@ -35,101 +36,75 @@ const AnalyticsTab = dynamic(
     ssr: false,
     loading: () => (
       <div className="grid gap-6 lg:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <Skeleton key={index} className="h-72 w-full rounded-xl" />
-        ))}
+        {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-72 w-full rounded-xl" />)}
       </div>
     ),
   },
 );
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.06 } },
-};
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 300, damping: 24 } },
-};
-
-const DATE_RANGES: Record<string, number | null> = {
-  all: null,
-  '30': 30,
-  '90': 90,
-  '180': 180,
-};
+type Drawer = { kind: 'order' | 'rfq' | 'vendor'; id: string } | null;
+type CreateDialog = 'order' | 'rfq' | 'vendor' | null;
 
 export default function ProcurementPage(): React.ReactElement {
-  const [isClient, setIsClient] = useState(false);
-  const [search, setSearch] = useState('');
-  const [projectFilter, setProjectFilter] = useState('all');
-  const [vendorFilter, setVendorFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [dateRange, setDateRange] = useState('all');
+  const [tab, setTab] = useState('orders');
+  const [filters, setFilters] = useState(DEFAULT_PO_FILTERS);
+  const [drawer, setDrawer] = useState<Drawer>(null);
+  const [createDialog, setCreateDialog] = useState<CreateDialog>(null);
 
-  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
-  const [orderDrawerOpen, setOrderDrawerOpen] = useState(false);
-  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
-  const [vendorDrawerOpen, setVendorDrawerOpen] = useState(false);
+  const ordersQuery = usePurchaseOrders();
+  const { data: vendors = [] } = useVendors();
+  const { data: rfqs = [] } = useRfqs();
+  const { data: deliveries = [] } = useDeliveries();
+  const { data: summary } = useProcurementSummary();
+  const { data: analytics } = useProcurementAnalytics();
+  const { data: projects = [] } = useProjects();
 
-  const { data: orders = [], isLoading: isLoadingOrders } = usePurchaseOrders();
-  const { data: vendors = [], isLoading: isLoadingVendors } = useVendors();
-  const { data: rfqs = [], isLoading: isLoadingRfqs } = useRfqs();
-  const { data: deliveries = [], isLoading: isLoadingDeliveries } = useDeliveries();
+  const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
+  const filteredOrders = useMemo(() => filterPurchaseOrders(orders, filters), [orders, filters]);
+  const insights = useMemo(() => (summary ? buildProcurementInsights(summary) : undefined), [summary]);
+  const selectedVendor = drawer?.kind === 'vendor' ? vendors.find((vendor) => vendor.id === drawer.id) ?? null : null;
 
-  useEffect(() => { setIsClient(true); }, []);
+  const openOrder = (id: string): void => setDrawer({ kind: 'order', id });
+  const closeDrawer = (): void => setDrawer(null);
 
-  const kpis = useMemo(() => {
-    const openRfqs = rfqs.filter((r) => r.status === 'open' || r.status === 'closing_soon' || r.status === 'evaluating').length;
-    const pendingPos = orders.filter((o) => o.approvalStatus === 'pending').length;
-    const approvedPos = orders.filter((o) => o.approvalStatus === 'approved').length;
-    const monthlyValue = 0; // Fetched from backend in future
-    const activeVendors = vendors.filter((v) => v.status === 'active').length;
-    const delayedDeliveries = deliveries.filter((d) => d.status === 'delayed').length;
-    return { openRfqs, pendingPos, approvedPos, monthlyValue, activeVendors, delayedDeliveries };
-  }, [orders, rfqs, vendors, deliveries]);
-
-  const anchorTime = useMemo(() => {
-    return orders.length ? orders.reduce((max, o) => Math.max(max, new Date(o.requestedDate).getTime()), 0) : Date.now();
-  }, [orders]);
-
-  const filteredOrders = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    const days = DATE_RANGES[dateRange];
-    const cutoff = days ? anchorTime - days * 86400000 : null;
-
-    return orders.filter((o) => {
-      const matchesSearch =
-        !term ||
-        o.poNumber.toLowerCase().includes(term) ||
-        o.vendorName.toLowerCase().includes(term) ||
-        o.projectName.toLowerCase().includes(term) ||
-        o.category.toLowerCase().includes(term) ||
-        o.createdBy.toLowerCase().includes(term);
-      const matchesProject = projectFilter === 'all' || o.projectId === projectFilter;
-      const matchesVendor = vendorFilter === 'all' || o.vendorId === vendorFilter;
-      const matchesStatus = statusFilter === 'all' || o.approvalStatus === statusFilter;
-      const matchesDate = cutoff === null || new Date(o.requestedDate).getTime() >= cutoff;
-      return matchesSearch && matchesProject && matchesVendor && matchesStatus && matchesDate;
-    });
-  }, [orders, search, projectFilter, vendorFilter, statusFilter, dateRange, anchorTime]);
-
-  if (!isClient) return <></>;
-  if (isLoadingOrders || isLoadingVendors || isLoadingRfqs || isLoadingDeliveries) return <div className="p-8">Loading procurement data...</div>;
-
-  function handleSelectOrder(order: PurchaseOrder): void {
-    setSelectedOrder(order);
-    setOrderDrawerOpen(true);
+  function handleInsight(insight: ProcurementInsight): void {
+    if (insight.target) setDrawer({ kind: insight.target.kind, id: insight.target.id });
   }
 
-  function handleSelectVendor(vendor: Vendor): void {
-    setSelectedVendor(vendor);
-    setVendorDrawerOpen(true);
+  function handleExport(): void {
+    if (filteredOrders.length === 0) {
+      toast.error('No purchase orders to export');
+      return;
+    }
+    downloadCsv(
+      `purchase_orders_${format(new Date(), 'yyyy-MM-dd')}.csv`,
+      ['PO Number', 'Project', 'Vendor', 'Category', 'Requested By', 'Requested', 'Expected', 'Amount (INR)', 'Status', 'Delivery', 'Received %', 'Priority'],
+      filteredOrders.map((order) => [
+        order.poNumber, order.project?.name, order.vendor?.name, order.category, order.requestedBy?.name,
+        order.requestedDate.slice(0, 10), order.expectedDelivery.slice(0, 10), order.amount, order.status,
+        order.deliveryStatus, order.receivedPercent, order.priority,
+      ]),
+    );
+    toast.success(`Exported ${filteredOrders.length} purchase orders`);
+  }
+
+  if (ordersQuery.isLoading) return <ProcurementLoading />;
+
+  if (ordersQuery.isError) {
+    return (
+      <div className="flex-1 p-4 md:p-8 pt-6">
+        <EmptyState
+          icon={AlertTriangle}
+          title="Unable to load procurement"
+          description="Purchase orders couldn't be fetched. Check your connection and try again."
+          action={<Button onClick={() => ordersQuery.refetch()}>Retry</Button>}
+        />
+      </div>
+    );
   }
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -138,102 +113,37 @@ export default function ProcurementPage(): React.ReactElement {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Procurement</h2>
           <p className="text-muted-foreground mt-1">
-            {kpis.pendingPos} orders awaiting approval · {kpis.openRfqs} RFQs in progress
+            {summary
+              ? `${summary.pendingApprovals} orders awaiting approval · ${summary.openRfqs} RFQs in progress`
+              : 'Purchase orders, RFQs, vendors and deliveries'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => toast('RFQ builder opening (demo)')}>
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="mr-1.5 h-4 w-4" /> Export
+          </Button>
+          <Button variant="outline" onClick={() => setCreateDialog('vendor')}>
+            <Building2 className="mr-1.5 h-4 w-4" /> Add Vendor
+          </Button>
+          <Button variant="outline" onClick={() => setCreateDialog('rfq')}>
             <Plus className="mr-1.5 h-4 w-4" /> New RFQ
           </Button>
-          <Button onClick={() => toast('Purchase order builder opening (demo)')}>
+          <Button onClick={() => setCreateDialog('order')}>
             <Plus className="mr-1.5 h-4 w-4" /> New Purchase Order
-          </Button>
-          <Button variant="outline" onClick={() => toast.success('Export started (demo)')}>
-            <Download className="mr-1.5 h-4 w-4" /> Export
           </Button>
         </div>
       </motion.div>
 
-      {/* KPI Cards */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
-      >
-        <motion.div variants={itemVariants}>
-          <ProcurementKpiCard
-            title="Open RFQs"
-            value={kpis.openRfqs}
-            description="awaiting quotes"
-            icon={<FileClock className="h-4 w-4" />}
-            trendLabel="3 closing soon"
-            trendDirection="up"
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <ProcurementKpiCard
-            title="Pending POs"
-            value={kpis.pendingPos}
-            description="need approval"
-            icon={<ClipboardList className="h-4 w-4" />}
-            trendLabel="review queue"
-            trendDirection="up"
-            accentClass="border-amber-200 dark:border-amber-800/30"
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <ProcurementKpiCard
-            title="Approved POs"
-            value={kpis.approvedPos}
-            description="this quarter"
-            icon={<ClipboardCheck className="h-4 w-4" />}
-            trendLabel="12%"
-            trendDirection="up"
-            accentClass="border-emerald-200 dark:border-emerald-800/30"
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <ProcurementKpiCard
-            title="Monthly Value"
-            value={formatCompactINR(kpis.monthlyValue)}
-            description="July procurement"
-            icon={<IndianRupee className="h-4 w-4" />}
-            trendLabel="7%"
-            trendDirection="up"
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <ProcurementKpiCard
-            title="Active Vendors"
-            value={kpis.activeVendors}
-            description="on the panel"
-            icon={<Building2 className="h-4 w-4" />}
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <ProcurementKpiCard
-            title="Delayed Deliveries"
-            value={kpis.delayedDeliveries}
-            description="behind schedule"
-            icon={<AlertTriangle className="h-4 w-4" />}
-            trendLabel="2 fewer"
-            trendDirection="down"
-            invertTrendColor
-            accentClass="border-red-200 dark:border-red-800/30"
-          />
-        </motion.div>
-      </motion.div>
+      <ProcurementKpis summary={summary} />
 
-      {/* Main content + AI panel */}
       <div className="grid gap-6 xl:grid-cols-4">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="xl:col-span-3"
+          className="xl:col-span-3 min-w-0"
         >
-          <Tabs defaultValue="orders">
+          <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="mb-4 flex-wrap h-auto">
               <TabsTrigger value="orders">Purchase Orders</TabsTrigger>
               <TabsTrigger value="rfqs">RFQs</TabsTrigger>
@@ -243,77 +153,31 @@ export default function ProcurementPage(): React.ReactElement {
             </TabsList>
 
             <TabsContent value="orders" className="space-y-4">
-              {/* Filter bar */}
-              <div className="flex flex-col lg:flex-row gap-3">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                  <Input
-                    placeholder="Search PO, vendor, project, category..."
-                    className="pl-9"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-                <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="w-full lg:w-48">
-                    <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <SelectValue placeholder="Project" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Projects</SelectItem>
-                    {/* Projects should be fetched from backend */}
-                  </SelectContent>
-                </Select>
-                <Select value={vendorFilter} onValueChange={setVendorFilter}>
-                  <SelectTrigger className="w-full lg:w-48">
-                    <SelectValue placeholder="Vendor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Vendors</SelectItem>
-                    {vendors.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full lg:w-40">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
-                    <SelectItem value="changes_requested">Changes Requested</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={dateRange} onValueChange={setDateRange}>
-                  <SelectTrigger className="w-full lg:w-40">
-                    <SelectValue placeholder="Date" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="30">Last 30 days</SelectItem>
-                    <SelectItem value="90">Last 90 days</SelectItem>
-                    <SelectItem value="180">Last 180 days</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <PurchaseOrderTable orders={filteredOrders} onSelect={handleSelectOrder} />
+              {orders.length === 0 ? (
+                <EmptyState
+                  icon={ClipboardList}
+                  title="No purchase orders yet"
+                  description="Raise your first purchase order, or issue an RFQ to compare vendor quotes first."
+                  action={<Button onClick={() => setCreateDialog('order')}>New Purchase Order</Button>}
+                />
+              ) : (
+                <>
+                  <PurchaseOrderFilters filters={filters} onChange={setFilters} projects={projects} vendors={vendors} />
+                  <PurchaseOrderTable orders={filteredOrders} onSelect={(order) => openOrder(order.id)} />
+                </>
+              )}
             </TabsContent>
 
             <TabsContent value="rfqs">
-              <RfqTab rfqs={rfqs} />
+              <RfqTab rfqs={rfqs} onSelect={(rfq) => setDrawer({ kind: 'rfq', id: rfq.id })} />
             </TabsContent>
 
             <TabsContent value="vendors">
-              <VendorsTab vendors={vendors} onSelect={handleSelectVendor} />
+              <VendorsTab vendors={vendors} onSelect={(vendor) => setDrawer({ kind: 'vendor', id: vendor.id })} />
             </TabsContent>
 
             <TabsContent value="deliveries">
-              <DeliveriesTab deliveries={deliveries} />
+              <DeliveriesTab deliveries={deliveries} analytics={analytics} onOpenOrder={openOrder} />
             </TabsContent>
 
             <TabsContent value="analytics">
@@ -322,27 +186,41 @@ export default function ProcurementPage(): React.ReactElement {
           </Tabs>
         </motion.div>
 
-        {/* AI Insight panel */}
         <motion.div
           initial={{ opacity: 0, x: 16 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
           className="xl:col-span-1"
         >
-          <AiInsightPanel insights={[]} className="sticky top-6" />
+          <AiInsightPanel insights={insights} onSelect={handleInsight} className="sticky top-6" />
         </motion.div>
       </div>
 
       <PurchaseOrderDrawer
-        order={selectedOrder}
-        open={orderDrawerOpen}
-        onClose={() => setOrderDrawerOpen(false)}
+        orderId={drawer?.kind === 'order' ? drawer.id : null}
+        open={drawer?.kind === 'order'}
+        onClose={closeDrawer}
+        onOpenOrder={openOrder}
       />
-      <VendorDrawer
-        vendor={selectedVendor}
-        open={vendorDrawerOpen}
-        onClose={() => setVendorDrawerOpen(false)}
+      <RfqDrawer
+        rfqId={drawer?.kind === 'rfq' ? drawer.id : null}
+        open={drawer?.kind === 'rfq'}
+        onClose={closeDrawer}
+        onOpenOrder={openOrder}
       />
+      <VendorDrawer vendor={selectedVendor} open={!!selectedVendor} onClose={closeDrawer} onOpenOrder={openOrder} />
+
+      <PurchaseOrderFormDialog
+        open={createDialog === 'order'}
+        onOpenChange={(open) => setCreateDialog(open ? 'order' : null)}
+        onSaved={openOrder}
+      />
+      <RfqFormDialog
+        open={createDialog === 'rfq'}
+        onOpenChange={(open) => setCreateDialog(open ? 'rfq' : null)}
+        onCreated={(id) => setDrawer({ kind: 'rfq', id })}
+      />
+      <VendorFormDialog open={createDialog === 'vendor'} onOpenChange={(open) => setCreateDialog(open ? 'vendor' : null)} />
     </div>
   );
 }

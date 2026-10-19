@@ -8,14 +8,16 @@ import {
 } from '@sitepilot/ui';
 import { Search, Filter, Building2 } from 'lucide-react';
 import { VendorCard } from './VendorCard';
-import { PROCUREMENT_CATEGORIES, type Vendor } from '@/data/procurement-demo';
+import { PROCUREMENT_CATEGORIES } from '@/features/procurement/constants';
+import type { Vendor } from '@/features/procurement/types';
 
 type SortKey = 'performance' | 'rating' | 'onTime' | 'outstanding';
 
 const SORTERS: Record<SortKey, (a: Vendor, b: Vendor) => number> = {
   performance: (a, b) => b.performanceScore - a.performanceScore,
   rating: (a, b) => b.rating - a.rating,
-  onTime: (a, b) => b.onTimeDeliveryPercent - a.onTimeDeliveryPercent,
+  // Vendors without a received delivery yet sort last.
+  onTime: (a, b) => (b.stats.onTimeDeliveryPercent ?? -1) - (a.stats.onTimeDeliveryPercent ?? -1),
   outstanding: (a, b) => b.outstandingBalance - a.outstandingBalance,
 };
 
@@ -27,24 +29,29 @@ interface VendorsTabProps {
 export function VendorsTab({ vendors, onSelect }: VendorsTabProps): React.ReactElement {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('ACTIVE');
   const [sortKey, setSortKey] = useState<SortKey>('performance');
 
+  const categories = useMemo(
+    () => [...new Set([...PROCUREMENT_CATEGORIES, ...vendors.flatMap((vendor) => vendor.categories)])],
+    [vendors],
+  );
+
   const filtered = useMemo(() => {
-    const query = search.toLowerCase();
+    const query = search.trim().toLowerCase();
     return vendors
       .filter((vendor) => {
         const matchesSearch =
           !query ||
           vendor.name.toLowerCase().includes(query) ||
           vendor.code.toLowerCase().includes(query) ||
-          vendor.city.toLowerCase().includes(query);
-        const matchesCategory =
-          categoryFilter === 'all' ||
-          vendor.categories.includes(categoryFilter as Vendor['categories'][number]);
-        return matchesSearch && matchesCategory;
+          (vendor.city?.toLowerCase().includes(query) ?? false);
+        const matchesCategory = categoryFilter === 'all' || vendor.categories.includes(categoryFilter);
+        const matchesStatus = statusFilter === 'all' || vendor.status === statusFilter;
+        return matchesSearch && matchesCategory && matchesStatus;
       })
       .sort(SORTERS[sortKey]);
-  }, [vendors, search, categoryFilter, sortKey]);
+  }, [vendors, search, categoryFilter, statusFilter, sortKey]);
 
   return (
     <div className="space-y-4">
@@ -66,9 +73,20 @@ export function VendorsTab({ vendors, onSelect }: VendorsTabProps): React.ReactE
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {PROCUREMENT_CATEGORIES.map((category) => (
+            {categories.map((category) => (
               <SelectItem key={category} value={category}>{category}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-36" aria-label="Vendor status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ACTIVE">Active</SelectItem>
+            <SelectItem value="INACTIVE">Inactive</SelectItem>
+            <SelectItem value="all">All vendors</SelectItem>
           </SelectContent>
         </Select>
 
@@ -92,7 +110,9 @@ export function VendorsTab({ vendors, onSelect }: VendorsTabProps): React.ReactE
       {filtered.length === 0 ? (
         <div className="py-16 text-center text-muted-foreground">
           <Building2 className="mx-auto h-10 w-10 opacity-40" />
-          <p className="mt-3 text-sm">No vendors match your filters.</p>
+          <p className="mt-3 text-sm">
+            {vendors.length === 0 ? 'No vendors yet. Add your first supplier to start raising orders.' : 'No vendors match your filters.'}
+          </p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
