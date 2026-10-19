@@ -4,20 +4,23 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Plus, Search, Filter, FileText, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { Plus, Search, Filter, FileText, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader } from '@sitepilot/ui';
 import { Button } from '@sitepilot/ui';
 import { Input } from '@sitepilot/ui';
-import { Badge } from '@sitepilot/ui';
+import { Skeleton } from '@sitepilot/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sitepilot/ui';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { useDailyReports } from '@/hooks/api/use-daily-reports';
+import { DailyReportStatusBadge } from '@/features/daily-reports/components/DailyReportStatusBadge';
+import { REPORT_STATUS_OPTIONS } from '@/features/daily-reports/constants';
 
 export default function DailyReportsListPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const { data: reports = [], isLoading, isError } = useDailyReports(params.id);
+  const { data: reports = [], isLoading, isError, refetch } = useDailyReports(params.id);
 
   const filtered = reports.filter((report) => {
     const query = search.trim().toLowerCase();
@@ -25,8 +28,8 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
       query === '' ||
       (report.submittedBy?.name ?? '').toLowerCase().includes(query) ||
       (report.weather ?? '').toLowerCase().includes(query) ||
-      report.status.toLowerCase().includes(query);
-    const matchesStatus = statusFilter === 'all' || report.status.toLowerCase() === statusFilter;
+      (report.workCompleted ?? '').toLowerCase().includes(query);
+    const matchesStatus = statusFilter === 'all' || report.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -68,16 +71,38 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="submitted">Submitted</SelectItem>
+              {REPORT_STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="py-12 text-center text-muted-foreground text-sm">Loading reports…</div>
+            <div className="p-6 space-y-3">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Skeleton key={index} className="h-10 w-full" />
+              ))}
+            </div>
           ) : isError ? (
-            <div className="py-12 text-center text-muted-foreground text-sm">Failed to load reports.</div>
+            <div className="py-12 text-center space-y-3">
+              <p className="text-sm text-muted-foreground">Unable to load daily reports. Check your connection and retry.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          ) : reports.length === 0 ? (
+            <EmptyState
+              className="m-6"
+              icon={FileText}
+              title="No daily reports yet"
+              description="Record today's progress, labour and site issues so the team has a daily record of this project."
+              action={
+                <Button asChild>
+                  <Link href={`/dashboard/projects/${params.id}/daily-reports/new`}>
+                    <Plus className="mr-2 h-4 w-4" /> New Report
+                  </Link>
+                </Button>
+              }
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
@@ -95,11 +120,10 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
                 <tbody className="divide-y divide-border/50">
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-muted-foreground">No reports found.</td>
+                      <td colSpan={7} className="py-12 text-center text-muted-foreground">No reports match your filters.</td>
                     </tr>
                   ) : filtered.map((report) => {
-                    const issues = (report.issues as { severity?: string }[] ?? []);
-                    const issueCount = issues.length;
+                    const issueCount = report.issues.length;
                     return (
                       <tr key={report.id} className="hover:bg-muted/10 transition-colors group">
                         <td className="px-6 py-4 font-medium flex items-center">
@@ -119,14 +143,7 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          <Badge
-                            variant={report.status === 'SUBMITTED' ? 'default' : 'secondary'}
-                            className="capitalize"
-                          >
-                            {report.status === 'SUBMITTED'
-                              ? <><CheckCircle2 className="mr-1 h-3 w-3" />Submitted</>
-                              : <><Clock className="mr-1 h-3 w-3" />Draft</>}
-                          </Badge>
+                          <DailyReportStatusBadge status={report.status} />
                         </td>
                         <td className="px-6 py-4 text-right">
                           <Button

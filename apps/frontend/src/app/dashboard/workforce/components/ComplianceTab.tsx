@@ -6,7 +6,7 @@ import {
   AlertTriangle, ShieldAlert, ShieldCheck, Award,
   CheckCircle2, XCircle, AlertCircle,
 } from 'lucide-react';
-import { Worker } from '@/data/workforce-demo';
+import type { Worker } from '@/hooks/api/use-workforce';
 
 interface ComplianceItem {
   workerId: string;

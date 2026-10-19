@@ -7,25 +7,17 @@ import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import {
   ArrowLeft, Calendar, CloudRain, User, Users, Hammer,
-  Truck, AlertTriangle, CheckCircle2, Clock, FileText, Sparkles,
+  Truck, AlertTriangle, CheckCircle2, FileText, Sparkles, Paperclip,
 } from 'lucide-react';
 import {
   Card, CardContent, CardHeader, CardTitle,
   Badge, Button, Skeleton,
 } from '@sitepilot/ui';
 import { useDailyReport } from '@/hooks/api/use-daily-reports';
-
-function StatusBadge({ status }: { status: 'DRAFT' | 'SUBMITTED' }) {
-  return status === 'SUBMITTED' ? (
-    <Badge variant="default" className="gap-1">
-      <CheckCircle2 className="h-3 w-3" /> Submitted
-    </Badge>
-  ) : (
-    <Badge variant="secondary" className="gap-1">
-      <Clock className="h-3 w-3" /> Draft
-    </Badge>
-  );
-}
+import { DailyReportStatusBadge } from '@/features/daily-reports/components/DailyReportStatusBadge';
+import { ReportAttachmentList } from '@/features/daily-reports/components/ReportAttachmentList';
+import { ReportReviewActions } from '@/features/daily-reports/components/ReportReviewActions';
+import { ReportReviewBanner } from '@/features/daily-reports/components/ReportReviewBanner';
 
 export default function DailyReportDetailPage({
   params,
@@ -60,18 +52,7 @@ export default function DailyReportDetailPage({
     );
   }
 
-  const materials = report.materialsConsumed as {
-    material?: string; quantity?: number; unit?: string;
-  }[];
-  const equipment = report.equipmentUsed as {
-    name?: string; hours?: number;
-  }[];
-  const issues = report.issues as {
-    severity?: string; description?: string;
-  }[];
-  const labourDetails = report.labourDetails as {
-    skilled?: number; unskilled?: number; supervisors?: number;
-  } | null;
+  const { materialsConsumed: materials, equipmentUsed: equipment, issues, labourDetails } = report;
 
   return (
     <motion.div
@@ -92,7 +73,7 @@ export default function DailyReportDetailPage({
             Daily Report — {format(new Date(report.date), 'MMM dd, yyyy')}
           </h2>
           <div className="flex items-center gap-3 mt-1">
-            <StatusBadge status={report.status} />
+            <DailyReportStatusBadge status={report.status} />
             {report.submittedBy && (
               <span className="text-sm text-muted-foreground flex items-center gap-1">
                 <User className="h-3.5 w-3.5" />
@@ -101,7 +82,10 @@ export default function DailyReportDetailPage({
             )}
           </div>
         </div>
+        <ReportReviewActions report={report} />
       </div>
+
+      <ReportReviewBanner report={report} />
 
       {/* Overview */}
       <Card>
@@ -288,6 +272,24 @@ export default function DailyReportDetailPage({
             <p className="text-sm leading-relaxed whitespace-pre-line text-muted-foreground">
               {report.remarks}
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Attachments */}
+      {report.attachments.length > 0 && (
+        <Card>
+          <CardHeader className="border-b bg-muted/20">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Paperclip className="h-4 w-4 text-muted-foreground" /> Photos & Attachments
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <ReportAttachmentList
+              projectId={params.id}
+              reportId={report.id}
+              attachments={report.attachments}
+            />
           </CardContent>
         </Card>
       )}

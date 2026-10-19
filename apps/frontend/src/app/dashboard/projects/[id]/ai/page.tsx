@@ -16,6 +16,7 @@ import { differenceInDays } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Progress, Skeleton } from '@sitepilot/ui';
 import { useProject, type ProjectDetail } from '@/hooks/api/use-projects';
 import { useWorkforce } from '@/hooks/api/use-workforce';
+import { isAbsentToday, isOnSiteToday } from '@/features/workforce/utils/attendance';
 import { formatRelativeTime } from '@/lib/utils';
 import { EmptyState } from '@/components/shared/EmptyState';
 
@@ -102,8 +103,8 @@ function buildWorkforce(workers: Worker[]): string {
   if (workers.length === 0) {
     return `### Workforce\nNo workforce is assigned to this project.`;
   }
-  const present = workers.filter((w) => w.status === 'active' || w.status === 'late').length;
-  const absent = workers.filter((w) => w.status === 'absent').length;
+  const present = workers.filter(isOnSiteToday).length;
+  const absent = workers.filter(isAbsentToday).length;
   const subs = workers.filter((w) => w.type.toLowerCase() === 'subcontractor').length;
   const trades = new Map<string, number>();
   for (const w of workers) trades.set(w.trade, (trades.get(w.trade) ?? 0) + 1);
@@ -156,7 +157,7 @@ function buildRisks(project: ProjectDetail, workers: Worker[]): string {
     risks.push(`Only **${days} day(s)** remain with progress at **${project.progress}%**.`);
   }
 
-  const absent = workers.filter((w) => w.status === 'absent').length;
+  const absent = workers.filter(isAbsentToday).length;
   if (absent > 0) risks.push(`**${absent}** worker(s) reported absent.`);
 
   const expiredCerts = workers.filter((w) =>
@@ -182,7 +183,7 @@ function buildSummary(project: ProjectDetail, workers: Worker[]): string {
     project.budget != null && project.budget > 0
       ? `${((project.spent / project.budget) * 100).toFixed(1)}%`
       : 'No data available';
-  const present = workers.filter((w) => w.status === 'active' || w.status === 'late').length;
+  const present = workers.filter(isOnSiteToday).length;
   const scheduleLine =
     days == null
       ? 'no completion date set'
@@ -308,7 +309,7 @@ export default function ProjectDirectorAIPage({ params }: { params: { id: string
   const days = daysToCompletion(project);
   const budgetUtil =
     project.budget != null && project.budget > 0 ? (project.spent / project.budget) * 100 : 0;
-  const present = workers.filter((w) => w.status === 'active' || w.status === 'late').length;
+  const present = workers.filter(isOnSiteToday).length;
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-140px)] gap-6 overflow-hidden">

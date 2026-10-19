@@ -9,6 +9,8 @@ export interface DashboardStats {
   totalSpent: number;
   pendingApprovals: number;
   workforceToday: number;
+  workforceTotal: number;
+  workforceNotMarked: number;
   projects: {
     id: string;
     name: string;

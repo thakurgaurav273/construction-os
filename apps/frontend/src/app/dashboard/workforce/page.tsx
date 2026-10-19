@@ -1,26 +1,29 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
-  Card, CardContent, CardHeader, CardTitle, CardDescription,
-  Button, Tabs, TabsList, TabsTrigger, TabsContent,
-  Input, Label,
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Card, CardContent, CardHeader, CardTitle,
+  Button, Tabs, TabsList, TabsTrigger, TabsContent, Skeleton,
 } from '@sitepilot/ui';
 import {
   Users, UserCheck, UserX, HardHat, ShieldCheck, Award,
-  Download, UserPlus, Lightbulb, AlertTriangle, TrendingUp,
+  Download, UserPlus, ClipboardCheck,
 } from 'lucide-react';
-import { workers as demoWorkers } from '@/data/workforce-demo';
-import type { Worker } from '@/data/workforce-demo';
+import { useWorkforce, useWorkforceStats } from '@/hooks/api/use-workforce';
+import { downloadCsv } from '@/lib/download-csv';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { ATTENDANCE_STATUS_STYLES, SHIFT_LABELS, WORKER_TYPE_LABELS } from '@/features/workforce/constants';
+import { formatCheckIn, toDisplayStatus } from '@/features/workforce/utils/attendance';
+import { MarkAttendanceSheet } from '@/features/workforce/components/MarkAttendanceSheet';
+import { WorkerFormDialog } from '@/features/workforce/components/WorkerFormDialog';
 import { WorkerDrawer } from './components/WorkerDrawer';
 import { DirectoryTab } from './components/DirectoryTab';
 import { AttendanceTab } from './components/AttendanceTab';
 import { TradesTab } from './components/TradesTab';
 import { ComplianceTab } from './components/ComplianceTab';
-import { useWorkforce, useWorkforceStats } from '@/hooks/api/use-workforce';
+import { WorkforceAlerts } from './components/WorkforceAlerts';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -33,7 +36,7 @@ const itemVariants = {
 
 interface KpiCardProps {
   title: string;
-  value: number | string;
+  value: number | string | undefined;
   description: string;
   icon: React.ReactNode;
   accentClass?: string;
@@ -47,7 +50,7 @@ function KpiCard({ title, value, description, icon, accentClass = '' }: KpiCardP
         <div className="text-muted-foreground group-hover:text-primary transition-colors">{icon}</div>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        {value === undefined ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold">{value}</div>}
         <p className="text-xs text-muted-foreground mt-1">{description}</p>
       </CardContent>
     </Card>
@@ -55,52 +58,31 @@ function KpiCard({ title, value, description, icon, accentClass = '' }: KpiCardP
 }
 
 export default function WorkforcePage(): React.ReactElement {
-  const [isClient, setIsClient] = useState(false);
-  const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newTrade, setNewTrade] = useState('');
-  const [newPhone, setNewPhone] = useState('');
+  const [attendanceOpen, setAttendanceOpen] = useState(false);
 
-  const { data: apiWorkers } = useWorkforce();
-  const { data: apiStats } = useWorkforceStats();
+  const { data: workers = [], isLoading, isError, refetch } = useWorkforce({ includeInactive: true });
+  const { data: stats } = useWorkforceStats();
+  const activeWorkers = workers.filter((worker) => worker.isActive);
+  const selectedWorker = workers.find((worker) => worker.id === selectedWorkerId) ?? null;
 
-  useEffect(() => { setIsClient(true); }, []);
-  if (!isClient) return <></>;
-
-  const workers = apiWorkers ?? demoWorkers;
-
-  const kpis = apiStats ?? {
-    total:            workers.length,
-    presentToday:     workers.filter((w) => w.status === 'active' || w.status === 'late').length,
-    absentToday:      workers.filter((w) => w.status === 'absent').length,
-    subcontractors:   workers.filter((w) => w.type === 'Subcontractor').length,
-    safetyCompliance: workers.length
-      ? Math.round((workers.filter((w) => w.ppeCompliant).length / workers.length) * 100)
-      : 0,
-    expiringCerts:    workers.filter((w) => w.certifications.some((c) => c.status === 'expiring')).length,
-  };
-
-  function handleSelectWorker(worker: Worker): void {
-    setSelectedWorker(worker);
-    setDrawerOpen(true);
-  }
-
-  function resetAddForm(): void {
-    setNewName('');
-    setNewTrade('');
-    setNewPhone('');
-  }
-
-  function handleAddWorker(): void {
-    if (!newName.trim()) {
-      toast.error('Enter a worker name.');
+  function handleExport(): void {
+    if (activeWorkers.length === 0) {
+      toast.error('No workers to export');
       return;
     }
-    toast.success(`${newName.trim()} added`);
-    resetAddForm();
-    setAddOpen(false);
+    downloadCsv(
+      `workforce_${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Name', 'Role', 'Trade', 'Type', 'Shift', 'Project', 'Phone', 'Email', 'Today', 'Attendance % (30d)', 'Last check-in', 'PPE compliant'],
+      activeWorkers.map((worker) => [
+        worker.name, worker.role, worker.trade, WORKER_TYPE_LABELS[worker.type], SHIFT_LABELS[worker.shift],
+        worker.project, worker.phone, worker.email,
+        ATTENDANCE_STATUS_STYLES[toDisplayStatus(worker.todayStatus)].label,
+        worker.attendanceRate, formatCheckIn(worker.lastCheckInAt), worker.ppeCompliant ? 'Yes' : 'No',
+      ]),
+    );
+    toast.success('Workforce export downloaded');
   }
 
   return (
@@ -114,12 +96,15 @@ export default function WorkforcePage(): React.ReactElement {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Workforce</h2>
           <p className="text-muted-foreground mt-1">
-            {kpis.total} workers across active projects
+            {stats ? `${stats.total} active workers across your sites` : 'Workers, daily attendance and compliance'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => toast.success('Workforce export started')}>
+          <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" /> Export
+          </Button>
+          <Button variant="outline" onClick={() => setAttendanceOpen(true)}>
+            <ClipboardCheck className="mr-2 h-4 w-4" /> Mark Attendance
           </Button>
           <Button onClick={() => setAddOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" /> Add Worker
@@ -135,18 +120,13 @@ export default function WorkforcePage(): React.ReactElement {
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
       >
         <motion.div variants={itemVariants}>
-          <KpiCard
-            title="Total Workforce"
-            value={kpis.total}
-            description="Across all sites"
-            icon={<Users className="h-4 w-4" />}
-          />
+          <KpiCard title="Total Workforce" value={stats?.total} description="Active across all sites" icon={<Users className="h-4 w-4" />} />
         </motion.div>
         <motion.div variants={itemVariants}>
           <KpiCard
-            title="Present Today"
-            value={kpis.presentToday}
-            description={`${kpis.total - kpis.presentToday - kpis.absentToday} on leave`}
+            title="On Site Today"
+            value={stats?.presentToday}
+            description={`${stats?.onLeaveToday ?? 0} on leave · ${stats?.notMarkedToday ?? 0} not marked`}
             icon={<UserCheck className="h-4 w-4" />}
             accentClass="border-emerald-200 dark:border-emerald-800/30"
           />
@@ -154,197 +134,98 @@ export default function WorkforcePage(): React.ReactElement {
         <motion.div variants={itemVariants}>
           <KpiCard
             title="Absent Today"
-            value={kpis.absentToday}
-            description="No prior notification"
+            value={stats?.absentToday}
+            description="Marked absent"
             icon={<UserX className="h-4 w-4" />}
             accentClass="border-red-200 dark:border-red-800/30"
           />
         </motion.div>
         <motion.div variants={itemVariants}>
-          <KpiCard
-            title="Subcontractors"
-            value={kpis.subcontractors}
-            description="From external firms"
-            icon={<HardHat className="h-4 w-4" />}
-          />
+          <KpiCard title="Subcontractors" value={stats?.subcontractors} description="From external firms" icon={<HardHat className="h-4 w-4" />} />
         </motion.div>
         <motion.div variants={itemVariants}>
           <KpiCard
             title="Safety Compliance"
-            value={`${kpis.safetyCompliance}%`}
+            value={stats ? `${stats.safetyCompliance}%` : undefined}
             description="PPE compliant workers"
             icon={<ShieldCheck className="h-4 w-4" />}
-            accentClass={kpis.safetyCompliance >= 90 ? 'border-emerald-200 dark:border-emerald-800/30' : 'border-amber-200 dark:border-amber-800/30'}
+            accentClass={(stats?.safetyCompliance ?? 0) >= 90 ? 'border-emerald-200 dark:border-emerald-800/30' : 'border-amber-200 dark:border-amber-800/30'}
           />
         </motion.div>
         <motion.div variants={itemVariants}>
           <KpiCard
-            title="Open Certifications"
-            value={kpis.expiringCerts}
-            description="Expiring within 30 days"
+            title="Expiring Certifications"
+            value={stats?.expiringCerts}
+            description="Workers with a cert expiring soon"
             icon={<Award className="h-4 w-4" />}
             accentClass="border-amber-200 dark:border-amber-800/30"
           />
         </motion.div>
       </motion.div>
 
-      {/* Main Content + AI Insight */}
+      {/* Main Content + Alerts */}
       <div className="grid gap-6 xl:grid-cols-4">
-        {/* Tabs - takes 3/4 */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="xl:col-span-3"
         >
-          <Tabs defaultValue="directory">
-            <TabsList className="mb-4">
-              <TabsTrigger value="directory">Directory</TabsTrigger>
-              <TabsTrigger value="attendance">Attendance</TabsTrigger>
-              <TabsTrigger value="trades">Trades</TabsTrigger>
-              <TabsTrigger value="compliance">Compliance</TabsTrigger>
-            </TabsList>
+          {isLoading && <Skeleton className="h-[420px] w-full rounded-xl" />}
+          {isError && (
+            <EmptyState
+              icon={Users}
+              title="Unable to load the workforce"
+              description="Check your connection and try again."
+              action={<Button variant="outline" onClick={() => refetch()}>Retry</Button>}
+            />
+          )}
+          {!isLoading && !isError && workers.length === 0 && (
+            <EmptyState
+              icon={Users}
+              title="No workers yet"
+              description="Add your site crew to start tracking daily attendance, trades and compliance."
+              action={<Button onClick={() => setAddOpen(true)}><UserPlus className="mr-2 h-4 w-4" /> Add Worker</Button>}
+            />
+          )}
+          {!isLoading && !isError && workers.length > 0 && (
+            <Tabs defaultValue="directory">
+              <TabsList className="mb-4">
+                <TabsTrigger value="directory">Directory</TabsTrigger>
+                <TabsTrigger value="attendance">Attendance</TabsTrigger>
+                <TabsTrigger value="trades">Trades</TabsTrigger>
+                <TabsTrigger value="compliance">Compliance</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="directory">
-              <DirectoryTab workers={workers} onSelectWorker={handleSelectWorker} />
-            </TabsContent>
-
-            <TabsContent value="attendance">
-              <AttendanceTab workers={workers} />
-            </TabsContent>
-
-            <TabsContent value="trades">
-              <TradesTab />
-            </TabsContent>
-
-            <TabsContent value="compliance">
-              <ComplianceTab workers={workers} />
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="directory">
+                <DirectoryTab workers={workers} onSelectWorker={(worker) => setSelectedWorkerId(worker.id)} />
+              </TabsContent>
+              <TabsContent value="attendance">
+                <AttendanceTab workers={activeWorkers} stats={stats} onMarkAttendance={() => setAttendanceOpen(true)} />
+              </TabsContent>
+              <TabsContent value="trades">
+                <TradesTab workers={activeWorkers} />
+              </TabsContent>
+              <TabsContent value="compliance">
+                <ComplianceTab workers={activeWorkers} />
+              </TabsContent>
+            </Tabs>
+          )}
         </motion.div>
 
-        {/* AI Insight Panel */}
         <motion.div
           initial={{ opacity: 0, x: 16 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
           className="xl:col-span-1"
         >
-          <Card className="border-primary/20 bg-primary/5 overflow-hidden relative sticky top-6">
-            <div className="absolute top-0 right-0 p-4 opacity-5">
-              <Lightbulb size={100} />
-            </div>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-primary text-sm">
-                <Lightbulb className="h-4 w-4" />
-                AI Workforce Insights
-              </CardTitle>
-              <CardDescription className="text-xs">Real-time workforce intelligence</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 relative z-10">
-              <div className="bg-card border rounded-lg p-3 shadow-sm">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                  <span className="text-xs font-semibold">Low Utilization Alert</span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Electrical crew utilization is 80%. Consider reallocating 2 workers to Smart City Sector 9 which is understaffed.
-                </p>
-              </div>
-
-              <div className="bg-card border rounded-lg p-3 shadow-sm">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />
-                  <span className="text-xs font-semibold">Concrete Crew Understaffed</span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Marina Bay Level 15 pour is scheduled for tomorrow but 2 concrete workers are absent today. Arrange standby crew.
-                </p>
-              </div>
-
-              <div className="bg-card border rounded-lg p-3 shadow-sm">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                  <span className="text-xs font-semibold">Certifications Expiring</span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {kpis.expiringCerts} workers have certifications expiring within 30 days. Schedule renewal training this week.
-                </p>
-              </div>
-
-              <div className="bg-card border rounded-lg p-3 shadow-sm">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <TrendingUp className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                  <span className="text-xs font-semibold">Attendance Improving</span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Overall attendance rate improved by 4% this week compared to Wk 26. Rajesh Kumar and Ramesh Singh teams leading at 95%+.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <WorkforceAlerts stats={stats} onMarkAttendance={() => setAttendanceOpen(true)} />
         </motion.div>
       </div>
 
-      {/* Worker Detail Drawer */}
-      <WorkerDrawer
-        worker={selectedWorker}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-      />
-
-      {/* Add Worker Dialog */}
-      <Dialog
-        open={addOpen}
-        onOpenChange={(o) => {
-          if (!o) resetAddForm();
-          setAddOpen(o);
-        }}
-      >
-        <DialogContent className="sm:max-w-[440px]">
-          <DialogHeader>
-            <DialogTitle>Add Worker</DialogTitle>
-            <DialogDescription>Register a new worker in the directory.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="worker-name">Name</Label>
-              <Input
-                id="worker-name"
-                placeholder="e.g. Rajesh Kumar"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="worker-trade">Role / Trade</Label>
-              <Input
-                id="worker-trade"
-                placeholder="e.g. Electrician"
-                value={newTrade}
-                onChange={(e) => setNewTrade(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="worker-phone">Phone</Label>
-              <Input
-                id="worker-phone"
-                placeholder="e.g. +91 98765 43210"
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { resetAddForm(); setAddOpen(false); }}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddWorker}>Add Worker</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <WorkerDrawer worker={selectedWorker} open={selectedWorker !== null} onClose={() => setSelectedWorkerId(null)} />
+      <WorkerFormDialog open={addOpen} onOpenChange={setAddOpen} />
+      <MarkAttendanceSheet open={attendanceOpen} onOpenChange={setAttendanceOpen} />
     </div>
   );
 }

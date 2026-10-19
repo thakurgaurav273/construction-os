@@ -1,32 +1,22 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Users, Search, HardHat, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Users, Search, CheckCircle2, AlertCircle, ShieldCheck, ClipboardCheck } from 'lucide-react';
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
   Button, Input, Badge, Progress, Skeleton,
 } from '@sitepilot/ui';
 import { useProjectWorkforce, useProjectWorkforceStats } from '@/hooks/api/use-workforce';
 import { EmptyState } from '@/components/shared/EmptyState';
-
-const STATUS_COLORS: Record<string, string> = {
-  active:   'bg-emerald-500',
-  late:     'bg-amber-500',
-  absent:   'bg-red-500',
-  on_leave: 'bg-blue-400',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  active:   'Active',
-  late:     'Late',
-  absent:   'Absent',
-  on_leave: 'On Leave',
-};
+import { ATTENDANCE_STATUS_STYLES, SHIFT_LABELS, WORKER_TYPE_LABELS } from '@/features/workforce/constants';
+import { formatCheckIn, toDisplayStatus } from '@/features/workforce/utils/attendance';
+import { MarkAttendanceSheet } from '@/features/workforce/components/MarkAttendanceSheet';
 
 export default function WorkforcePage({ params }: { params: { id: string } }) {
-  const { data: workers = [], isLoading } = useProjectWorkforce(params.id);
+  const { data: workers = [], isLoading, isError, refetch } = useProjectWorkforce(params.id);
   const { data: stats } = useProjectWorkforceStats(params.id);
   const [search, setSearch] = useState('');
+  const [attendanceOpen, setAttendanceOpen] = useState(false);
 
   const trades = useMemo(() => {
     const counts = new Map<string, number>();
@@ -58,31 +48,47 @@ export default function WorkforcePage({ params }: { params: { id: string } }) {
     );
   }
 
+  if (isError) {
+    return (
+      <EmptyState
+        icon={Users}
+        title="Unable to load this site's workforce"
+        description="Check your connection and try again."
+        action={<Button variant="outline" onClick={() => refetch()}>Retry</Button>}
+      />
+    );
+  }
+
   if (workers.length === 0) {
     return (
       <EmptyState
         icon={Users}
         title="No workforce assigned yet"
-        description="Workers assigned to this project will appear here with attendance and trade breakdowns."
+        description="Assign workers to this project from the Workforce directory to track their daily attendance here."
       />
     );
   }
 
-  const total        = stats?.total ?? workers.length;
-  const presentToday = stats?.presentToday ?? workers.filter((w) => w.status === 'active' || w.status === 'late').length;
-  const absentToday  = stats?.absentToday ?? workers.filter((w) => w.status === 'absent').length;
-  const subcontractors = stats?.subcontractors ?? workers.filter((w) => w.type === 'Subcontractor').length;
-  const attendance   = total > 0 ? (presentToday / total) * 100 : 0;
-  const safety       = stats?.safetyCompliance ?? 0;
+  const total          = stats?.total ?? workers.length;
+  const presentToday   = stats?.presentToday ?? 0;
+  const absentToday    = stats?.absentToday ?? 0;
+  const notMarkedToday = stats?.notMarkedToday ?? 0;
+  const subcontractors = stats?.subcontractors ?? 0;
+  const attendance     = total > 0 ? (presentToday / total) * 100 : 0;
+  const safety         = stats?.safetyCompliance ?? 0;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Workforce</h2>
-          <p className="text-muted-foreground">Personnel assigned to this project.</p>
+          <p className="text-muted-foreground">Personnel assigned to this project and today&apos;s attendance.</p>
         </div>
+        <Button onClick={() => setAttendanceOpen(true)}>
+          <ClipboardCheck className="mr-2 h-4 w-4" /> Mark Attendance
+        </Button>
       </div>
+      <MarkAttendanceSheet projectId={params.id} open={attendanceOpen} onOpenChange={setAttendanceOpen} />
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -98,12 +104,15 @@ export default function WorkforcePage({ params }: { params: { id: string } }) {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Present Today</CardTitle>
+            <CardTitle className="text-sm font-medium">On Site Today</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{attendance.toFixed(0)}%</div>
+            <div className="text-2xl font-bold">
+              {presentToday}<span className="text-sm font-normal text-muted-foreground"> / {total}</span>
+            </div>
             <Progress value={attendance} className="h-1.5 mt-2" indicatorColor="bg-emerald-500" />
+            {notMarkedToday > 0 && <p className="text-xs text-muted-foreground mt-1">{notMarkedToday} not marked yet</p>}
           </CardContent>
         </Card>
         <Card>
@@ -113,7 +122,7 @@ export default function WorkforcePage({ params }: { params: { id: string } }) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{absentToday}</div>
-            <p className="text-xs text-muted-foreground mt-1">worker{absentToday === 1 ? '' : 's'} absent</p>
+            <p className="text-xs text-muted-foreground mt-1">worker{absentToday === 1 ? '' : 's'} marked absent today</p>
           </CardContent>
         </Card>
         <Card>
@@ -176,7 +185,9 @@ export default function WorkforcePage({ params }: { params: { id: string } }) {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {filtered.map((worker) => (
+                {filtered.map((worker) => {
+                  const status = ATTENDANCE_STATUS_STYLES[toDisplayStatus(worker.todayStatus)];
+                  return (
                   <div
                     key={worker.id}
                     className="flex items-start gap-3 p-4 rounded-xl border bg-muted/20 hover:bg-muted/40 transition-colors"
@@ -187,8 +198,8 @@ export default function WorkforcePage({ params }: { params: { id: string } }) {
                         {worker.initials}
                       </div>
                       <span
-                        className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background ${STATUS_COLORS[worker.status] ?? 'bg-gray-400'}`}
-                        title={STATUS_LABELS[worker.status] ?? worker.status}
+                        className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background ${status.dot}`}
+                        title={status.label}
                       />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -197,33 +208,24 @@ export default function WorkforcePage({ params }: { params: { id: string } }) {
                       <p className="text-xs text-muted-foreground">{worker.trade}</p>
                       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                         <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0">
-                          {worker.type}
+                          {WORKER_TYPE_LABELS[worker.type]}
                         </Badge>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] font-normal px-1.5 py-0 ${
-                            worker.status === 'active' ? 'text-emerald-600 border-emerald-300' :
-                            worker.status === 'late'   ? 'text-amber-600 border-amber-300' :
-                            worker.status === 'absent' ? 'text-red-600 border-red-300' :
-                            'text-blue-600 border-blue-300'
-                          }`}
-                        >
-                          {STATUS_LABELS[worker.status] ?? worker.status}
+                        <Badge variant="outline" className={`text-[10px] font-normal px-1.5 py-0 ${status.text}`}>
+                          {status.label}
                         </Badge>
-                        {worker.shift && (
-                          <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0">
-                            {worker.shift} shift
-                          </Badge>
-                        )}
+                        <Badge variant="outline" className="text-[10px] font-normal px-1.5 py-0">
+                          {SHIFT_LABELS[worker.shift]} shift
+                        </Badge>
                       </div>
-                      {worker.lastCheckIn && (
+                      {worker.lastCheckInAt && (
                         <p className="text-[10px] text-muted-foreground mt-1 truncate">
-                          Last check-in: {worker.lastCheckIn}
+                          Last check-in: {formatCheckIn(worker.lastCheckInAt)}
                         </p>
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

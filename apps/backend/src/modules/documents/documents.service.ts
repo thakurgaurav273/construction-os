@@ -23,6 +23,7 @@ export class DocumentsService {
     organizationId: string,
     userId: string,
     file: Express.Multer.File,
+    options: { dailyReportId?: string } = {},
   ) {
     const key = `organizations/${organizationId}/projects/${projectId}/documents/${uuidv4()}-${file.originalname}`;
     const url = await this.storage.upload(key, file.buffer, file.mimetype);
@@ -35,8 +36,9 @@ export class DocumentsService {
         size: file.size,
         url,
         storageKey: key,
-        entityType: 'project',
-        entityId: projectId,
+        entityType: options.dailyReportId ? 'daily_report' : 'project',
+        entityId: options.dailyReportId ?? projectId,
+        dailyReportId: options.dailyReportId,
         projectId,
         organizationId,
         uploadedById: userId,

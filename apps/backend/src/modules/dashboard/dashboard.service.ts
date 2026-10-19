@@ -1,13 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { WorkforceService } from '../workforce/workforce.service';
 import { subMonths, format } from 'date-fns';
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly workforce: WorkforceService,
+  ) {}
 
   async getStats(organizationId: string) {
-    const [projects, recentActivities] = await Promise.all([
+    const [projects, recentActivities, workforceStats] = await Promise.all([
       this.prisma.project.findMany({
         where: { organizationId, deletedAt: null },
         select: {
@@ -30,6 +34,7 @@ export class DashboardService {
         take: 6,
         include: { actor: { select: { id: true, name: true, avatar: true } } },
       }),
+      this.workforce.getStats(organizationId),
     ]);
 
     const activeProjects = projects.filter((p) =>
@@ -54,7 +59,9 @@ export class DashboardService {
       totalBudget,
       totalSpent,
       pendingApprovals: 0,
-      workforceToday: 0,
+      workforceToday: workforceStats.presentToday,
+      workforceTotal: workforceStats.total,
+      workforceNotMarked: workforceStats.notMarkedToday,
       projects: projects.map((p) => ({
         id: p.id,
         name: p.name,

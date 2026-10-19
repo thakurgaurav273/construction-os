@@ -6,7 +6,7 @@
  * different values on the server and the client, which React would flag as a
  * hydration mismatch.
  *
- * Reference "today" is 2026-07-17, matching workforce-demo.ts.
+ * Reference "today" is 2026-07-17.
  */
 
 import { addDays, format } from 'date-fns';

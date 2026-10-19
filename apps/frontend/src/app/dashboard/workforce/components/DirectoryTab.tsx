@@ -10,44 +10,16 @@ import {
   Search, Filter, ChevronLeft, ChevronRight,
   Phone, Clock, MoreHorizontal, Eye,
 } from 'lucide-react';
-import { Worker, WorkerStatus, WorkerTrade } from '@/data/workforce-demo';
+import type { Worker } from '@/hooks/api/use-workforce';
+import { ATTENDANCE_STATUS_STYLES, TRADE_OPTIONS, type AttendanceDisplayStatus } from '@/features/workforce/constants';
+import { AttendanceStatusLabel } from '@/features/workforce/components/AttendanceStatusLabel';
+import {
+  attendanceRateTone, avatarColorFor, formatCheckIn, toDisplayStatus,
+} from '@/features/workforce/utils/attendance';
 
 const PAGE_SIZE = 15;
 
-const STATUS_LABELS: Record<WorkerStatus, string> = {
-  active: 'Present',
-  late: 'Late',
-  absent: 'Absent',
-  on_leave: 'On Leave',
-};
-
-const STATUS_DOT: Record<WorkerStatus, string> = {
-  active:   'bg-emerald-500',
-  late:     'bg-amber-500',
-  absent:   'bg-red-500',
-  on_leave: 'bg-blue-500',
-};
-
-const TRADES: WorkerTrade[] = [
-  'Civil', 'Electrical', 'Steel Fixing', 'Concrete',
-  'Mechanical', 'Masonry', 'Equipment Operation', 'Plumbing', 'Carpentry', 'Painting',
-];
-
-const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500',
-  'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-orange-500',
-];
-
-function getAvatarColor(workerId: string): string {
-  const idx = parseInt(workerId.replace('w', ''), 10);
-  return AVATAR_COLORS[idx % AVATAR_COLORS.length];
-}
-
-function getAttendanceColor(pct: number): string {
-  if (pct >= 90) return 'text-emerald-600';
-  if (pct >= 75) return 'text-amber-600';
-  return 'text-red-600';
-}
+const STATUS_FILTERS: AttendanceDisplayStatus[] = ['PRESENT', 'LATE', 'HALF_DAY', 'ABSENT', 'ON_LEAVE', 'NOT_MARKED'];
 
 interface DirectoryTabProps {
   workers: Worker[];
@@ -58,6 +30,7 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [tradeFilter, setTradeFilter] = useState<string>('all');
+  const [showInactive, setShowInactive] = useState(false);
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
@@ -69,12 +42,12 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
         w.trade.toLowerCase().includes(search.toLowerCase()) ||
         (w.project ?? '').toLowerCase().includes(search.toLowerCase());
 
-      const matchesStatus = statusFilter === 'all' || w.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || toDisplayStatus(w.todayStatus) === statusFilter;
       const matchesTrade = tradeFilter === 'all' || w.trade === tradeFilter;
 
-      return matchesSearch && matchesStatus && matchesTrade;
+      return (showInactive || w.isActive) && matchesSearch && matchesStatus && matchesTrade;
     });
-  }, [workers, search, statusFilter, tradeFilter]);
+  }, [workers, search, statusFilter, tradeFilter, showInactive]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(page, totalPages);
@@ -114,14 +87,13 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
         <Select value={statusFilter} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-full sm:w-40">
             <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-            <SelectValue placeholder="Status" />
+            <SelectValue placeholder="Today" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Present</SelectItem>
-            <SelectItem value="late">Late</SelectItem>
-            <SelectItem value="absent">Absent</SelectItem>
-            <SelectItem value="on_leave">On Leave</SelectItem>
+            <SelectItem value="all">Any status</SelectItem>
+            {STATUS_FILTERS.map((status) => (
+              <SelectItem key={status} value={status}>{ATTENDANCE_STATUS_STYLES[status].label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
@@ -131,9 +103,19 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Trades</SelectItem>
-            {TRADES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            {TRADE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
+
+        <label className="flex items-center gap-2 text-sm text-muted-foreground whitespace-nowrap">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-input accent-primary"
+            checked={showInactive}
+            onChange={(e) => { setShowInactive(e.target.checked); resetPage(); }}
+          />
+          Include inactive
+        </label>
       </div>
 
       <p className="text-sm text-muted-foreground">
@@ -150,9 +132,9 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell">Trade</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap hidden lg:table-cell">Project</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap hidden xl:table-cell">Contact</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Today</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap hidden lg:table-cell">Exp</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell">Att %</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell" title="Last 30 days">Att %</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap hidden xl:table-cell">Last Check-in</th>
                 <th className="px-4 py-3 w-10"></th>
               </tr>
@@ -176,14 +158,17 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <Avatar className={`h-8 w-8 shrink-0 ${getAvatarColor(worker.id)} text-white`}>
-                          <AvatarFallback className={`${getAvatarColor(worker.id)} text-white text-xs font-bold`}>
+                        <Avatar className={`h-8 w-8 shrink-0 ${avatarColorFor(worker.id)} text-white`}>
+                          <AvatarFallback className={`${avatarColorFor(worker.id)} text-white text-xs font-bold`}>
                             {worker.initials}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="font-medium group-hover:text-primary transition-colors whitespace-nowrap">{worker.name}</p>
-                          <p className="text-xs text-muted-foreground">{worker.role}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {worker.role}
+                            {!worker.isActive && <span className="ml-1.5 text-destructive">· Inactive</span>}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -191,39 +176,37 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
                       <Badge variant="secondary" className="text-xs whitespace-nowrap">{worker.trade}</Badge>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
-                      <p className="text-xs text-muted-foreground max-w-[160px] truncate">{worker.project}</p>
+                      <p className="text-xs text-muted-foreground max-w-[160px] truncate">{worker.project ?? 'Not assigned'}</p>
                     </td>
                     <td className="px-4 py-3 hidden xl:table-cell">
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Phone className="h-3 w-3" />
-                        <span className="whitespace-nowrap">{worker.phone}</span>
+                        <span className="whitespace-nowrap">{worker.phone ?? '—'}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`h-2 w-2 rounded-full shrink-0 ${STATUS_DOT[worker.status]}`} />
-                        <span className="text-xs whitespace-nowrap">{STATUS_LABELS[worker.status]}</span>
-                      </div>
+                      <AttendanceStatusLabel status={worker.todayStatus} />
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground whitespace-nowrap">
                       {worker.experienceYears} yr
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
-                      <span className={`text-xs font-semibold ${getAttendanceColor(worker.attendancePercent)}`}>
-                        {worker.attendancePercent}%
+                      <span className={`text-xs font-semibold ${attendanceRateTone(worker.attendanceRate)}`}>
+                        {worker.attendanceRate === null ? '—' : `${worker.attendanceRate}%`}
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden xl:table-cell">
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3 shrink-0" />
-                        <span className="whitespace-nowrap">{worker.lastCheckIn}</span>
+                        <span className="whitespace-nowrap">{formatCheckIn(worker.lastCheckInAt)}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                        aria-label={`View ${worker.name}`}
                         onClick={(e) => { e.stopPropagation(); onSelectWorker(worker); }}
                       >
                         <Eye className="h-3.5 w-3.5" />

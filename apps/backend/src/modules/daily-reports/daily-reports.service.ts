@@ -1,74 +1,206 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException,
+} from '@nestjs/common';
+import { DailyReport, DailyReportStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { DocumentsService } from '../documents/documents.service';
+import { ALLOWED_ATTACHMENT_MIME_TYPES } from './daily-reports.constants';
+import {
+  DAILY_REPORT_DETAIL_INCLUDE, DAILY_REPORT_LIST_INCLUDE, DailyReportDetailView, DailyReportView,
+  toDailyReportContentData, toDailyReportDetailView, toDailyReportView,
+} from './daily-report.mapper';
 import { CreateDailyReportDto } from './dto/create-daily-report.dto';
+import { DailyReportQueryDto } from './dto/daily-report-query.dto';
+import { UpdateDailyReportDto } from './dto/update-daily-report.dto';
+
+const EDITABLE_STATUSES: DailyReportStatus[] = ['DRAFT', 'REJECTED'];
+const SORTABLE_FIELDS = ['date', 'createdAt', 'submittedAt'] as const;
+
+export interface PaginatedDailyReports {
+  items: DailyReportView[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export type DailyReportSummary = Record<DailyReportStatus, number> & { total: number };
 
 @Injectable()
 export class DailyReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly documents: DocumentsService,
+  ) {}
 
-  async findAll(projectId: string, organizationId: string) {
+  async findAllForProject(projectId: string, organizationId: string): Promise<DailyReportView[]> {
     const reports = await this.prisma.dailyReport.findMany({
       where: { projectId, organizationId },
-      include: { submittedBy: { select: { id: true, name: true, avatar: true } } },
-      orderBy: { date: 'desc' },
+      include: DAILY_REPORT_LIST_INCLUDE,
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
     });
-    return reports.map((r) => this.map(r));
+    return reports.map(toDailyReportView);
   }
 
-  async findOne(projectId: string, reportId: string, organizationId: string) {
-    const r = await this.prisma.dailyReport.findFirst({
+  async findAllForOrganization(
+    organizationId: string,
+    query: DailyReportQueryDto,
+  ): Promise<PaginatedDailyReports> {
+    const where: Prisma.DailyReportWhereInput = {
+      organizationId,
+      project: { deletedAt: null },
+      projectId: query.projectId,
+      status: query.status,
+    };
+    const search = query.search?.trim();
+    if (search) {
+      where.OR = [
+        { workCompleted: { contains: search, mode: 'insensitive' } },
+        { project: { name: { contains: search, mode: 'insensitive' } } },
+        { submittedBy: { name: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const sortField = SORTABLE_FIELDS.find((field) => field === query.sort) ?? 'date';
+    const sortOrder = query.order === 'asc' ? 'asc' : 'desc';
+
+    const [reports, total] = await this.prisma.$transaction([
+      this.prisma.dailyReport.findMany({
+        where,
+        include: DAILY_REPORT_LIST_INCLUDE,
+        orderBy: [{ [sortField]: sortOrder }, { createdAt: 'desc' }],
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+      }),
+      this.prisma.dailyReport.count({ where }),
+    ]);
+
+    return { items: reports.map(toDailyReportView), total, page: query.page, limit: query.limit };
+  }
+
+  async getSummary(organizationId: string): Promise<DailyReportSummary> {
+    const groups = await this.prisma.dailyReport.groupBy({
+      by: ['status'],
+      where: { organizationId, project: { deletedAt: null } },
+      _count: { _all: true },
+    });
+
+    const summary: DailyReportSummary = { DRAFT: 0, SUBMITTED: 0, APPROVED: 0, REJECTED: 0, total: 0 };
+    for (const group of groups) {
+      summary[group.status] = group._count._all;
+      summary.total += group._count._all;
+    }
+    return summary;
+  }
+
+  async findOne(projectId: string, reportId: string, organizationId: string): Promise<DailyReportDetailView> {
+    const report = await this.prisma.dailyReport.findFirst({
       where: { id: reportId, projectId, organizationId },
-      include: {
-        submittedBy: { select: { id: true, name: true, avatar: true } },
-        documents: true,
-      },
+      include: DAILY_REPORT_DETAIL_INCLUDE,
     });
-    if (!r) throw new NotFoundException('Daily report not found');
-    return this.map(r);
+    if (!report) throw new NotFoundException('Daily report not found.');
+    return toDailyReportDetailView(report);
   }
 
-  async create(projectId: string, organizationId: string, userId: string, dto: CreateDailyReportDto) {
+  async create(
+    projectId: string,
+    organizationId: string,
+    userId: string,
+    dto: CreateDailyReportDto,
+  ): Promise<DailyReportDetailView> {
+    await this.assertProjectInOrganization(projectId, organizationId);
+
     const report = await this.prisma.dailyReport.create({
       data: {
+        ...toDailyReportContentData(dto),
+        date: new Date(dto.date),
         projectId,
         organizationId,
         submittedById: userId,
-        date: dto.date ? new Date(dto.date) : new Date(),
-        weather: dto.weather,
-        overallProgress: dto.overallProgress,
-        workCompleted: dto.workCompleted,
-        remarks: dto.remarks,
-        labourCount: dto.labourCount ?? 0,
-        status: dto.status ?? 'DRAFT',
-        labourDetails: (dto.labourDetails ?? {}) as any,
-        materialsConsumed: (dto.materialsConsumed ?? []) as any,
-        equipmentUsed: (dto.equipmentUsed ?? []) as any,
-        issues: (dto.issues ?? []) as any,
+        status: 'DRAFT',
       },
-      include: { submittedBy: { select: { id: true, name: true, avatar: true } } },
     });
-    return this.map(report);
+    return this.findOne(projectId, report.id, organizationId);
   }
 
-  private map(r: any) {
-    return {
-      id: r.id,
-      projectId: r.projectId,
-      date: r.date,
-      weather: r.weather,
-      overallProgress: r.overallProgress,
-      workCompleted: r.workCompleted,
-      remarks: r.remarks,
-      labourCount: r.labourCount,
-      status: r.status,
-      aiSummary: r.aiSummary,
-      labourDetails: r.labourDetails,
-      materialsConsumed: r.materialsConsumed,
-      equipmentUsed: r.equipmentUsed,
-      issues: r.issues,
-      submittedBy: r.submittedBy,
-      documents: r.documents ?? [],
-      createdAt: r.createdAt,
-    };
+  async update(
+    projectId: string,
+    reportId: string,
+    organizationId: string,
+    userId: string,
+    dto: UpdateDailyReportDto,
+  ): Promise<DailyReportDetailView> {
+    await this.findEditableReport(projectId, reportId, organizationId, userId);
+    await this.prisma.dailyReport.update({
+      where: { id: reportId },
+      data: toDailyReportContentData(dto),
+    });
+    return this.findOne(projectId, reportId, organizationId);
+  }
+
+  async addAttachment(
+    projectId: string,
+    reportId: string,
+    organizationId: string,
+    userId: string,
+    file: Express.Multer.File | undefined,
+  ): Promise<DailyReportDetailView> {
+    if (!file) throw new BadRequestException('Select a file to upload.');
+    if (!ALLOWED_ATTACHMENT_MIME_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException('Attach photos (JPG, PNG, WEBP, HEIC) or PDF files only.');
+    }
+
+    await this.findEditableReport(projectId, reportId, organizationId, userId);
+    await this.documents.upload(projectId, organizationId, userId, file, { dailyReportId: reportId });
+    return this.findOne(projectId, reportId, organizationId);
+  }
+
+  async removeAttachment(
+    projectId: string,
+    reportId: string,
+    documentId: string,
+    organizationId: string,
+    userId: string,
+  ): Promise<DailyReportDetailView> {
+    await this.findEditableReport(projectId, reportId, organizationId, userId);
+
+    const attachment = await this.prisma.document.findFirst({
+      where: { id: documentId, dailyReportId: reportId, organizationId },
+      select: { id: true },
+    });
+    if (!attachment) throw new NotFoundException('Attachment not found.');
+
+    await this.documents.remove(attachment.id, organizationId);
+    return this.findOne(projectId, reportId, organizationId);
+  }
+
+  /**
+   * Only the author may change a report, and only while it is a draft or has been sent back.
+   * Submitted and approved reports are the site's record of the day and stay locked.
+   */
+  async findEditableReport(
+    projectId: string,
+    reportId: string,
+    organizationId: string,
+    userId: string,
+  ): Promise<DailyReport> {
+    const report = await this.prisma.dailyReport.findFirst({
+      where: { id: reportId, projectId, organizationId },
+    });
+    if (!report) throw new NotFoundException('Daily report not found.');
+    if (report.submittedById !== userId) {
+      throw new ForbiddenException('Only the author can change this report.');
+    }
+    if (!EDITABLE_STATUSES.includes(report.status)) {
+      throw new ConflictException('Submitted reports are locked and can no longer be edited.');
+    }
+    return report;
+  }
+
+  private async assertProjectInOrganization(projectId: string, organizationId: string): Promise<void> {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!project) throw new NotFoundException('Project not found.');
   }
 }

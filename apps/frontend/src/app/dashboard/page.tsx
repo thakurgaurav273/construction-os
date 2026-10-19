@@ -164,8 +164,15 @@ export default function DashboardPage() {
                 <Users className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">-</div>
-                <p className="text-xs text-muted-foreground mt-1">Attendance module coming soon</p>
+                <div className="text-2xl font-bold">
+                  <AnimatedCounter value={stats?.workforceToday ?? 0} />
+                  <span className="text-sm font-normal text-muted-foreground"> / {stats?.workforceTotal ?? 0}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats && stats.workforceNotMarked > 0
+                    ? `${stats.workforceNotMarked} not marked yet`
+                    : 'On site across all projects'}
+                </p>
               </CardContent>
             </Card>
           </motion.div>
