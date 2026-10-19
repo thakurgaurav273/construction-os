@@ -16,6 +16,7 @@ import { InventoryItemsService } from './inventory-items.service';
 import { InventoryTransactionsService } from './inventory-transactions.service';
 import { InventoryTransfersService } from './inventory-transfers.service';
 import { InventoryWarehousesService } from './inventory-warehouses.service';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
 interface AuthUser {
   id: string;
@@ -24,7 +25,7 @@ interface AuthUser {
 }
 
 @Controller('inventory')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class InventoryController {
   constructor(
     private readonly items: InventoryItemsService,
@@ -55,6 +56,7 @@ export class InventoryController {
     return this.items.findOne(id, user.organizationId);
   }
 
+  @RequirePermission('inventory.adjust')
   @Patch('items/:id')
   updateItem(@Param('id') id: string, @Body() dto: UpdateInventoryItemDto, @CurrentUser() user: AuthUser) {
     return this.items.update(id, user.organizationId, dto);
@@ -80,11 +82,13 @@ export class InventoryController {
     return this.transfers.findOne(id, user.organizationId);
   }
 
+  @RequirePermission('inventory.transfer')
   @Post('transfers')
   createTransfer(@Body() dto: CreateTransferDto, @CurrentUser() user: AuthUser) {
     return this.transfers.create(user.organizationId, dto);
   }
 
+  @RequirePermission('inventory.transfer')
   @Patch('transfers/:id')
   updateTransfer(@Param('id') id: string, @Body() dto: UpdateTransferDto, @CurrentUser() user: AuthUser) {
     return this.transfers.updateStatus(id, user.organizationId, dto);
@@ -100,6 +104,7 @@ export class InventoryController {
     return this.adjustments.findAll(user.organizationId, warehouseId);
   }
 
+  @RequirePermission('inventory.adjust')
   @Post('adjustments')
   createAdjustment(@Body() dto: CreateAdjustmentDto, @CurrentUser() user: AuthUser) {
     return this.adjustments.create(user.organizationId, dto);

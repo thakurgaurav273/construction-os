@@ -15,6 +15,7 @@ import {
 } from '@/hooks/api/use-inventory';
 import { formatDate, formatNumber } from '@/lib/utils';
 import { getTransferStatusMeta } from './inventory-format';
+import { useCan } from '@/hooks/api/use-access';
 
 interface TransferDrawerProps {
   transferId: string | null;
@@ -53,6 +54,7 @@ function TransferDrawerBody({
   onClose: () => void;
 }): React.ReactElement {
   const updateTransfer = useUpdateTransfer();
+  const can = useCan();
   const meta = getTransferStatusMeta(transfer.status);
   const actions = actionsForStatus(transfer.status);
 
@@ -133,7 +135,7 @@ function TransferDrawerBody({
       </ScrollArea>
 
       {/* Footer */}
-      {actions.length > 0 && (
+      {actions.length > 0 && can('inventory.transfer') && (
         <div className="shrink-0 border-t bg-background px-5 py-3 grid grid-cols-2 gap-2">
           {actions.map((a) => {
             const Icon = a.icon;

@@ -9,6 +9,7 @@ import {
 import { usePurchaseOrderTransition, type PurchaseOrderTransition } from '@/hooks/api/use-procurement';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { useAuthStore } from '@/store/auth.store';
+import { useCan } from '@/hooks/api/use-access';
 import { getOrderPermissions } from '@/features/procurement/utils/order-rules';
 import type { PurchaseOrderDetail } from '@/features/procurement/types';
 import { PurchaseOrderFormDialog } from '@/features/procurement/components/PurchaseOrderFormDialog';
@@ -30,9 +31,10 @@ export function PurchaseOrderActions({ order, onReceive, onOpenOrder }: Purchase
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [noteRequest, setNoteRequest] = useState<ReviewNoteRequest | null>(null);
-  const permissions = getOrderPermissions(order, currentUserId);
+  const can = useCan();
+  const permissions = getOrderPermissions(order, currentUserId, can);
   // Vendors bill for what arrived, so billing opens once anything has been received.
-  const canRecordInvoice = order.status === 'APPROVED' && order.receivedPercent > 0 && !!order.vendor;
+  const canRecordInvoice = order.status === 'APPROVED' && order.receivedPercent > 0 && !!order.vendor && can('invoice.create');
 
   async function runTransition(kind: PurchaseOrderTransition, successMessage: string, note?: string): Promise<void> {
     try {
@@ -101,8 +103,10 @@ export function PurchaseOrderActions({ order, onReceive, onOpenOrder }: Purchase
         </div>
       )}
 
-      {order.status === 'PENDING' && permissions.isOwnOrder && (
-        <p className="text-xs text-muted-foreground">Awaiting approval. Another team member must review orders you raise.</p>
+      {order.status === 'PENDING' && !permissions.canReview && (
+        <p className="text-xs text-muted-foreground">
+          Awaiting approval.{permissions.isOwnOrder ? ' Another team member must review orders you raise.' : ''}
+        </p>
       )}
 
       {permissions.canSubmit && (
@@ -139,15 +143,17 @@ export function PurchaseOrderActions({ order, onReceive, onOpenOrder }: Purchase
       )}
 
       <div className="flex items-center justify-between gap-2">
-        <Button
-          size="sm"
-          variant="ghost"
-          className="gap-1.5"
-          disabled={busy}
-          onClick={() => runTransition('duplicate', 'Duplicated as {po}').catch(() => undefined)}
-        >
-          <Copy className="h-3.5 w-3.5" /> Duplicate
-        </Button>
+        {permissions.canDuplicate ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="gap-1.5"
+            disabled={busy}
+            onClick={() => runTransition('duplicate', 'Duplicated as {po}').catch(() => undefined)}
+          >
+            <Copy className="h-3.5 w-3.5" /> Duplicate
+          </Button>
+        ) : <span />}
         {permissions.canCancel && (
           <Button
             size="sm"

@@ -7,6 +7,7 @@ import { Ban, CheckCircle2, Landmark, XCircle } from 'lucide-react';
 import { usePaymentTransition, type PaymentTransition } from '@/hooks/api/use-finance';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { useAuthStore } from '@/store/auth.store';
+import { useCan } from '@/hooks/api/use-access';
 import { ReviewNoteDialog, type ReviewNoteRequest } from '@/components/shared/ReviewNoteDialog';
 import { MarkPaidDialog } from '@/features/finance/components/MarkPaidDialog';
 import type { Payment } from '@/features/finance/types';
@@ -17,7 +18,9 @@ export function PaymentRowActions({ payment }: { payment: Payment }): React.Reac
   const transition = usePaymentTransition();
   const [noteRequest, setNoteRequest] = useState<ReviewNoteRequest | null>(null);
   const [paying, setPaying] = useState(false);
+  const can = useCan();
   const isOwnRequest = !!currentUserId && payment.requestedBy?.id === currentUserId;
+  const canReview = payment.status === 'PENDING' && !isOwnRequest && can('payment.approve');
 
   async function run(kind: PaymentTransition, message: string, note?: string): Promise<void> {
     try {
@@ -38,7 +41,7 @@ export function PaymentRowActions({ payment }: { payment: Payment }): React.Reac
 
   return (
     <div className="flex flex-wrap items-center gap-1" onClick={(event) => event.stopPropagation()}>
-      {payment.status === 'PENDING' && !isOwnRequest && (
+      {canReview && (
         <>
           <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" disabled={busy} onClick={() => ask('approve', {
             title: `Approve ${payment.paymentNumber}?`,
@@ -59,14 +62,15 @@ export function PaymentRowActions({ payment }: { payment: Payment }): React.Reac
           </Button>
         </>
       )}
-      {payment.status === 'PENDING' && isOwnRequest && (
-        <span className="text-xs text-muted-foreground">Awaiting another approver</span>
+      {payment.status === 'PENDING' && !canReview && (
+        <span className="text-xs text-muted-foreground">{isOwnRequest ? 'Awaiting another approver' : 'Awaiting approval'}</span>
       )}
-      {payment.status === 'APPROVED' && (
+      {payment.status === 'APPROVED' && can('payment.release') && (
         <Button size="sm" className="h-7 gap-1 text-xs" onClick={() => setPaying(true)}>
           <Landmark className="h-3 w-3" /> Mark paid
         </Button>
       )}
+      {can('payment.request') && (
       <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs text-muted-foreground hover:text-destructive" disabled={busy} onClick={() => ask('cancel', {
         title: `Cancel ${payment.paymentNumber}?`,
         description: 'The amount returns to the invoice balance.',
@@ -76,6 +80,7 @@ export function PaymentRowActions({ payment }: { payment: Payment }): React.Reac
       }, `${payment.paymentNumber} cancelled`)}>
         <Ban className="h-3 w-3" /> Cancel
       </Button>
+      )}
 
       <ReviewNoteDialog request={noteRequest} onClose={() => setNoteRequest(null)} />
       <MarkPaidDialog payment={paying ? payment : null} onClose={() => setPaying(false)} />

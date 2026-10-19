@@ -5,9 +5,10 @@ import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Badge, Button, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger } from '@sitepilot/ui';
-import { AlertTriangle, Download, Plus, Receipt } from 'lucide-react';
+import { AlertTriangle, Download, Lock, Plus, Receipt } from 'lucide-react';
 import { useBudget, useCashFlow, useFinanceSummary, useInvoices, usePayments } from '@/hooks/api/use-finance';
 import { downloadCsv } from '@/lib/download-csv';
+import { useCurrentAccess } from '@/hooks/api/use-access';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { AiInsightPanel } from '@/components/shared/AiInsightPanel';
 import { InvoiceFormDialog } from '@/features/finance/components/InvoiceFormDialog';
@@ -35,6 +36,23 @@ function FinanceLoading(): React.ReactElement {
 }
 
 export default function FinancePage(): React.ReactElement {
+  const { data: access, isLoading: isLoadingAccess } = useCurrentAccess();
+  if (isLoadingAccess) return <FinanceLoading />;
+  if (!access?.permissions.includes('finance.view')) {
+    return (
+      <div className="flex-1 p-4 md:p-8 pt-6">
+        <EmptyState
+          icon={Lock}
+          title="Finance is restricted"
+          description="Invoices, payments and budgets are visible to finance, project managers and admins. Ask an admin if you need access."
+        />
+      </div>
+    );
+  }
+  return <FinanceWorkspace canRecordInvoice={access.permissions.includes('invoice.create')} />;
+}
+
+function FinanceWorkspace({ canRecordInvoice }: { canRecordInvoice: boolean }): React.ReactElement {
   const [tab, setTab] = useState('invoices');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -104,9 +122,11 @@ export default function FinancePage(): React.ReactElement {
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-1.5 h-4 w-4" /> Export
           </Button>
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" /> Record Invoice
-          </Button>
+          {canRecordInvoice && (
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" /> Record Invoice
+            </Button>
+          )}
         </div>
       </motion.div>
 
@@ -136,7 +156,7 @@ export default function FinancePage(): React.ReactElement {
                   icon={Receipt}
                   title="No vendor invoices yet"
                   description="Record a bill when it arrives. Bills against purchase orders are checked against what was ordered and received."
-                  action={<Button onClick={() => setCreateOpen(true)}>Record Invoice</Button>}
+                  action={canRecordInvoice ? <Button onClick={() => setCreateOpen(true)}>Record Invoice</Button> : undefined}
                 />
               ) : (
                 <InvoicesTab invoices={invoices} onSelect={(invoice) => setSelectedInvoiceId(invoice.id)} />

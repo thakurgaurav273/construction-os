@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { Search, Plus, ClipboardList, AlertTriangle } from 'lucide-react';
 import { Button, Input, Skeleton } from '@sitepilot/ui';
 import { usePurchaseOrders } from '@/hooks/api/use-procurement';
+import { useCan } from '@/hooks/api/use-access';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { PurchaseOrderFormDialog } from '@/features/procurement/components/PurchaseOrderFormDialog';
 import { PurchaseOrderTable } from '@/app/dashboard/procurement/components/PurchaseOrderTable';
@@ -15,6 +16,7 @@ export default function ProjectPurchaseOrdersPage({ params }: { params: { id: st
   const [search, setSearch] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const canCreate = useCan()('po.create');
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -60,9 +62,11 @@ export default function ProjectPurchaseOrdersPage({ params }: { params: { id: st
               : 'Materials, equipment and services ordered for this project.'}
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-1.5 h-4 w-4" /> New Purchase Order
-        </Button>
+        {canCreate && (
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> New Purchase Order
+          </Button>
+        )}
       </div>
 
       {orders.length === 0 ? (
@@ -70,7 +74,7 @@ export default function ProjectPurchaseOrdersPage({ params }: { params: { id: st
           icon={ClipboardList}
           title="No purchase orders for this project"
           description="Raise a purchase order to procure materials or equipment for this site."
-          action={<Button onClick={() => setCreateOpen(true)}>New Purchase Order</Button>}
+          action={canCreate ? <Button onClick={() => setCreateOpen(true)}>New Purchase Order</Button> : undefined}
         />
       ) : (
         <>

@@ -7,6 +7,7 @@ import { Ban, CheckCircle2, HandCoins, Loader2, Pencil, Send, XCircle } from 'lu
 import { useInvoiceTransition, type InvoiceTransition } from '@/hooks/api/use-finance';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { useAuthStore } from '@/store/auth.store';
+import { useCan } from '@/hooks/api/use-access';
 import { ReviewNoteDialog, type ReviewNoteRequest } from '@/components/shared/ReviewNoteDialog';
 import { InvoiceFormDialog } from '@/features/finance/components/InvoiceFormDialog';
 import { PaymentRequestDialog } from '@/features/finance/components/PaymentRequestDialog';
@@ -21,11 +22,14 @@ export function InvoiceActions({ invoice }: { invoice: InvoiceDetail }): React.R
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [noteRequest, setNoteRequest] = useState<ReviewNoteRequest | null>(null);
 
+  const can = useCan();
   const isOwnInvoice = !!currentUserId && invoice.createdBy?.id === currentUserId;
-  const canReview = invoice.status === 'PENDING_APPROVAL' && !isOwnInvoice;
+  const canReview = invoice.status === 'PENDING_APPROVAL' && !isOwnInvoice && can('invoice.approve');
   const hasVariance = invoice.match.status === 'VARIANCE';
   const hasOpenPayments = invoice.payments.some((payment) => ['PENDING', 'APPROVED', 'PAID'].includes(payment.status));
-  const canCancel = CANCELLABLE.includes(invoice.status) && !hasOpenPayments;
+  // Whoever entered a bill withdraws it until approval; anyone else's, or an approved bill, needs approver rights.
+  const canWithdraw = can('invoice.approve') || (isOwnInvoice && invoice.status !== 'APPROVED' && can('invoice.create'));
+  const canCancel = CANCELLABLE.includes(invoice.status) && !hasOpenPayments && canWithdraw;
   const busy = transition.isPending;
 
   async function run(kind: InvoiceTransition, message: string, note?: string): Promise<void> {
@@ -44,7 +48,7 @@ export function InvoiceActions({ invoice }: { invoice: InvoiceDetail }): React.R
 
   return (
     <div className="shrink-0 border-t bg-background px-5 py-3 space-y-2">
-      {invoice.status === 'DRAFT' && (
+      {invoice.status === 'DRAFT' && can('invoice.create') && (
         <div className="grid grid-cols-2 gap-2">
           <Button size="sm" className="gap-1.5" disabled={busy} onClick={() => run('submit', `${invoice.invoiceNumber} sent for approval`).catch(() => undefined)}>
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />} Submit for approval
@@ -78,11 +82,13 @@ export function InvoiceActions({ invoice }: { invoice: InvoiceDetail }): React.R
           </Button>
         </div>
       )}
-      {invoice.status === 'PENDING_APPROVAL' && isOwnInvoice && (
-        <p className="text-xs text-muted-foreground">Awaiting approval. Another team member must review bills you enter.</p>
+      {invoice.status === 'PENDING_APPROVAL' && !canReview && (
+        <p className="text-xs text-muted-foreground">
+          Awaiting approval.{isOwnInvoice ? ' Another team member must review bills you enter.' : ''}
+        </p>
       )}
 
-      {invoice.unscheduledAmount > 0 && (
+      {invoice.unscheduledAmount > 0 && can('payment.request') && (
         <Button size="sm" className="w-full gap-1.5" onClick={() => setPaymentOpen(true)}>
           <HandCoins className="h-3.5 w-3.5" /> Request payment
         </Button>

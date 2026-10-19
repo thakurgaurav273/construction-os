@@ -5,11 +5,12 @@ import { AwardRfqDto, CreateRfqDto, InviteVendorsDto, RecordQuoteDto } from './d
 import { RfqDetailView, RfqView } from './rfq.mapper';
 import { RfqQuotesService } from './rfq-quotes.service';
 import { RfqsService } from './rfqs.service';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
 interface AuthUser { id: string; organizationId: string; role: string }
 
 @Controller('rfqs')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RfqsController {
   constructor(
     private readonly rfqs: RfqsService,
@@ -26,11 +27,13 @@ export class RfqsController {
     return this.rfqs.findOne(id, user.organizationId);
   }
 
+  @RequirePermission('rfq.manage')
   @Post()
   create(@Body() dto: CreateRfqDto, @CurrentUser() user: AuthUser): Promise<RfqDetailView> {
     return this.rfqs.create(user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('rfq.manage')
   @Post(':id/invitations')
   invite(
     @Param('id', ParseUUIDPipe) id: string,
@@ -40,6 +43,7 @@ export class RfqsController {
     return this.rfqs.invite(id, user.organizationId, dto);
   }
 
+  @RequirePermission('rfq.manage')
   @Put(':id/invitations/:invitationId/quote')
   recordQuote(
     @Param('id', ParseUUIDPipe) id: string,
@@ -50,6 +54,7 @@ export class RfqsController {
     return this.quotes.recordQuote(id, invitationId, user.organizationId, dto);
   }
 
+  @RequirePermission('rfq.manage')
   @Post(':id/invitations/:invitationId/decline')
   decline(
     @Param('id', ParseUUIDPipe) id: string,
@@ -59,16 +64,19 @@ export class RfqsController {
     return this.quotes.decline(id, invitationId, user.organizationId);
   }
 
+  @RequirePermission('rfq.manage')
   @Post(':id/close')
   close(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<RfqDetailView> {
     return this.rfqs.close(id, user.organizationId);
   }
 
+  @RequirePermission('rfq.manage')
   @Post(':id/cancel')
   cancel(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<RfqDetailView> {
     return this.rfqs.cancel(id, user.organizationId);
   }
 
+  @RequirePermission('rfq.award')
   @Post(':id/award')
   award(
     @Param('id', ParseUUIDPipe) id: string,

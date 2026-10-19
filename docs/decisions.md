@@ -706,6 +706,51 @@ Finance was read-only seeded data. Vendor bills weren't linked to vendors, purch
 
 ---
 
+# ADR-019 - Permission-Based Access Control
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-20
+
+---
+
+## Context
+
+Every endpoint checked only that the caller was signed in. Any member, including a viewer, could approve purchase orders, approve and release payments, or change organization settings. The role was read from the JWT, so role changes and removals took effect only when the token expired. Admins could also grant themselves or others the Owner role.
+
+---
+
+## Decision
+
+- **Permissions, not roles, guard actions.** The catalogue (`Permission` in `@sitepilot/types`; labels and the role → permission map in `backend/src/common/permissions`) has one entry per business action: `po.approve`, `invoice.approve`, `payment.release`, `finance.view`, and so on. Code checks permissions; role names appear only in the map.
+- **Reads are open, writes and money are not.** Any member can read operational data (projects, procurement, workforce, materials). Every write needs its own permission, and financial data (invoices, payments, budgets, cash flow, financial reports) needs `finance.view`.
+- `@RequirePermission()` with `PermissionsGuard`. Class-level and route-level lists are combined, so the finance controllers carry `finance.view` and each write adds its own permission.
+- **Role is looked up per request.** The JWT strategy reads the membership on every request, so a role change or removal applies immediately. `/auth/me` returns the current role and permissions, and the frontend hides actions with `useCan()` / `<Can>`.
+- Status-dependent rules stay in services: only approvers can cancel an approved PO or invoice, or someone else's open one. Maker-checker still applies on top of permissions.
+- Only owners can grant, change or remove the Owner role.
+- A test (`npm test` in the backend) fails if any write endpoint lacks a route-level permission, or references a permission outside the catalogue.
+
+---
+
+## Alternatives
+
+- Hardcoded role checks per endpoint: rejected, because they scatter business policy and make custom roles impossible later.
+- Per-organization editable roles stored in the database: deferred. The map is a single data structure, so it can move to a table without touching guards or controllers.
+
+---
+
+## Consequences
+
+- One extra membership lookup per authenticated request.
+- Approval limits (e.g. a project manager approves POs up to ₹5L) aren't implemented yet. They'd sit beside the permission check in the approve services.
+- Read access isn't scoped to project membership yet; any member reads all projects in the organization.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

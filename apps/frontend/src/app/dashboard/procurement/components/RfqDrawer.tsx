@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Badge, Button, ScrollArea, Sheet, SheetContent, SheetTitle, Skeleton } from '@sitepilot/ui';
 import { AlertTriangle, ClipboardList, ExternalLink, Package, Scale, Users, X, Ban, Lock } from 'lucide-react';
 import { useRfq, useRfqTransition } from '@/hooks/api/use-procurement';
+import { useCan } from '@/hooks/api/use-access';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import type { RfqDetail } from '@/features/procurement/types';
 import { InviteVendorsDialog } from '@/features/procurement/components/InviteVendorsDialog';
@@ -26,6 +27,7 @@ const formatDay = (value: string): string => format(new Date(value), 'dd MMM yyy
 export function RfqDrawer({ rfqId, open, onClose, onOpenOrder }: RfqDrawerProps): React.ReactElement {
   const { data: rfq, isLoading, isError, refetch } = useRfq(open ? rfqId : null);
   const transition = useRfqTransition();
+  const canManage = useCan()('rfq.manage');
   const [inviteRfq, setInviteRfq] = useState<RfqDetail | null>(null);
   const [quoteRequest, setQuoteRequest] = useState<RecordQuoteRequest | null>(null);
 
@@ -135,7 +137,7 @@ export function RfqDrawer({ rfqId, open, onClose, onOpenOrder }: RfqDrawerProps)
               </div>
             </ScrollArea>
 
-            {(rfq.status === 'OPEN' || rfq.status === 'EVALUATING') && (
+            {canManage && (rfq.status === 'OPEN' || rfq.status === 'EVALUATING') && (
               <div className="shrink-0 border-t bg-background px-5 py-3 flex flex-wrap items-center gap-2">
                 {rfq.status === 'OPEN' && (
                   <>

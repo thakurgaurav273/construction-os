@@ -5,11 +5,13 @@ import { OptionalNoteDto, RequiredNoteDto } from '../procurement/dto/review-note
 import { CreatePaymentDto, MarkPaidDto, PaymentQueryDto } from './dto/payment.dto';
 import { PaymentView } from './payment.mapper';
 import { PaymentsService } from './payments.service';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
 interface AuthUser { id: string; organizationId: string; role: string }
 
 @Controller('finance/payments')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermission('finance.view')
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
 
@@ -18,11 +20,13 @@ export class PaymentsController {
     return this.payments.findAll(user.organizationId, query);
   }
 
+  @RequirePermission('payment.request')
   @Post()
   create(@Body() dto: CreatePaymentDto, @CurrentUser() user: AuthUser): Promise<PaymentView> {
     return this.payments.create(user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('payment.approve')
   @Post(':id/approve')
   approve(
     @Param('id', ParseUUIDPipe) id: string,
@@ -32,6 +36,7 @@ export class PaymentsController {
     return this.payments.approve(id, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('payment.approve')
   @Post(':id/reject')
   reject(
     @Param('id', ParseUUIDPipe) id: string,
@@ -41,6 +46,7 @@ export class PaymentsController {
     return this.payments.reject(id, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('payment.release')
   @Post(':id/paid')
   markPaid(
     @Param('id', ParseUUIDPipe) id: string,
@@ -50,6 +56,7 @@ export class PaymentsController {
     return this.payments.markPaid(id, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('payment.request')
   @Post(':id/cancel')
   cancel(
     @Param('id', ParseUUIDPipe) id: string,

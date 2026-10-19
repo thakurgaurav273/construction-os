@@ -6,6 +6,7 @@ import { MaterialQueryDto } from './dto/material-query.dto';
 import { MovementQueryDto } from './dto/movement-query.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
 import { CreateMaterialDto } from './dto/create-material.dto';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
 interface AuthUser {
   id: string;
@@ -14,10 +15,11 @@ interface AuthUser {
 }
 
 @Controller('materials')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class MaterialsController {
   constructor(private readonly materialsService: MaterialsService) {}
 
+  @RequirePermission('material.manage')
   @Post()
   create(@Body() dto: CreateMaterialDto, @CurrentUser() user: AuthUser) {
     return this.materialsService.create(user.organizationId, dto);
@@ -58,6 +60,7 @@ export class MaterialsController {
     return this.materialsService.findOne(id, user.organizationId);
   }
 
+  @RequirePermission('material.manage')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateMaterialDto, @CurrentUser() user: AuthUser) {
     return this.materialsService.update(id, user.organizationId, dto);

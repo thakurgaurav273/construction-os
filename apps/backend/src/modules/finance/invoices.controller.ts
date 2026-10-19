@@ -7,11 +7,14 @@ import { BillableLine } from './invoice-match.service';
 import { InvoiceDetailView, InvoiceView } from './invoice.mapper';
 import { InvoiceWorkflowService } from './invoice-workflow.service';
 import { InvoicesService } from './invoices.service';
+import type { Permission } from '@sitepilot/types';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
-interface AuthUser { id: string; organizationId: string; role: string }
+interface AuthUser { id: string; organizationId: string; role: string; permissions: Permission[] }
 
 @Controller('finance/invoices')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermission('finance.view')
 export class InvoicesController {
   constructor(
     private readonly invoices: InvoicesService,
@@ -34,11 +37,13 @@ export class InvoicesController {
     return this.invoices.findOne(id, user.organizationId);
   }
 
+  @RequirePermission('invoice.create')
   @Post()
   create(@Body() dto: CreateInvoiceDto, @CurrentUser() user: AuthUser): Promise<InvoiceDetailView> {
     return this.invoices.create(user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('invoice.create')
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -48,11 +53,13 @@ export class InvoicesController {
     return this.invoices.update(id, user.organizationId, dto);
   }
 
+  @RequirePermission('invoice.create')
   @Post(':id/submit')
   submit(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<InvoiceDetailView> {
     return this.workflow.submit(id, user.organizationId, user.id);
   }
 
+  @RequirePermission('invoice.approve')
   @Post(':id/approve')
   approve(
     @Param('id', ParseUUIDPipe) id: string,
@@ -62,6 +69,7 @@ export class InvoicesController {
     return this.workflow.approve(id, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('invoice.approve')
   @Post(':id/reject')
   reject(
     @Param('id', ParseUUIDPipe) id: string,
@@ -71,12 +79,13 @@ export class InvoicesController {
     return this.workflow.reject(id, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('invoice.create')
   @Post(':id/cancel')
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: OptionalNoteDto,
     @CurrentUser() user: AuthUser,
   ): Promise<InvoiceDetailView> {
-    return this.workflow.cancel(id, user.organizationId, user.id, dto);
+    return this.workflow.cancel(id, user.organizationId, user.id, dto, user.permissions.includes('invoice.approve'));
   }
 }

@@ -10,12 +10,14 @@ import { getApiErrorMessage } from '@/lib/api/errors';
 import { ATTENDANCE_STATUS_STYLES } from '@/features/workforce/constants';
 import { AttendanceStatusLabel } from '@/features/workforce/components/AttendanceStatusLabel';
 import { attendanceRateTone, formatCheckIn, toDisplayStatus } from '@/features/workforce/utils/attendance';
+import { useCan } from '@/hooks/api/use-access';
 
 function formatTime(timestamp: string | null): string {
   return timestamp ? format(new Date(timestamp), 'h:mm a') : '—';
 }
 
 export function WorkerAttendanceCard({ worker }: { worker: Worker }): React.ReactElement {
+  const can = useCan();
   const { data: detail, isLoading, isError, refetch } = useWorker(worker.id);
   const shiftEvent = useShiftEvent(worker.projectId ?? '');
 
@@ -81,7 +83,7 @@ export function WorkerAttendanceCard({ worker }: { worker: Worker }): React.Reac
             </p>
           </div>
 
-          {(canCheckIn || canCheckOut) && (
+          {(canCheckIn || canCheckOut) && can('attendance.mark') && (
             <div className="grid grid-cols-2 gap-2">
               <Button size="sm" variant="outline" disabled={!canCheckIn || shiftEvent.isPending} onClick={() => recordShiftEvent('check-in')}>
                 <LogIn className="h-3.5 w-3.5" /> Check in now

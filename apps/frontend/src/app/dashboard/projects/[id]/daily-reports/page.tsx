@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { useDailyReports } from '@/hooks/api/use-daily-reports';
 import { DailyReportStatusBadge } from '@/features/daily-reports/components/DailyReportStatusBadge';
 import { REPORT_STATUS_OPTIONS } from '@/features/daily-reports/constants';
+import { Can } from '@/components/shared/Can';
 
 export default function DailyReportsListPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -44,11 +45,13 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
           <h2 className="text-2xl font-bold tracking-tight">Daily Reports</h2>
           <p className="text-muted-foreground mt-1">Track daily site progress, weather, and safety logs.</p>
         </div>
-        <Link href={`/dashboard/projects/${params.id}/daily-reports/new`}>
-          <Button className="shadow-lg shadow-primary/20">
-            <Plus className="mr-2 h-4 w-4" /> New Report
-          </Button>
-        </Link>
+        <Can permission="dailyReport.write">
+          <Link href={`/dashboard/projects/${params.id}/daily-reports/new`}>
+            <Button className="shadow-lg shadow-primary/20">
+              <Plus className="mr-2 h-4 w-4" /> New Report
+            </Button>
+          </Link>
+        </Can>
       </div>
 
       <Card>
@@ -96,11 +99,13 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
               title="No daily reports yet"
               description="Record today's progress, labour and site issues so the team has a daily record of this project."
               action={
-                <Button asChild>
-                  <Link href={`/dashboard/projects/${params.id}/daily-reports/new`}>
-                    <Plus className="mr-2 h-4 w-4" /> New Report
-                  </Link>
-                </Button>
+                <Can permission="dailyReport.write">
+                  <Button asChild>
+                    <Link href={`/dashboard/projects/${params.id}/daily-reports/new`}>
+                      <Plus className="mr-2 h-4 w-4" /> New Report
+                    </Link>
+                  </Button>
+                </Can>
               }
             />
           ) : (

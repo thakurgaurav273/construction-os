@@ -90,28 +90,31 @@ export class ReportsService {
   }
 
   // List generated reports history
-  async getHistory(organizationId: string, options?: { page?: number; limit?: number }) {
+  async getHistory(organizationId: string, options?: { page?: number; limit?: number }, includeFinancial = true) {
     const page = options?.page ?? 1;
     const limit = options?.limit ?? 20;
     const skip = (page - 1) * limit;
+    const where = { organizationId, ...(includeFinancial ? {} : { type: { not: 'FINANCIAL' } }) };
 
     const [data, total] = await Promise.all([
       this.prisma.generatedReport.findMany({
-        where: { organizationId },
+        where,
         include: { project: { select: { id: true, name: true } } },
         orderBy: { generatedAt: 'desc' },
         skip,
         take: limit,
       }),
-      this.prisma.generatedReport.count({ where: { organizationId } }),
+      this.prisma.generatedReport.count({ where }),
     ]);
 
     return { data, total, page, limit };
   }
 
   // Get single report
-  async getById(id: string, organizationId: string) {
-    return this.prisma.generatedReport.findFirst({ where: { id, organizationId } });
+  async getById(id: string, organizationId: string, includeFinancial = true) {
+    return this.prisma.generatedReport.findFirst({
+      where: { id, organizationId, ...(includeFinancial ? {} : { type: { not: 'FINANCIAL' } }) },
+    });
   }
 
   // Delete report

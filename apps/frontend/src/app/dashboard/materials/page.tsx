@@ -18,6 +18,7 @@ import { InventoryTab } from './components/InventoryTab';
 import { MovementsTab } from './components/MovementsTab';
 import { SuppliersTab } from './components/SuppliersTab';
 import { useMaterials } from '@/hooks/api/use-materials';
+import { Can } from '@/components/shared/Can';
 
 // Analytics is chart-heavy and sits behind a tab, so load it on demand.
 const AnalyticsTab = dynamic(
@@ -97,9 +98,11 @@ export default function MaterialsPage(): React.ReactElement {
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-1.5 h-4 w-4" /> Export
           </Button>
-          <Button onClick={() => setFormOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" /> Add Material
-          </Button>
+          <Can permission="material.manage">
+            <Button onClick={() => setFormOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" /> Add Material
+            </Button>
+          </Can>
         </div>
       </motion.div>
 

@@ -11,6 +11,7 @@ import {
   usePurchaseOrders, useVendors, useRfqs, useDeliveries, useProcurementSummary, useProcurementAnalytics,
 } from '@/hooks/api/use-procurement';
 import { useProjects } from '@/hooks/api/use-projects';
+import { useCan } from '@/hooks/api/use-access';
 import { downloadCsv } from '@/lib/download-csv';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { buildProcurementInsights, type ProcurementInsight } from '@/features/procurement/utils/insights';
@@ -50,6 +51,7 @@ export default function ProcurementPage(): React.ReactElement {
   const [filters, setFilters] = useState(DEFAULT_PO_FILTERS);
   const [drawer, setDrawer] = useState<Drawer>(null);
   const [createDialog, setCreateDialog] = useState<CreateDialog>(null);
+  const can = useCan();
 
   const ordersQuery = usePurchaseOrders();
   const { data: vendors = [] } = useVendors();
@@ -122,15 +124,21 @@ export default function ProcurementPage(): React.ReactElement {
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-1.5 h-4 w-4" /> Export
           </Button>
-          <Button variant="outline" onClick={() => setCreateDialog('vendor')}>
-            <Building2 className="mr-1.5 h-4 w-4" /> Add Vendor
-          </Button>
-          <Button variant="outline" onClick={() => setCreateDialog('rfq')}>
-            <Plus className="mr-1.5 h-4 w-4" /> New RFQ
-          </Button>
-          <Button onClick={() => setCreateDialog('order')}>
-            <Plus className="mr-1.5 h-4 w-4" /> New Purchase Order
-          </Button>
+          {can('vendor.manage') && (
+            <Button variant="outline" onClick={() => setCreateDialog('vendor')}>
+              <Building2 className="mr-1.5 h-4 w-4" /> Add Vendor
+            </Button>
+          )}
+          {can('rfq.manage') && (
+            <Button variant="outline" onClick={() => setCreateDialog('rfq')}>
+              <Plus className="mr-1.5 h-4 w-4" /> New RFQ
+            </Button>
+          )}
+          {can('po.create') && (
+            <Button onClick={() => setCreateDialog('order')}>
+              <Plus className="mr-1.5 h-4 w-4" /> New Purchase Order
+            </Button>
+          )}
         </div>
       </motion.div>
 
@@ -157,8 +165,10 @@ export default function ProcurementPage(): React.ReactElement {
                 <EmptyState
                   icon={ClipboardList}
                   title="No purchase orders yet"
-                  description="Raise your first purchase order, or issue an RFQ to compare vendor quotes first."
-                  action={<Button onClick={() => setCreateDialog('order')}>New Purchase Order</Button>}
+                  description={can('po.create')
+                    ? 'Raise your first purchase order, or issue an RFQ to compare vendor quotes first.'
+                    : 'Purchase orders raised by your team will appear here.'}
+                  action={can('po.create') ? <Button onClick={() => setCreateDialog('order')}>New Purchase Order</Button> : undefined}
                 />
               ) : (
                 <>

@@ -3,11 +3,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { BudgetLineView, CashFlowView, FinanceService } from './finance.service';
 import { FinanceSummary, FinanceSummaryService } from './finance-summary.service';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
 interface AuthUser { id: string; organizationId: string; role: string }
 
 @Controller('finance')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermission('finance.view')
 export class FinanceController {
   constructor(
     private readonly finance: FinanceService,

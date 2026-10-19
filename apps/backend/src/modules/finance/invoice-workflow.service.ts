@@ -97,9 +97,22 @@ export class InvoiceWorkflowService {
     return this.invoices.findOne(id, organizationId);
   }
 
-  async cancel(id: string, organizationId: string, userId: string, dto: OptionalNoteDto): Promise<InvoiceDetailView> {
+  /** Whoever entered a bill can withdraw it until approval; anyone else's, or an approved bill, needs approver rights. */
+  async cancel(
+    id: string,
+    organizationId: string,
+    userId: string,
+    dto: OptionalNoteDto,
+    isApprover: boolean,
+  ): Promise<InvoiceDetailView> {
     const invoice = await this.invoices.findInvoiceOrThrow(id, organizationId);
     if (!CANCELLABLE_INVOICE_STATUSES.includes(invoice.status)) throw new ConflictException('This invoice is already closed.');
+    if (invoice.status === 'APPROVED' && !isApprover) {
+      throw new ForbiddenException('Only invoice approvers can cancel an approved invoice.');
+    }
+    if (invoice.createdById !== userId && !isApprover) {
+      throw new ForbiddenException('Only whoever entered this invoice or an invoice approver can cancel it.');
+    }
     const scheduled = await this.prisma.payment.count({ where: { invoiceId: id, status: { in: COMMITTED_PAYMENT_STATUSES } } });
     if (scheduled > 0) {
       throw new ConflictException('Payments are scheduled or made against this invoice. Cancel those payments first.');

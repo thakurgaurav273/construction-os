@@ -1279,8 +1279,8 @@ async function seedFinance(orgId: string) {
   const projIdByCode: Record<string, string> = Object.fromEntries(projects.map((p) => [p.code, p.id]));
   const vendors = await prisma.vendor.findMany({ where: { organizationId: orgId }, select: { id: true, name: true } });
   const vendorIdByName: Record<string, string> = Object.fromEntries(vendors.map((v) => [v.name, v.id]));
-  // Bills are entered by the site engineer so the owner can approve them (maker-checker).
-  const clerk = await prisma.user.findUnique({ where: { email: 'rajan.m@grovyn.com' }, select: { id: true } });
+  // Bills are entered by the finance team so the owner can approve them (maker-checker).
+  const clerk = await prisma.user.findUnique({ where: { email: 'suresh.b@grovyn.com' }, select: { id: true } });
 
   const CATS = ['Steel & Rebar', 'Cement & Concrete', 'Electrical', 'Mechanical', 'Labour', 'Equipment Hire', 'Overheads'];
   const BD: Record<string, number[][]> = {

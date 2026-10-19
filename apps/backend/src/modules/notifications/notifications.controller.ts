@@ -2,11 +2,12 @@ import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards } f
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { NotificationsService } from './notifications.service';
+import { PermissionsGuard } from '../../common/permissions';
 
 interface AuthUser { id: string; organizationId: string; role: string }
 
 @Controller('notifications')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class NotificationsController {
   constructor(private notifications: NotificationsService) {}
 

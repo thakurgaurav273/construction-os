@@ -125,10 +125,23 @@ export class PurchaseOrderWorkflowService {
     return this.orders.findOne(id, organizationId);
   }
 
-  async cancel(id: string, organizationId: string, userId: string, dto: OptionalNoteDto): Promise<PurchaseOrderDetailView> {
+  /** Requesters can withdraw their own open orders; anyone else's, or an approved commitment, needs approver rights. */
+  async cancel(
+    id: string,
+    organizationId: string,
+    userId: string,
+    dto: OptionalNoteDto,
+    isApprover: boolean,
+  ): Promise<PurchaseOrderDetailView> {
     const order = await this.orders.findOrderOrThrow(id, organizationId);
     if (!CANCELLABLE_PO_STATUSES.includes(order.status)) {
       throw new ConflictException('This purchase order is already closed.');
+    }
+    if (order.status === 'APPROVED' && !isApprover) {
+      throw new ForbiddenException('Only purchase order approvers can cancel an approved order.');
+    }
+    if (order.requestedById !== userId && !isApprover) {
+      throw new ForbiddenException('Only the requester or a purchase order approver can cancel this order.');
     }
     if (order.items.some((item) => toNumber(item.receivedQuantity) > 0)) {
       throw new ConflictException("Goods have already been received against this order, so it can't be cancelled.");

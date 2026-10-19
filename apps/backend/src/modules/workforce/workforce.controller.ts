@@ -7,6 +7,7 @@ import { ProjectFilterQueryDto, WorkforceQueryDto } from './dto/attendance.dto';
 import { CreateWorkerDto } from './dto/create-worker.dto';
 import { UpdateWorkerDto } from './dto/update-worker.dto';
 import { WorkerDetailView, WorkerView } from './worker.mapper';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
 interface AuthUser {
   id: string;
@@ -15,7 +16,7 @@ interface AuthUser {
 }
 
 @Controller('workforce')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class WorkforceController {
   constructor(private readonly workforceService: WorkforceService) {}
 
@@ -39,11 +40,13 @@ export class WorkforceController {
     return this.workforceService.findOne(id, user.organizationId);
   }
 
+  @RequirePermission('workforce.manage')
   @Post()
   create(@Body() dto: CreateWorkerDto, @CurrentUser() user: AuthUser): Promise<WorkerDetailView> {
     return this.workforceService.create(user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('workforce.manage')
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -53,11 +56,13 @@ export class WorkforceController {
     return this.workforceService.update(id, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('workforce.manage')
   @Post(':id/deactivate')
   deactivate(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<WorkerDetailView> {
     return this.workforceService.setActive(id, user.organizationId, false);
   }
 
+  @RequirePermission('workforce.manage')
   @Post(':id/reactivate')
   reactivate(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<WorkerDetailView> {
     return this.workforceService.setActive(id, user.organizationId, true);
@@ -65,7 +70,7 @@ export class WorkforceController {
 }
 
 @Controller('projects/:projectId/workforce')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ProjectWorkforceController {
   constructor(private readonly workforceService: WorkforceService) {}
 

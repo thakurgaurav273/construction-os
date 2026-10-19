@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { OrgRole } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { MailService } from '../../common/mail/mail.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -42,28 +43,24 @@ export class SettingsService {
   }
 
   // Change member role
-  async changeMemberRole(userId: string, organizationId: string, newRole: string, currentUserId: string) {
-    const currentUser = await this.prisma.userOrganization.findFirst({
-      where: { userId: currentUserId, organizationId },
-    });
-
-    if (!currentUser || (currentUser.role !== 'OWNER' && currentUser.role !== 'ADMIN')) {
-      throw new ForbiddenException('Only Owner or Admin can change roles');
-    }
-
+  async changeMemberRole(userId: string, organizationId: string, newRole: OrgRole, currentUserId: string) {
+    // Route access (members.manage) is checked by the guard; ownership rules are checked here.
     if (userId === currentUserId) {
       throw new BadRequestException('Cannot change your own role');
     }
 
-    const target = await this.prisma.userOrganization.findFirst({ where: { userId, organizationId } });
+    const [actorRole, target] = await Promise.all([
+      this.roleOf(currentUserId, organizationId),
+      this.prisma.userOrganization.findFirst({ where: { userId, organizationId } }),
+    ]);
     if (!target) throw new NotFoundException('Member not found');
-
-    const validRoles = ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_ENGINEER', 'STORE_MANAGER', 'PROCUREMENT', 'FINANCE', 'VIEWER'];
-    if (!validRoles.includes(newRole)) throw new BadRequestException('Invalid role');
+    if ((newRole === 'OWNER' || target.role === 'OWNER') && actorRole !== 'OWNER') {
+      throw new ForbiddenException('Only an owner can grant or change the Owner role');
+    }
 
     return this.prisma.userOrganization.update({
       where: { userId_organizationId: { userId, organizationId } },
-      data: { role: newRole as any },
+      data: { role: newRole },
     });
   }
 
@@ -73,17 +70,14 @@ export class SettingsService {
       throw new BadRequestException('Cannot remove yourself');
     }
 
-    const currentUser = await this.prisma.userOrganization.findFirst({
-      where: { userId: currentUserId, organizationId },
-    });
-    if (!currentUser || (currentUser.role !== 'OWNER' && currentUser.role !== 'ADMIN')) {
-      throw new ForbiddenException('Only Owner or Admin can remove members');
-    }
-
-    const target = await this.prisma.userOrganization.findFirst({ where: { userId, organizationId } });
+    const [actorRole, target] = await Promise.all([
+      this.roleOf(currentUserId, organizationId),
+      this.prisma.userOrganization.findFirst({ where: { userId, organizationId } }),
+    ]);
     if (!target) throw new NotFoundException('Member not found');
 
     if (target.role === 'OWNER') {
+      if (actorRole !== 'OWNER') throw new ForbiddenException('Only an owner can remove another owner');
       const ownerCount = await this.prisma.userOrganization.count({
         where: { organizationId, role: 'OWNER' },
       });
@@ -96,12 +90,9 @@ export class SettingsService {
   }
 
   // Invite member
-  async inviteMember(email: string, role: string, organizationId: string, userId: string) {
-    const currentUser = await this.prisma.userOrganization.findFirst({
-      where: { userId, organizationId },
-    });
-    if (!currentUser || (currentUser.role !== 'OWNER' && currentUser.role !== 'ADMIN')) {
-      throw new ForbiddenException('Only Owner or Admin can invite members');
+  async inviteMember(email: string, role: OrgRole, organizationId: string, userId: string) {
+    if (role === 'OWNER' && (await this.roleOf(userId, organizationId)) !== 'OWNER') {
+      throw new ForbiddenException('Only an owner can invite another owner');
     }
 
     // Check if already member
@@ -130,7 +121,7 @@ export class SettingsService {
       data: {
         email,
         token: hashedToken,
-        role: role as any,
+        role,
         organizationId,
         invitedById: userId,
         expiresAt,
@@ -230,5 +221,10 @@ export class SettingsService {
       where: { id: inv.id },
       data: { acceptedAt: new Date() },
     });
+  }
+
+  private async roleOf(userId: string, organizationId: string): Promise<OrgRole | null> {
+    const membership = await this.prisma.userOrganization.findFirst({ where: { userId, organizationId }, select: { role: true } });
+    return membership?.role ?? null;
   }
 }

@@ -6,11 +6,12 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { DocumentsService } from './documents.service';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
 interface AuthUser { id: string; organizationId: string; role: string }
 
 @Controller('projects/:projectId/documents')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DocumentsController {
   constructor(private readonly service: DocumentsService) {}
 
@@ -19,6 +20,7 @@ export class DocumentsController {
     return this.service.findAll(projectId, user.organizationId);
   }
 
+  @RequirePermission('document.upload')
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   upload(
@@ -38,6 +40,7 @@ export class DocumentsController {
     return this.service.getDownloadUrl(documentId, user.organizationId);
   }
 
+  @RequirePermission('document.delete')
   @Delete(':documentId')
   remove(
     @Param('projectId') projectId: string,

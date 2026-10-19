@@ -2,6 +2,7 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { PermissionsGuard } from '../../common/permissions';
 
 interface AuthUser {
   id: string;
@@ -10,7 +11,7 @@ interface AuthUser {
 }
 
 @Controller('dashboard')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 

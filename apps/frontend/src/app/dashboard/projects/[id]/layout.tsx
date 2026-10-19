@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { Badge, Button, Skeleton, cn } from '@sitepilot/ui';
 import { useProject } from '@/hooks/api/use-projects';
 import { ProjectFormDialog } from '../components/ProjectFormDialog';
+import { Can } from '@/components/shared/Can';
 
 const tabs = [
   { name: 'Overview',        href: '' },
@@ -102,14 +103,16 @@ export default function ProjectDetailLayout({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <Button variant="outline" disabled={!project} onClick={() => setEditOpen(true)}>
-              Project Settings
-            </Button>
-            <Button disabled={!project} onClick={() => setEditOpen(true)}>
-              Update Progress
-            </Button>
-          </div>
+          <Can permission="project.update">
+            <div className="flex items-center gap-3 shrink-0">
+              <Button variant="outline" disabled={!project} onClick={() => setEditOpen(true)}>
+                Project Settings
+              </Button>
+              <Button disabled={!project} onClick={() => setEditOpen(true)}>
+                Update Progress
+              </Button>
+            </div>
+          </Can>
         </div>
 
         {/* Tabs */}

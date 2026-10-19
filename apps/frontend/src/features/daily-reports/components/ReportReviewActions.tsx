@@ -12,6 +12,7 @@ import { getApiErrorMessage } from '@/lib/api/errors';
 import { useAuthStore } from '@/store/auth.store';
 import { canEditReport, canReviewReport } from '../utils/report-permissions';
 import { RejectReportDialog } from './RejectReportDialog';
+import { useCan } from '@/hooks/api/use-access';
 
 /**
  * Authors edit and submit their own reports; anyone else reviews submitted ones.
@@ -23,8 +24,9 @@ export function ReportReviewActions({ report }: { report: DailyReportDetail }) {
   const submitReport = useSubmitDailyReport(report.projectId);
   const reviewReport = useReviewDailyReport(report.projectId);
 
-  const canEdit = canEditReport(report, currentUserId);
-  const canReview = canReviewReport(report, currentUserId);
+  const can = useCan();
+  const canEdit = canEditReport(report, currentUserId) && can('dailyReport.write');
+  const canReview = canReviewReport(report, currentUserId) && can('dailyReport.approve');
 
   async function handleSubmit(): Promise<void> {
     try {

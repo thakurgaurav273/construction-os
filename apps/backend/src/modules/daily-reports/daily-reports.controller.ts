@@ -15,11 +15,12 @@ import { CreateDailyReportDto } from './dto/create-daily-report.dto';
 import { DailyReportQueryDto } from './dto/daily-report-query.dto';
 import { ApproveDailyReportDto, RejectDailyReportDto } from './dto/review-daily-report.dto';
 import { UpdateDailyReportDto } from './dto/update-daily-report.dto';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
 interface AuthUser { id: string; organizationId: string; role: string }
 
 @Controller('daily-reports')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class OrganizationDailyReportsController {
   constructor(private readonly service: DailyReportsService) {}
 
@@ -38,7 +39,7 @@ export class OrganizationDailyReportsController {
 }
 
 @Controller('projects/:projectId/daily-reports')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DailyReportsController {
   constructor(
     private readonly service: DailyReportsService,
@@ -62,6 +63,7 @@ export class DailyReportsController {
     return this.service.findOne(projectId, reportId, user.organizationId);
   }
 
+  @RequirePermission('dailyReport.write')
   @Post()
   create(
     @Param('projectId') projectId: string,
@@ -71,6 +73,7 @@ export class DailyReportsController {
     return this.service.create(projectId, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('dailyReport.write')
   @Patch(':reportId')
   update(
     @Param('projectId') projectId: string,
@@ -81,6 +84,7 @@ export class DailyReportsController {
     return this.service.update(projectId, reportId, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('dailyReport.write')
   @Post(':reportId/submit')
   submit(
     @Param('projectId') projectId: string,
@@ -90,6 +94,7 @@ export class DailyReportsController {
     return this.workflow.submit(projectId, reportId, user.organizationId, user.id);
   }
 
+  @RequirePermission('dailyReport.approve')
   @Post(':reportId/approve')
   approve(
     @Param('projectId') projectId: string,
@@ -100,6 +105,7 @@ export class DailyReportsController {
     return this.workflow.approve(projectId, reportId, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('dailyReport.approve')
   @Post(':reportId/reject')
   reject(
     @Param('projectId') projectId: string,
@@ -110,6 +116,7 @@ export class DailyReportsController {
     return this.workflow.reject(projectId, reportId, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('dailyReport.write')
   @Post(':reportId/attachments')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_ATTACHMENT_SIZE_BYTES } }))
   addAttachment(
@@ -121,6 +128,7 @@ export class DailyReportsController {
     return this.service.addAttachment(projectId, reportId, user.organizationId, user.id, file);
   }
 
+  @RequirePermission('dailyReport.write')
   @Delete(':reportId/attachments/:documentId')
   removeAttachment(
     @Param('projectId') projectId: string,

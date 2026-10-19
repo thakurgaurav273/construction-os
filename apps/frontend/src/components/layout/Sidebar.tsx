@@ -21,12 +21,16 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@sitepilot/ui';
+import type { Permission } from '@sitepilot/types';
 import { useAuthStore } from '@/store/auth.store';
+import { useCan } from '@/hooks/api/use-access';
 
 interface NavItem {
   name: string;
   href: string;
   icon: LucideIcon;
+  /** Hidden for members whose role doesn't grant it. */
+  permission?: Permission;
 }
 
 interface NavGroup {
@@ -61,7 +65,7 @@ const navigation: NavGroup[] = [
   {
     group: 'Business',
     items: [
-      { name: 'Finance', href: '/dashboard/finance',  icon: DollarSign },
+      { name: 'Finance', href: '/dashboard/finance',  icon: DollarSign, permission: 'finance.view' },
       { name: 'Reports', href: '/dashboard/reports',  icon: BarChart3 },
     ],
   },
@@ -83,6 +87,10 @@ export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const user = useAuthStore((state) => state.user);
   const organization = useAuthStore((state) => state.organization);
+  const can = useCan();
+  const visibleNavigation = navigation
+    .map((group) => ({ ...group, items: group.items.filter((item) => !item.permission || can(item.permission)) }))
+    .filter((group) => group.items.length > 0);
 
   const userInitials = user?.name
     ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
@@ -137,7 +145,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-5">
-        {navigation.map((group) => (
+        {visibleNavigation.map((group) => (
           <div key={group.group}>
             <AnimatePresence>
               {!isCollapsed && (

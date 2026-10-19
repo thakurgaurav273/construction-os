@@ -19,6 +19,7 @@ import { attendanceRateTone, toDisplayStatus } from '@/features/workforce/utils/
 import { AssignProjectDialog } from '@/features/workforce/components/AssignProjectDialog';
 import { WorkerFormDialog } from '@/features/workforce/components/WorkerFormDialog';
 import { WorkerAttendanceCard } from './WorkerAttendanceCard';
+import { Can } from '@/components/shared/Can';
 
 interface WorkerDrawerProps {
   worker: Worker | null;
@@ -272,12 +273,14 @@ export function WorkerDrawer({ worker, open, onClose }: WorkerDrawerProps): Reac
 
         {/* ── Sticky Footer ── */}
         <div className="shrink-0 border-t bg-background px-5 py-3 flex gap-2">
-          <Button size="sm" className="flex-1 gap-1.5" onClick={() => setAssignOpen(true)} disabled={!worker.isActive}>
-            <UserPlus className="h-3.5 w-3.5" /> {worker.projectId ? 'Reassign Project' : 'Assign Project'}
-          </Button>
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditOpen(true)}>
-            <Pencil className="h-3.5 w-3.5" /> Edit
-          </Button>
+          <Can permission="workforce.manage">
+            <Button size="sm" className="flex-1 gap-1.5" onClick={() => setAssignOpen(true)} disabled={!worker.isActive}>
+              <UserPlus className="h-3.5 w-3.5" /> {worker.projectId ? 'Reassign Project' : 'Assign Project'}
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditOpen(true)}>
+              <Pencil className="h-3.5 w-3.5" /> Edit
+            </Button>
+          </Can>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="ghost" aria-label="More actions"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -289,6 +292,7 @@ export function WorkerDrawer({ worker, open, onClose }: WorkerDrawerProps): Reac
               <DropdownMenuItem disabled={!worker.email} onSelect={() => { window.location.href = `mailto:${worker.email}`; }}>
                 <Mail className="mr-2 h-4 w-4" /> Email
               </DropdownMenuItem>
+              <Can permission="workforce.manage">
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 disabled={setWorkerActive.isPending}
@@ -299,6 +303,7 @@ export function WorkerDrawer({ worker, open, onClose }: WorkerDrawerProps): Reac
                   ? <><UserX className="mr-2 h-4 w-4" /> Deactivate worker</>
                   : <><UserCheck className="mr-2 h-4 w-4" /> Reactivate worker</>}
               </DropdownMenuItem>
+              </Can>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

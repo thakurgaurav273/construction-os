@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@sitepilot/ui';
 import { PackageCheck, Truck, X } from 'lucide-react';
 import { useDeliveryTransition } from '@/hooks/api/use-procurement';
+import { useCan } from '@/hooks/api/use-access';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import type { Delivery, PurchaseOrderDetail } from '@/features/procurement/types';
 import { StatusBadge } from './StatusBadge';
@@ -17,6 +18,7 @@ interface PurchaseOrderDeliveriesProps {
 
 export function PurchaseOrderDeliveries({ order, onReceive }: PurchaseOrderDeliveriesProps): React.ReactElement {
   const transition = useDeliveryTransition();
+  const canReceive = useCan()('delivery.receive');
 
   async function runTransition(delivery: Delivery, kind: 'in-transit' | 'cancel'): Promise<void> {
     try {
@@ -60,7 +62,7 @@ export function PurchaseOrderDeliveries({ order, onReceive }: PurchaseOrderDeliv
               </div>
               <StatusBadge kind="delivery" value={delivery.isDelayed ? 'DELAYED' : delivery.status} />
             </div>
-            {isOpen && (
+            {isOpen && canReceive && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => onReceive(delivery)}>
                   <PackageCheck className="h-3 w-3" /> Receive

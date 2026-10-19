@@ -4,6 +4,7 @@ import React from 'react';
 import { AlertTriangle, CheckCircle2, ClipboardCheck, Clock, ShieldAlert, TrendingUp, UserX, type LucideIcon } from 'lucide-react';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Skeleton } from '@sitepilot/ui';
 import type { WorkforceStats } from '@/hooks/api/use-workforce';
+import { Can } from '@/components/shared/Can';
 
 interface Alert {
   icon: LucideIcon;
@@ -53,9 +54,11 @@ export function WorkforceAlerts({ stats, onMarkAttendance }: { stats: WorkforceS
         {stats && stats.notMarkedToday > 0 && (
           <div className="bg-card border rounded-lg p-3 shadow-sm space-y-2">
             <p className="text-xs font-semibold">{stats.notMarkedToday} workers not marked today</p>
-            <Button size="sm" className="w-full" onClick={onMarkAttendance}>
-              <ClipboardCheck className="mr-2 h-3.5 w-3.5" /> Mark Attendance
-            </Button>
+            <Can permission="attendance.mark">
+              <Button size="sm" className="w-full" onClick={onMarkAttendance}>
+                <ClipboardCheck className="mr-2 h-3.5 w-3.5" /> Mark Attendance
+              </Button>
+            </Can>
           </div>
         )}
 

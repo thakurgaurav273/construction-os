@@ -5,6 +5,8 @@ import { RegisterDto } from './dto/register.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { AuthenticatedUser } from './strategies/jwt.strategy';
 
 @Controller('auth')
 export class AuthController {
@@ -31,18 +33,20 @@ export class AuthController {
     return this.authService.logout(refreshToken);
   }
 
+  /** The signed-in member, including their current role and permissions in this organization. */
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  getMe(@CurrentUser() user: Record<string, unknown>) {
+  getMe(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
     return user;
   }
 
   @Patch('organization')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermission('organization.manage')
   updateOrganization(
-    @CurrentUser() user: Record<string, unknown>,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateOrganizationDto,
   ) {
-    return this.authService.updateOrganization(user.organizationId as string, dto);
+    return this.authService.updateOrganization(user.organizationId, dto);
   }
 }

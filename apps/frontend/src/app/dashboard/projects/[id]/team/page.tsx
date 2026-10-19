@@ -8,6 +8,7 @@ import { useProject } from '@/hooks/api/use-projects';
 import { getInitials } from '@/lib/utils';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { AddMemberDialog } from '../../components/AddMemberDialog';
+import { Can } from '@/components/shared/Can';
 
 function roleLabel(role: string): string {
   return role.charAt(0) + role.slice(1).toLowerCase();
@@ -22,7 +23,7 @@ export default function ProjectTeamPage({ params }: { params: { id: string } }) 
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-semibold tracking-tight">Project Team</h3>
-        <Button onClick={() => setAddOpen(true)}>Add Member</Button>
+        <Can permission="project.members.manage"><Button onClick={() => setAddOpen(true)}>Add Member</Button></Can>
       </div>
 
       {isLoading ? (
@@ -43,7 +44,7 @@ export default function ProjectTeamPage({ params }: { params: { id: string } }) 
           icon={Users}
           title="No team members yet"
           description="Assign engineers, managers, and viewers to this project to see them here."
-          action={<Button onClick={() => setAddOpen(true)}>Add Member</Button>}
+          action={<Can permission="project.members.manage"><Button onClick={() => setAddOpen(true)}>Add Member</Button></Can>}
         />
       ) : (
         <motion.div

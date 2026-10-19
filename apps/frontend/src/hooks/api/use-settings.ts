@@ -31,13 +31,15 @@ export function useMembers() {
   });
 }
 
-export function useInvitations() {
+/** Only members who manage the team can list invitations; others skip the request. */
+export function useInvitations({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery<Invitation[]>({
     queryKey: ['settings', 'invitations'],
     queryFn: async () => {
       const res = await apiClient.get('/settings/invitations');
       return res.data.data ?? res.data;
     },
+    enabled,
   });
 }
 

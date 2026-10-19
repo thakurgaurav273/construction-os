@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { formatDate, formatNumber } from '@/lib/utils';
 import { getTransferStatusMeta } from './inventory-format';
 import { CreateTransferDialog } from './CreateTransferDialog';
+import { Can } from '@/components/shared/Can';
 
 const PAGE_SIZE = 10;
 
@@ -95,9 +96,11 @@ export function TransfersTab({ onSelect }: TransfersTabProps): React.ReactElemen
             ))}
           </SelectContent>
         </Select>
-        <Button onClick={() => setCreateOpen(true)} className="whitespace-nowrap">
-          <Plus className="mr-1.5 h-4 w-4" /> New Transfer
-        </Button>
+        <Can permission="inventory.transfer">
+          <Button onClick={() => setCreateOpen(true)} className="whitespace-nowrap">
+            <Plus className="mr-1.5 h-4 w-4" /> New Transfer
+          </Button>
+        </Can>
       </div>
 
       {isError ? (
@@ -120,7 +123,7 @@ export function TransfersTab({ onSelect }: TransfersTabProps): React.ReactElemen
           icon={ArrowLeftRight}
           title="No transfers found"
           description="No stock transfers match your filters. Create a transfer to move stock between warehouses."
-          action={<Button onClick={() => setCreateOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> New Transfer</Button>}
+          action={<Can permission="inventory.transfer"><Button onClick={() => setCreateOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> New Transfer</Button></Can>}
         />
       ) : (
         <>

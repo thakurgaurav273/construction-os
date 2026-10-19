@@ -3,11 +3,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProcurementAnalytics, ProcurementAnalyticsService } from './procurement-analytics.service';
 import { ProcurementSummary, ProcurementSummaryService } from './procurement-summary.service';
+import { PermissionsGuard } from '../../common/permissions';
 
 interface AuthUser { id: string; organizationId: string; role: string }
 
 @Controller('procurement')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ProcurementInsightsController {
   constructor(
     private readonly summary: ProcurementSummaryService,

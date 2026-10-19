@@ -1,3 +1,4 @@
+import type { Permission } from '@sitepilot/types';
 import type { PurchaseOrder, PurchaseOrderStatus } from '../types';
 
 /**
@@ -15,19 +16,28 @@ export interface OrderPermissions {
   isOwnOrder: boolean;
   canCancel: boolean;
   canRecordDelivery: boolean;
+  canDuplicate: boolean;
 }
 
-export function getOrderPermissions(order: PurchaseOrder, currentUserId: string | undefined): OrderPermissions {
+/** Combines the order's status with what the member's role allows. */
+export function getOrderPermissions(
+  order: PurchaseOrder,
+  currentUserId: string | undefined,
+  can: (permission: Permission) => boolean,
+): OrderPermissions {
   const hasReceipts = order.items.some((item) => item.receivedQuantity > 0);
   const isOwnOrder = !!currentUserId && order.requestedBy?.id === currentUserId;
+  // Requesters withdraw their own open orders; anyone else's, or an approved commitment, needs approver rights.
+  const canWithdraw = can('po.approve') || (isOwnOrder && order.status !== 'APPROVED' && can('po.create'));
 
   return {
-    canEdit: EDITABLE.includes(order.status),
-    canSubmit: EDITABLE.includes(order.status),
-    canReview: order.status === 'PENDING' && !isOwnOrder,
+    canEdit: EDITABLE.includes(order.status) && can('po.create'),
+    canSubmit: EDITABLE.includes(order.status) && can('po.create'),
+    canReview: order.status === 'PENDING' && !isOwnOrder && can('po.approve'),
     isOwnOrder,
-    canCancel: CANCELLABLE.includes(order.status) && !hasReceipts,
-    canRecordDelivery: order.status === 'APPROVED' && order.deliveryStatus !== 'DELIVERED',
+    canCancel: CANCELLABLE.includes(order.status) && !hasReceipts && canWithdraw,
+    canRecordDelivery: order.status === 'APPROVED' && order.deliveryStatus !== 'DELIVERED' && can('delivery.receive'),
+    canDuplicate: can('po.create'),
   };
 }
 

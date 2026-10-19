@@ -12,6 +12,7 @@ import {
 } from '@sitepilot/ui';
 import { useProjects } from '@/hooks/api/use-projects';
 import { ProjectFormDialog } from './components/ProjectFormDialog';
+import { Can } from '@/components/shared/Can';
 
 const STATUS_FILTERS = ['PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED', 'ARCHIVED'] as const;
 const PRIORITY_FILTERS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
@@ -68,9 +69,11 @@ export default function ProjectsListPage() {
             {isLoading ? 'Loading...' : `${projects.length} project${projects.length !== 1 ? 's' : ''} across your organisation`}
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> New Project
-        </Button>
+        <Can permission="project.create">
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> New Project
+          </Button>
+        </Can>
       </div>
 
       <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -124,9 +127,11 @@ export default function ProjectsListPage() {
               : 'Create your first project to get started.'}
           </p>
           {!search && statusFilter === 'ALL' && priorityFilter === 'ALL' && (
-            <Button className="mt-4" onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" /> New Project
-            </Button>
+            <Can permission="project.create">
+              <Button className="mt-4" onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" /> New Project
+              </Button>
+            </Can>
           )}
         </div>
       ) : (

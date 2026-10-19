@@ -9,11 +9,13 @@ import { OptionalNoteDto, RequiredNoteDto } from './dto/review-note.dto';
 import { PurchaseOrderWorkflowService } from './purchase-order-workflow.service';
 import { PurchaseOrderDetailView, PurchaseOrderView } from './purchase-order.mapper';
 import { PurchaseOrdersService } from './purchase-orders.service';
+import type { Permission } from '@sitepilot/types';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
-interface AuthUser { id: string; organizationId: string; role: string }
+interface AuthUser { id: string; organizationId: string; role: string; permissions: Permission[] }
 
 @Controller('purchase-orders')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class PurchaseOrdersController {
   constructor(
     private readonly orders: PurchaseOrdersService,
@@ -31,11 +33,13 @@ export class PurchaseOrdersController {
     return this.orders.findOne(id, user.organizationId);
   }
 
+  @RequirePermission('po.create')
   @Post()
   create(@Body() dto: CreatePurchaseOrderDto, @CurrentUser() user: AuthUser): Promise<PurchaseOrderDetailView> {
     return this.orders.create(user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('po.create')
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -45,16 +49,19 @@ export class PurchaseOrdersController {
     return this.orders.update(id, user.organizationId, dto);
   }
 
+  @RequirePermission('po.create')
   @Post(':id/duplicate')
   duplicate(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<PurchaseOrderDetailView> {
     return this.orders.duplicate(id, user.organizationId, user.id);
   }
 
+  @RequirePermission('po.create')
   @Post(':id/submit')
   submit(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<PurchaseOrderDetailView> {
     return this.workflow.submit(id, user.organizationId, user.id);
   }
 
+  @RequirePermission('po.approve')
   @Post(':id/approve')
   approve(
     @Param('id', ParseUUIDPipe) id: string,
@@ -64,6 +71,7 @@ export class PurchaseOrdersController {
     return this.workflow.approve(id, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('po.approve')
   @Post(':id/reject')
   reject(
     @Param('id', ParseUUIDPipe) id: string,
@@ -73,6 +81,7 @@ export class PurchaseOrdersController {
     return this.workflow.reject(id, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('po.approve')
   @Post(':id/request-changes')
   requestChanges(
     @Param('id', ParseUUIDPipe) id: string,
@@ -82,15 +91,17 @@ export class PurchaseOrdersController {
     return this.workflow.requestChanges(id, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('po.create')
   @Post(':id/cancel')
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: OptionalNoteDto,
     @CurrentUser() user: AuthUser,
   ): Promise<PurchaseOrderDetailView> {
-    return this.workflow.cancel(id, user.organizationId, user.id, dto);
+    return this.workflow.cancel(id, user.organizationId, user.id, dto, user.permissions.includes('po.approve'));
   }
 
+  @RequirePermission('delivery.receive')
   @Post(':id/deliveries')
   scheduleDelivery(
     @Param('id', ParseUUIDPipe) id: string,
@@ -100,6 +111,7 @@ export class PurchaseOrdersController {
     return this.deliveries.schedule(id, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('delivery.receive')
   @Post(':id/receipts')
   receiveGoods(
     @Param('id', ParseUUIDPipe) id: string,

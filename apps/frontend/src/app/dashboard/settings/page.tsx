@@ -28,6 +28,9 @@ import {
   type Member,
   type Invitation,
 } from '@/hooks/api/use-settings';
+import { useCurrentAccess } from '@/hooks/api/use-access';
+import { useAuthStore } from '@/store/auth.store';
+import { Can } from '@/components/shared/Can';
 
 const INITIAL_ORG = {
   companyName: 'Nexus Construction Group',
@@ -36,7 +39,8 @@ const INITIAL_ORG = {
   headquarters: '100 Construction Way, NY 10001',
 };
 
-const ROLES = ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'ENGINEER', 'FINANCE', 'PROCUREMENT', 'VIEWER'] as const;
+/** Must match OrgRole on the backend. */
+const ROLES = ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_ENGINEER', 'STORE_MANAGER', 'PROCUREMENT', 'FINANCE', 'VIEWER'] as const;
 
 const tabs = [
   { id: 'organization', name: 'Organization', icon: Building2 },
@@ -49,6 +53,11 @@ const tabs = [
 ];
 
 export default function SettingsPage() {
+  const { data: access } = useCurrentAccess();
+  const currentUserId = useAuthStore((state) => state.user?.id);
+  const canManageMembers = access?.permissions.includes('members.manage') ?? false;
+  // Only owners can hand out or take away the Owner role (enforced server-side too).
+  const assignableRoles = ROLES.filter((role) => role !== 'OWNER' || access?.role === 'OWNER');
   const [activeTab, setActiveTab] = useState('organization');
   const [org, setOrg] = useState(INITIAL_ORG);
   const [logo, setLogo] = useState<string | null>(null);
@@ -63,7 +72,7 @@ export default function SettingsPage() {
 
   // API hooks
   const { data: members = [], isLoading: loadingMembers } = useMembers();
-  const { data: invitations = [], isLoading: loadingInvitations } = useInvitations();
+  const { data: invitations = [], isLoading: loadingInvitations } = useInvitations({ enabled: canManageMembers });
   const inviteMutation = useInviteMember();
   const changeMemberRoleMutation = useChangeMemberRole();
   const removeMemberMutation = useRemoveMember();
@@ -222,8 +231,10 @@ export default function SettingsPage() {
               </Card>
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={handleDiscard}>Discard Changes</Button>
-                <Button onClick={() => toast.success('Settings saved')}><Save className="mr-2 h-4 w-4" /> Save Changes</Button>
+                <Can permission="organization.manage">
+                  <Button variant="outline" onClick={handleDiscard}>Discard Changes</Button>
+                  <Button onClick={() => toast.success('Settings saved')}><Save className="mr-2 h-4 w-4" /> Save Changes</Button>
+                </Can>
               </div>
             </>
           )}
@@ -237,7 +248,7 @@ export default function SettingsPage() {
                     <CardTitle>Members</CardTitle>
                     <CardDescription>Manage who has access to this workspace.</CardDescription>
                   </div>
-                  <Button onClick={() => setInviteOpen(true)}><Mail className="mr-2 h-4 w-4" /> Invite Member</Button>
+                  {canManageMembers && <Button onClick={() => setInviteOpen(true)}><Mail className="mr-2 h-4 w-4" /> Invite Member</Button>}
                 </CardHeader>
                 <CardContent>
                   {loadingMembers ? (
@@ -269,12 +280,16 @@ export default function SettingsPage() {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <Select value={member.role} onValueChange={(role) => handleChangeRole(member.id, role)}>
-                                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    {ROLES.map((r) => <SelectItem key={r} value={r}>{r.replace(/_/g, ' ')}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
+                                {canManageMembers && member.id !== currentUserId && (member.role !== 'OWNER' || access?.role === 'OWNER') ? (
+                                  <Select value={member.role} onValueChange={(role) => handleChangeRole(member.id, role)}>
+                                    <SelectTrigger className="w-40" aria-label={`Role for ${member.name || member.email}`}><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      {assignableRoles.map((r) => <SelectItem key={r} value={r}>{r.replace(/_/g, ' ')}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Badge variant="outline">{member.role.replace(/_/g, ' ')}</Badge>
+                                )}
                               </td>
                               <td className="px-4 py-3">
                                 <span className="flex items-center text-emerald-600 text-xs font-medium">
@@ -283,14 +298,17 @@ export default function SettingsPage() {
                               </td>
                               <td className="px-4 py-3 text-xs text-muted-foreground">{format(new Date(member.joinedAt), 'MMM dd, yyyy')}</td>
                               <td className="px-4 py-3 text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-red-500 hover:text-red-600"
-                                  onClick={() => setDeleteAlert({ open: true, memberId: member.id })}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {canManageMembers && member.id !== currentUserId && (member.role !== 'OWNER' || access?.role === 'OWNER') && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-500 hover:text-red-600"
+                                    aria-label={`Remove ${member.name || member.email}`}
+                                    onClick={() => setDeleteAlert({ open: true, memberId: member.id })}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -302,6 +320,7 @@ export default function SettingsPage() {
               </Card>
 
               {/* Pending Invitations Section */}
+              {canManageMembers && (
               <Card>
                 <CardHeader>
                   <CardTitle>Pending Invitations</CardTitle>
@@ -341,6 +360,7 @@ export default function SettingsPage() {
                   )}
                 </CardContent>
               </Card>
+              )}
             </div>
           )}
 
@@ -383,7 +403,7 @@ export default function SettingsPage() {
                   <SelectValue placeholder="Role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLES.map((r) => (
+                  {assignableRoles.map((r) => (
                     <SelectItem key={r} value={r}>{r.replace(/_/g, ' ')}</SelectItem>
                   ))}
                 </SelectContent>

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { usePurchaseOrders, useSetVendorActive } from '@/hooks/api/use-procurement';
 import { getApiErrorMessage } from '@/lib/api/errors';
+import { useCan } from '@/hooks/api/use-access';
 import type { Vendor } from '@/features/procurement/types';
 import { PurchaseOrderFormDialog } from '@/features/procurement/components/PurchaseOrderFormDialog';
 import { VendorFormDialog } from '@/features/procurement/components/VendorFormDialog';
@@ -59,6 +60,7 @@ export function VendorDrawer({ vendor, open, onClose, onOpenOrder }: VendorDrawe
   // Shares the page's all-orders cache instead of fetching per vendor.
   const { data: orders = [], isLoading: isLoadingOrders } = usePurchaseOrders();
   const setVendorActive = useSetVendorActive();
+  const can = useCan();
   const [editOpen, setEditOpen] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
   const recentOrders = orders.filter((order) => order.vendor?.id === vendor?.id).slice(0, RECENT_ORDER_LIMIT);
@@ -227,15 +229,21 @@ export function VendorDrawer({ vendor, open, onClose, onOpenOrder }: VendorDrawe
               </div>
             </ScrollArea>
 
+            {(can('po.create') || can('vendor.manage')) && (
             <div className="shrink-0 border-t bg-background px-5 py-3 space-y-2">
               <div className="grid grid-cols-2 gap-2">
-                <Button size="sm" className="gap-1.5" disabled={vendor.status !== 'ACTIVE'} onClick={() => setOrderOpen(true)}>
-                  <ShoppingCart className="h-3.5 w-3.5" /> New PO
-                </Button>
-                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditOpen(true)}>
-                  <Pencil className="h-3.5 w-3.5" /> Edit
-                </Button>
+                {can('po.create') && (
+                  <Button size="sm" className="gap-1.5" disabled={vendor.status !== 'ACTIVE'} onClick={() => setOrderOpen(true)}>
+                    <ShoppingCart className="h-3.5 w-3.5" /> New PO
+                  </Button>
+                )}
+                {can('vendor.manage') && (
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditOpen(true)}>
+                    <Pencil className="h-3.5 w-3.5" /> Edit
+                  </Button>
+                )}
               </div>
+              {can('vendor.manage') && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -247,7 +255,9 @@ export function VendorDrawer({ vendor, open, onClose, onOpenOrder }: VendorDrawe
                   ? <><PauseCircle className="h-3.5 w-3.5" /> Deactivate vendor</>
                   : <><PlayCircle className="h-3.5 w-3.5" /> Reactivate vendor</>}
               </Button>
+              )}
             </div>
+            )}
 
             <VendorFormDialog open={editOpen} onOpenChange={setEditOpen} vendor={vendor} />
             <PurchaseOrderFormDialog open={orderOpen} onOpenChange={setOrderOpen} vendor={vendor} onSaved={onOpenOrder} />

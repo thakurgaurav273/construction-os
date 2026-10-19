@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Badge, Button } from '@sitepilot/ui';
 import { Award, PencilLine, XCircle } from 'lucide-react';
 import { useAwardRfq, useDeclineQuote } from '@/hooks/api/use-procurement';
+import { useCan } from '@/hooks/api/use-access';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import type { RfqDetail, RfqInvitation } from '@/features/procurement/types';
 import { formatCurrency } from './procurement-format';
@@ -33,6 +34,7 @@ export function RfqQuoteComparison({ rfq, onRecordQuote }: RfqQuoteComparisonPro
   const awardRfq = useAwardRfq();
   const declineQuote = useDeclineQuote();
   const [confirmAwardId, setConfirmAwardId] = useState<string | null>(null);
+  const can = useCan();
   const isOpenForQuotes = rfq.status === 'OPEN' || rfq.status === 'EVALUATING';
   const invitations = [...rfq.invitations].sort(compareInvitations);
 
@@ -91,7 +93,7 @@ export function RfqQuoteComparison({ rfq, onRecordQuote }: RfqQuoteComparisonPro
 
             {isOpenForQuotes && (
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {invitation.status === 'QUOTED' && !isExpired && invitation.vendor.status === 'ACTIVE' && (
+                {can('rfq.award') && invitation.status === 'QUOTED' && !isExpired && invitation.vendor.status === 'ACTIVE' && (
                   isConfirming ? (
                     <>
                       <Button size="sm" className="h-7 text-xs" disabled={awardRfq.isPending} onClick={() => handleAward(invitation)}>
@@ -105,12 +107,12 @@ export function RfqQuoteComparison({ rfq, onRecordQuote }: RfqQuoteComparisonPro
                     </Button>
                   )
                 )}
-                {!isConfirming && (
+                {!isConfirming && can('rfq.manage') && (
                   <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => onRecordQuote(invitation)}>
                     <PencilLine className="h-3 w-3" /> {invitation.status === 'QUOTED' ? 'Update quote' : 'Record quote'}
                   </Button>
                 )}
-                {!isConfirming && invitation.status !== 'DECLINED' && (
+                {!isConfirming && can('rfq.manage') && invitation.status !== 'DECLINED' && (
                   <Button
                     size="sm"
                     variant="ghost"
