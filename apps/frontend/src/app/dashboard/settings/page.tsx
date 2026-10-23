@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
-import Image from 'next/image';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Building2, Users, Shield, Palette, Plug, Key, History, Save, Upload, Trash2, CheckCircle2, Settings2, Mail } from 'lucide-react';
+import { Bell, Building2, Users, Shield, Palette, Plug, Sparkles, History, Trash2, CheckCircle2, Settings2, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@sitepilot/ui';
 import { Button } from '@sitepilot/ui';
 import { Input } from '@sitepilot/ui';
@@ -28,31 +27,47 @@ import {
   type Member,
   type Invitation,
 } from '@/hooks/api/use-settings';
+import { useCurrentAccess } from '@/hooks/api/use-access';
+import { useAuthStore } from '@/store/auth.store';
+import { Can } from '@/components/shared/Can';
+import { AuditLogsTab } from '@/features/audit/components/AuditLogsTab';
+import { NotificationPreferencesTab } from '@/features/notifications/components/NotificationPreferencesTab';
+import { AiSettingsTab } from '@/features/ai/components/AiSettingsTab';
+import { BrandingTab } from '@/features/branding/components/BrandingTab';
+import { OrganizationSettingsTab } from '@/features/settings/components/OrganizationSettingsTab';
 
-const INITIAL_ORG = {
-  companyName: 'Nexus Construction Group',
-  slug: 'nexus-group',
-  supportEmail: 'support@nexus.com',
-  headquarters: '100 Construction Way, NY 10001',
-};
-
-const ROLES = ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'ENGINEER', 'FINANCE', 'PROCUREMENT', 'VIEWER'] as const;
+/** Must match OrgRole on the backend. */
+const ROLES = ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_ENGINEER', 'STORE_MANAGER', 'PROCUREMENT', 'FINANCE', 'VIEWER'] as const;
 
 const tabs = [
   { id: 'organization', name: 'Organization', icon: Building2 },
   { id: 'members', name: 'Members & Roles', icon: Users },
+  { id: 'notifications', name: 'Notifications', icon: Bell },
   { id: 'security', name: 'Security & Auth', icon: Shield },
   { id: 'branding', name: 'Branding', icon: Palette },
   { id: 'integrations', name: 'Integrations', icon: Plug },
-  { id: 'api', name: 'API Keys', icon: Key },
+  { id: 'ai', name: 'AI', icon: Sparkles },
   { id: 'audit', name: 'Audit Logs', icon: History },
 ];
 
 export default function SettingsPage() {
+  const { data: access } = useCurrentAccess();
+  const currentUserId = useAuthStore((state) => state.user?.id);
+  const canManageMembers = access?.permissions.includes('members.manage') ?? false;
+  // Only owners can hand out or take away the Owner role (enforced server-side too).
+  const assignableRoles = ROLES.filter((role) => role !== 'OWNER' || access?.role === 'OWNER');
   const [activeTab, setActiveTab] = useState('organization');
-  const [org, setOrg] = useState(INITIAL_ORG);
-  const [logo, setLogo] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Other screens link straight to a tab, e.g. /dashboard/settings#notifications.
+  useEffect(() => {
+    const openTabFromHash = (): void => {
+      const tab = window.location.hash.slice(1);
+      if (tabs.some((candidate) => candidate.id === tab)) setActiveTab(tab);
+    };
+    openTabFromHash();
+    window.addEventListener('hashchange', openTabFromHash);
+    return () => window.removeEventListener('hashchange', openTabFromHash);
+  }, []);
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -63,33 +78,12 @@ export default function SettingsPage() {
 
   // API hooks
   const { data: members = [], isLoading: loadingMembers } = useMembers();
-  const { data: invitations = [], isLoading: loadingInvitations } = useInvitations();
+  const { data: invitations = [], isLoading: loadingInvitations } = useInvitations({ enabled: canManageMembers });
   const inviteMutation = useInviteMember();
   const changeMemberRoleMutation = useChangeMemberRole();
   const removeMemberMutation = useRemoveMember();
   const resendInvitationMutation = useResendInvitation();
   const cancelInvitationMutation = useCancelInvitation();
-
-  const updateOrgField = (field: keyof typeof INITIAL_ORG, value: string): void => {
-    setOrg((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleLogoSelect = (event: React.ChangeEvent<HTMLInputElement>): void => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setLogo(URL.createObjectURL(file));
-    toast.success('Logo updated');
-    event.target.value = '';
-  };
-
-  const handleRemoveLogo = (): void => {
-    setLogo(null);
-    toast('Logo removed');
-  };
-
-  const handleDiscard = (): void => {
-    setOrg(INITIAL_ORG);
-  };
 
   const handleInviteSubmit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
@@ -164,69 +158,7 @@ export default function SettingsPage() {
         </aside>
 
         <main className="flex-1 min-w-0 space-y-6">
-          {activeTab === 'organization' && (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Organization Details</CardTitle>
-                  <CardDescription>Update your company&apos;s basic information.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center gap-6 pb-6 border-b">
-                    <div className="h-20 w-20 rounded-xl bg-muted border flex items-center justify-center shrink-0 overflow-hidden">
-                      {logo ? (
-                        <Image src={logo} alt="Workspace logo" width={80} height={80} className="h-full w-full object-cover" unoptimized />
-                      ) : (
-                        <Building2 className="h-8 w-8 text-muted-foreground opacity-50" />
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Workspace Logo</h4>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleLogoSelect}
-                      />
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Upload</Button>
-                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive/90" onClick={handleRemoveLogo} disabled={!logo}><Trash2 className="mr-2 h-4 w-4" /> Remove</Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Recommended size: 256x256px. Max 2MB.</p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Company Name</label>
-                      <Input value={org.companyName} onChange={(e) => updateOrgField('companyName', e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Workspace Slug</label>
-                      <div className="flex items-center">
-                        <span className="px-3 py-2 border border-r-0 rounded-l-md bg-muted text-muted-foreground text-sm">sitepilot.com/</span>
-                        <Input value={org.slug} onChange={(e) => updateOrgField('slug', e.target.value)} className="rounded-l-none" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Support Email</label>
-                      <Input value={org.supportEmail} onChange={(e) => updateOrgField('supportEmail', e.target.value)} type="email" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Headquarters</label>
-                      <Input value={org.headquarters} onChange={(e) => updateOrgField('headquarters', e.target.value)} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={handleDiscard}>Discard Changes</Button>
-                <Button onClick={() => toast.success('Settings saved')}><Save className="mr-2 h-4 w-4" /> Save Changes</Button>
-              </div>
-            </>
-          )}
+          {activeTab === 'organization' && <OrganizationSettingsTab />}
 
           {activeTab === 'members' && (
             <div className="space-y-6">
@@ -237,7 +169,7 @@ export default function SettingsPage() {
                     <CardTitle>Members</CardTitle>
                     <CardDescription>Manage who has access to this workspace.</CardDescription>
                   </div>
-                  <Button onClick={() => setInviteOpen(true)}><Mail className="mr-2 h-4 w-4" /> Invite Member</Button>
+                  {canManageMembers && <Button onClick={() => setInviteOpen(true)}><Mail className="mr-2 h-4 w-4" /> Invite Member</Button>}
                 </CardHeader>
                 <CardContent>
                   {loadingMembers ? (
@@ -269,12 +201,16 @@ export default function SettingsPage() {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <Select value={member.role} onValueChange={(role) => handleChangeRole(member.id, role)}>
-                                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    {ROLES.map((r) => <SelectItem key={r} value={r}>{r.replace(/_/g, ' ')}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
+                                {canManageMembers && member.id !== currentUserId && (member.role !== 'OWNER' || access?.role === 'OWNER') ? (
+                                  <Select value={member.role} onValueChange={(role) => handleChangeRole(member.id, role)}>
+                                    <SelectTrigger className="w-40" aria-label={`Role for ${member.name || member.email}`}><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      {assignableRoles.map((r) => <SelectItem key={r} value={r}>{r.replace(/_/g, ' ')}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Badge variant="outline">{member.role.replace(/_/g, ' ')}</Badge>
+                                )}
                               </td>
                               <td className="px-4 py-3">
                                 <span className="flex items-center text-emerald-600 text-xs font-medium">
@@ -283,14 +219,17 @@ export default function SettingsPage() {
                               </td>
                               <td className="px-4 py-3 text-xs text-muted-foreground">{format(new Date(member.joinedAt), 'MMM dd, yyyy')}</td>
                               <td className="px-4 py-3 text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-red-500 hover:text-red-600"
-                                  onClick={() => setDeleteAlert({ open: true, memberId: member.id })}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {canManageMembers && member.id !== currentUserId && (member.role !== 'OWNER' || access?.role === 'OWNER') && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-500 hover:text-red-600"
+                                    aria-label={`Remove ${member.name || member.email}`}
+                                    onClick={() => setDeleteAlert({ open: true, memberId: member.id })}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -302,6 +241,7 @@ export default function SettingsPage() {
               </Card>
 
               {/* Pending Invitations Section */}
+              {canManageMembers && (
               <Card>
                 <CardHeader>
                   <CardTitle>Pending Invitations</CardTitle>
@@ -341,10 +281,19 @@ export default function SettingsPage() {
                   )}
                 </CardContent>
               </Card>
+              )}
             </div>
           )}
 
-          {activeTab !== 'organization' && activeTab !== 'members' && (
+          {activeTab === 'audit' && <AuditLogsTab />}
+
+          {activeTab === 'notifications' && <NotificationPreferencesTab />}
+
+          {activeTab === 'ai' && <AiSettingsTab />}
+
+          {activeTab === 'branding' && <BrandingTab />}
+
+          {activeTab !== 'organization' && activeTab !== 'members' && activeTab !== 'audit' && activeTab !== 'notifications' && activeTab !== 'ai' && activeTab !== 'branding' && (
             <Card className="border-dashed border-border/60 bg-gradient-to-b from-muted/10 to-muted/30 shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)]">
               <div className="flex flex-col items-center justify-center p-20 text-center text-muted-foreground">
                 <div className="h-16 w-16 rounded-2xl bg-background border shadow-sm flex items-center justify-center mb-6">
@@ -383,7 +332,7 @@ export default function SettingsPage() {
                   <SelectValue placeholder="Role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLES.map((r) => (
+                  {assignableRoles.map((r) => (
                     <SelectItem key={r} value={r}>{r.replace(/_/g, ' ')}</SelectItem>
                   ))}
                 </SelectContent>

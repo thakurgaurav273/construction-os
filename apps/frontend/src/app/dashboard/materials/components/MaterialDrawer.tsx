@@ -1,9 +1,8 @@
 'use client';
 
 import React from 'react';
-import { toast } from 'sonner';
 import {
-  Button, Badge, Progress, ScrollArea, Skeleton,
+  Badge, Progress, ScrollArea, Skeleton,
   Sheet, SheetContent, SheetTitle,
 } from '@sitepilot/ui';
 import {
@@ -18,6 +17,8 @@ import {
   formatCurrency, formatCompactINR, getMovementMeta,
 } from './materials-format';
 import { MaterialStatusBadge } from './MaterialStatusBadge';
+import { MaterialDrawerActions } from './MaterialDrawerActions';
+import { MaterialStoresCard } from './MaterialStoresCard';
 
 interface MaterialDrawerProps {
   materialId: string | null;
@@ -81,7 +82,7 @@ function MaterialThumb({ material }: { material: MaterialDetail }): React.ReactE
   );
 }
 
-function MaterialDrawerBody({ material }: { material: MaterialDetail }): React.ReactElement {
+function MaterialDrawerBody({ material, onClose }: { material: MaterialDetail; onClose: () => void }): React.ReactElement {
   const specs = material.specifications ? Object.entries(material.specifications) : [];
   const recentMovements = material.movements.slice(0, 6);
 
@@ -117,11 +118,7 @@ function MaterialDrawerBody({ material }: { material: MaterialDetail }): React.R
             <Stat label="Stock Value" value={formatCompactINR(material.stockValue)} />
           </div>
 
-          {material.warehouse && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Truck className="h-4 w-4" /> Stored in <span className="font-medium text-foreground">{material.warehouse}</span>
-            </div>
-          )}
+          <MaterialStoresCard material={material} />
 
           {/* Specifications */}
           {specs.length > 0 && (
@@ -234,7 +231,9 @@ function MaterialDrawerBody({ material }: { material: MaterialDetail }): React.R
                           <p className="text-xs text-muted-foreground">{project.projectCode}</p>
                         </div>
                         <span className="text-xs font-semibold shrink-0">
-                          {formatNumber(project.consumed)} / {formatNumber(project.allocated)} {material.unit}
+                          {project.allocated > 0
+                            ? `${formatNumber(project.consumed)} / ${formatNumber(project.allocated)} ${material.unit}`
+                            : `${formatNumber(project.consumed)} ${material.unit} issued`}
                         </span>
                       </div>
                       <Progress value={percent} className="h-1.5" />
@@ -247,19 +246,7 @@ function MaterialDrawerBody({ material }: { material: MaterialDetail }): React.R
         </div>
       </ScrollArea>
 
-      {/* Footer */}
-      <div className="shrink-0 border-t bg-background px-5 py-3 grid grid-cols-2 gap-2">
-        <Button
-          size="sm"
-          className="gap-1.5"
-          onClick={() => toast(`Stock adjustment for ${material.name} (demo)`)}
-        >
-          <SlidersHorizontal className="h-3.5 w-3.5" /> Adjust Stock
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => toast(`Reorder drafted for ${material.name} (demo)`)} className="gap-1.5">
-          <Truck className="h-3.5 w-3.5" /> Reorder
-        </Button>
-      </div>
+      <MaterialDrawerActions material={material} onArchived={onClose} />
     </>
   );
 }
@@ -287,7 +274,7 @@ export function MaterialDrawer({ materialId, open, onClose }: MaterialDrawerProp
         ) : isLoading || !material ? (
           <DrawerSkeleton />
         ) : (
-          <MaterialDrawerBody material={material} />
+          <MaterialDrawerBody material={material} onClose={onClose} />
         )}
       </SheetContent>
     </Sheet>

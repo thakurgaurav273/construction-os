@@ -24,6 +24,7 @@ import { AttendanceTab } from './components/AttendanceTab';
 import { TradesTab } from './components/TradesTab';
 import { ComplianceTab } from './components/ComplianceTab';
 import { WorkforceAlerts } from './components/WorkforceAlerts';
+import { Can } from '@/components/shared/Can';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -103,12 +104,16 @@ export default function WorkforcePage(): React.ReactElement {
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" /> Export
           </Button>
-          <Button variant="outline" onClick={() => setAttendanceOpen(true)}>
-            <ClipboardCheck className="mr-2 h-4 w-4" /> Mark Attendance
-          </Button>
-          <Button onClick={() => setAddOpen(true)}>
-            <UserPlus className="mr-2 h-4 w-4" /> Add Worker
-          </Button>
+          <Can permission="attendance.mark">
+            <Button variant="outline" onClick={() => setAttendanceOpen(true)}>
+              <ClipboardCheck className="mr-2 h-4 w-4" /> Mark Attendance
+            </Button>
+          </Can>
+          <Can permission="workforce.manage">
+            <Button onClick={() => setAddOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" /> Add Worker
+            </Button>
+          </Can>
         </div>
       </motion.div>
 
@@ -185,7 +190,7 @@ export default function WorkforcePage(): React.ReactElement {
               icon={Users}
               title="No workers yet"
               description="Add your site crew to start tracking daily attendance, trades and compliance."
-              action={<Button onClick={() => setAddOpen(true)}><UserPlus className="mr-2 h-4 w-4" /> Add Worker</Button>}
+              action={<Can permission="workforce.manage"><Button onClick={() => setAddOpen(true)}><UserPlus className="mr-2 h-4 w-4" /> Add Worker</Button></Can>}
             />
           )}
           {!isLoading && !isError && workers.length > 0 && (

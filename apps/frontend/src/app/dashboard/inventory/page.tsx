@@ -18,6 +18,10 @@ import { WarehouseDrawer } from './components/WarehouseDrawer';
 import { TransfersTab } from './components/TransfersTab';
 import { TransferDrawer } from './components/TransferDrawer';
 import { TransactionsTab } from './components/TransactionsTab';
+import { format } from 'date-fns';
+import { fetchAllInventoryItems } from '@/hooks/api/use-inventory';
+import { downloadCsv } from '@/lib/download-csv';
+import { getApiErrorMessage } from '@/lib/api/errors';
 
 // Analytics is chart-heavy and sits behind a tab, so load it on demand.
 const AnalyticsTab = dynamic(
@@ -41,6 +45,31 @@ export default function InventoryPage(): React.ReactElement {
   const [warehouseDrawerOpen, setWarehouseDrawerOpen] = useState(false);
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(null);
   const [transferDrawerOpen, setTransferDrawerOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport(): Promise<void> {
+    setExporting(true);
+    try {
+      const items = await fetchAllInventoryItems();
+      if (items.length === 0) {
+        toast.error('No stock to export yet');
+        return;
+      }
+      downloadCsv(
+        `inventory_${format(new Date(), 'yyyy-MM-dd')}.csv`,
+        ['Material', 'SKU', 'Store', 'Category', 'Unit', 'On hand', 'Reserved', 'Available', 'Incoming', 'Reorder level', 'Unit cost (INR)', 'Value (INR)', 'Status'],
+        items.map((item) => [
+          item.materialName, item.sku, item.warehouseName, item.categoryName, item.unit, item.quantity, item.reserved,
+          item.available, item.incoming, item.reorderLevel, item.unitCost, item.value, item.status,
+        ]),
+      );
+      toast.success(`Exported ${items.length} stock lines`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Couldn't export inventory. Try again."));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   function handleSelectItem(itemId: string): void {
     setSelectedItemId(itemId);
@@ -72,8 +101,8 @@ export default function InventoryPage(): React.ReactElement {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => toast.success('Inventory export started (demo)')}>
-            <Download className="mr-1.5 h-4 w-4" /> Export
+          <Button variant="outline" onClick={handleExport} disabled={exporting}>
+            <Download className="mr-1.5 h-4 w-4" /> {exporting ? 'Exporting…' : 'Export'}
           </Button>
         </div>
       </motion.div>

@@ -3,6 +3,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AttendanceRecordView, AttendanceRoster, AttendanceService } from './attendance.service';
 import { AttendanceDateQueryDto, MarkAttendanceDto, WorkerShiftEventDto } from './dto/attendance.dto';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { Audit } from '../../common/audit';
 
 interface AuthUser {
   id: string;
@@ -11,7 +13,7 @@ interface AuthUser {
 }
 
 @Controller('projects/:projectId/attendance')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
@@ -24,6 +26,8 @@ export class AttendanceController {
     return this.attendanceService.getRoster(user.organizationId, projectId, query.date);
   }
 
+  @RequirePermission('attendance.mark')
+  @Audit('attendance.marked')
   @Put()
   markAttendance(
     @Param('projectId') projectId: string,
@@ -33,6 +37,8 @@ export class AttendanceController {
     return this.attendanceService.markAttendance(user.organizationId, projectId, user.id, dto);
   }
 
+  @RequirePermission('attendance.mark')
+  @Audit('attendance.checked_in')
   @Post('check-in')
   checkIn(
     @Param('projectId') projectId: string,
@@ -42,6 +48,8 @@ export class AttendanceController {
     return this.attendanceService.checkIn(user.organizationId, projectId, user.id, dto.workerId);
   }
 
+  @RequirePermission('attendance.mark')
+  @Audit('attendance.checked_out')
   @Post('check-out')
   checkOut(
     @Param('projectId') projectId: string,

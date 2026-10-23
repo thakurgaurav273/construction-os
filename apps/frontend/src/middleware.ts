@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const PUBLIC_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/invite'];
+const PUBLIC_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/accept-invitation'];
 const AUTH_ROUTES = ['/login', '/register'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get('access_token')?.value;
+  // The access cookie lasts 15 minutes; the session cookie marks a refreshable session in between.
+  const token = request.cookies.get('access_token')?.value ?? request.cookies.get('sp_session')?.value;
 
   const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
   const isAuthRoute = AUTH_ROUTES.some((route) => pathname.startsWith(route));

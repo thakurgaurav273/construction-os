@@ -6,7 +6,7 @@ import {
   Sheet, SheetContent, SheetTitle,
 } from '@sitepilot/ui';
 import {
-  Warehouse, X, MapPin, User, Package, Layers, AlertTriangle,
+  Warehouse, X, MapPin, User, Package, AlertTriangle,
   ArrowDownLeft, ArrowUpRight,
 } from 'lucide-react';
 import {
@@ -15,6 +15,9 @@ import {
 import { formatNumber, formatRelativeTime } from '@/lib/utils';
 import { formatCompactINR, formatWarehouseType, getTxMeta } from './inventory-format';
 import { InventoryStatusBadge } from './InventoryStatusBadge';
+import { WarehouseDrawerActions } from './WarehouseDrawerActions';
+import { WarehouseLocationsCard } from '@/features/inventory/components/WarehouseLocationsCard';
+import { useCan } from '@/hooks/api/use-access';
 
 interface WarehouseDrawerProps {
   warehouseId: string | null;
@@ -69,8 +72,9 @@ function MovementList({
   );
 }
 
-function WarehouseDrawerBody({ warehouse }: { warehouse: WarehouseDetail }): React.ReactElement {
+function WarehouseDrawerBody({ warehouse, onClose }: { warehouse: WarehouseDetail; onClose: () => void }): React.ReactElement {
   const { kpis } = warehouse;
+  const canManage = useCan()('warehouse.manage');
   return (
     <>
       {/* Hero */}
@@ -116,21 +120,7 @@ function WarehouseDrawerBody({ warehouse }: { warehouse: WarehouseDetail }): Rea
             <Progress value={kpis.utilization} className="h-2" />
           )}
 
-          {/* Locations */}
-          {warehouse.locations.length > 0 && (
-            <div className="rounded-xl border bg-card p-4">
-              <h4 className="text-sm font-semibold flex items-center gap-1.5 mb-3">
-                <Layers className="h-4 w-4 text-muted-foreground" /> Bin Locations
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {warehouse.locations.map((loc) => (
-                  <Badge key={loc.id} variant="outline" className="text-xs">
-                    {loc.code}{loc.zone ? ` · ${loc.zone}` : ''}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
+          <WarehouseLocationsCard warehouse={warehouse} canManage={canManage} />
 
           {/* Items */}
           <div className="rounded-xl border bg-card p-4">
@@ -163,6 +153,7 @@ function WarehouseDrawerBody({ warehouse }: { warehouse: WarehouseDetail }): Rea
           </div>
         </div>
       </ScrollArea>
+      {canManage && <WarehouseDrawerActions warehouse={warehouse} onArchived={onClose} />}
     </>
   );
 }
@@ -198,7 +189,7 @@ export function WarehouseDrawer({ warehouseId, open, onClose }: WarehouseDrawerP
             <Skeleton className="h-40 w-full rounded-xl" />
           </div>
         ) : (
-          <WarehouseDrawerBody warehouse={warehouse} />
+          <WarehouseDrawerBody warehouse={warehouse} onClose={onClose} />
         )}
       </SheetContent>
     </Sheet>

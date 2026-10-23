@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import {
   Activity as ActivityIcon,
@@ -11,7 +10,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Card, CardContent, Button, Skeleton } from '@sitepilot/ui';
+import { Card, CardContent, Skeleton } from '@sitepilot/ui';
 import { useProject } from '@/hooks/api/use-projects';
 import { formatRelativeTime } from '@/lib/utils';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -33,9 +32,9 @@ export default function ProjectTimelinePage({ params }: { params: { id: string }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div>
         <h3 className="text-xl font-semibold tracking-tight">Activity Timeline</h3>
-        <Button variant="outline">Export</Button>
+        <p className="text-sm text-muted-foreground">The latest changes on this project. The full history is in Settings → Audit Logs.</p>
       </div>
 
       {isLoading ? (

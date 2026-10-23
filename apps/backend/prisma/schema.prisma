@@ -97,11 +97,27 @@ model User {
   dailyReports         DailyReport[]      @relation("DailyReportAuthor")
   reviewedDailyReports DailyReport[]      @relation("DailyReportReviewer")
   markedAttendance     Attendance[]
+  requestedPurchaseOrders PurchaseOrder[] @relation("PurchaseOrderRequester")
+  reviewedPurchaseOrders  PurchaseOrder[] @relation("PurchaseOrderReviewer")
+  createdRfqs             Rfq[]           @relation("RfqCreator")
+  receivedDeliveries      Delivery[]      @relation("DeliveryReceiver")
+  createdInvoices         Invoice[]       @relation("InvoiceCreator")
+  reviewedInvoices        Invoice[]       @relation("InvoiceReviewer")
+  requestedPayments       Payment[]       @relation("PaymentRequester")
+  reviewedPayments        Payment[]       @relation("PaymentReviewer")
   documents            Document[]
   activities           Activity[]
   notifications        Notification[]
   refreshTokens        RefreshToken[]
+  passwordResetTokens  PasswordResetToken[]
   invitations          Invitation[]       @relation("InvitedBy")
+  materialIssues       MaterialIssue[]
+  transfersRequested   StockTransfer[]    @relation("TransferRequestedBy")
+  transfersApproved    StockTransfer[]    @relation("TransferApprovedBy")
+  transfersCompleted   StockTransfer[]    @relation("TransferCompletedBy")
+  stockAdjustments     StockAdjustment[]
+  notificationPreferences NotificationPreference[]
+  aiAccessRequests        AiAccessRequest[]   @relation("AiAccessRequester")
 
   @@map("users")
 }
@@ -111,6 +127,8 @@ model Organization {
   name      String
   slug      String   @unique
   logo      String?
+  /// Brand colour as #RRGGBB, applied to buttons, links and highlights. Null means the default SitePilot theme.
+  brandColor String?
   address   String?
   gstNumber String?
   currency  String   @default("INR")
@@ -152,6 +170,14 @@ model Organization {
   reports               Report[]
   generatedReports      GeneratedReport[]
   reportSchedules       ReportSchedule[]
+  materialIssues        MaterialIssue[]
+  auditLogs             AuditLog[]
+  notificationPreferences NotificationPreference[]
+  aiCredentials           AiCredential[]
+  aiSetting               AiOrgSetting?
+  aiAccessRequests        AiAccessRequest[]
+  aiUsage                 AiUsage[]
+  aiInsightSnapshots      AiInsightSnapshot[]
 
   @@map("organizations")
 }
@@ -187,6 +213,45 @@ model RefreshToken {
   @@index([userId])
   @@index([token])
   @@map("refresh_tokens")
+}
+
+/// Append-only record of who did what. A database trigger rejects every UPDATE and DELETE.
+/// The actor is a snapshot (id + name), not a foreign key, so entries outlive the user who made them.
+model AuditLog {
+  id             String   @id @default(uuid())
+  action         String
+  entityType     String
+  entityId       String?
+  projectId      String?
+  actorId        String?
+  actorName      String
+  metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, actorId])
+  @@map("audit_logs")
+}
+
+/// One-time link for setting a new password. Only the SHA-256 hash of the token is stored.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model Invitation {
@@ -225,6 +290,10 @@ model Project {
   startDate          DateTime?
   expectedCompletion DateTime?
   actualCompletion   DateTime?
+  /// Status to return to when an archived project is restored.
+  archivedFromStatus ProjectStatus?
+  archivedAt         DateTime?
+  deletedById        String?
   organizationId     String
   createdById        String
   createdAt          DateTime        @default(now())
@@ -250,6 +319,7 @@ model Project {
   budgetItems           BudgetItem[]
   cashFlowEntries       CashFlowEntry[]
   generatedReports      GeneratedReport[]
+  materialIssues        MaterialIssue[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -373,6 +443,12 @@ model Notification {
   title          String
   message        String
   read           Boolean          @default(false)
+  /// Preference group, e.g. "approvals" or "decisions".
+  category       String           @default("general")
+  /// Event that caused it, e.g. "purchase_order.approved".
+  event          String?
+  /// In-app path to open, e.g. "/dashboard/procurement".
+  link           String?
   entityType     String?
   entityId       String?
   userId         String
@@ -383,8 +459,26 @@ model Notification {
   organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([userId, read])
+  @@index([userId, organizationId, createdAt])
   @@index([organizationId])
   @@map("notifications")
+}
+
+/// A member's delivery choice for one notification category. Missing rows mean the category's defaults.
+model NotificationPreference {
+  id             String   @id @default(uuid())
+  userId         String
+  organizationId String
+  category       String
+  inApp          Boolean  @default(true)
+  email          Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId, category])
+  @@map("notification_preferences")
 }
 
 // ─── Workforce ───────────────────────────────────────────────────────────────
@@ -527,6 +621,8 @@ model Material {
   inventoryTransactions InventoryTransaction[]
   stockTransferItems    StockTransferItem[]
   stockAdjustments      StockAdjustment[]
+  poLineItems           PoLineItem[]
+  materialIssues        MaterialIssue[]
 
   @@unique([sku, organizationId])
   @@index([organizationId])
@@ -578,6 +674,41 @@ model MaterialProjectUsage {
   @@index([materialId])
   @@index([projectId])
   @@map("material_project_usages")
+}
+
+enum MaterialIssueType {
+  ISSUE
+  RETURN
+}
+
+/// A material issue note (stock leaving a store for a project site) or a return note (unused stock coming back).
+model MaterialIssue {
+  id             String            @id @default(uuid())
+  code           String
+  type           MaterialIssueType
+  quantity       Decimal           @db.Decimal(15, 3)
+  /// Carrying cost per unit when the stock moved, so issued value stays fixed if the average cost later changes.
+  unitCost       Decimal           @db.Decimal(15, 2)
+  note           String?
+  issuedOn       DateTime
+  materialId     String
+  warehouseId    String
+  projectId      String
+  issuedById     String
+  organizationId String
+  createdAt      DateTime          @default(now())
+
+  material     Material     @relation(fields: [materialId], references: [id])
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
+  project      Project      @relation(fields: [projectId], references: [id])
+  issuedBy     User         @relation(fields: [issuedById], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([code, organizationId])
+  @@index([organizationId])
+  @@index([projectId, issuedOn])
+  @@index([materialId])
+  @@map("material_issues")
 }
 
 // ─── Inventory ───────────────────────────────────────────────────────────────
@@ -647,6 +778,8 @@ model Warehouse {
   adjustments   StockAdjustment[]
   transfersFrom StockTransfer[]        @relation("TransferFrom")
   transfersTo   StockTransfer[]        @relation("TransferTo")
+  deliveries    Delivery[]
+  materialIssues MaterialIssue[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -669,6 +802,7 @@ model WarehouseLocation {
   organization Organization    @relation(fields: [organizationId], references: [id])
   items        InventoryItem[]
 
+  @@unique([warehouseId, code])
   @@index([warehouseId])
   @@index([organizationId])
   @@map("warehouse_locations")
@@ -741,8 +875,11 @@ model StockTransfer {
   fromWarehouseId String
   toWarehouseId   String
   note            String?
-  requestedBy     String?
-  approvedBy      String?
+  /// Why the transfer was rejected or cancelled.
+  reviewNote      String?
+  requestedById   String
+  approvedById    String?
+  completedById   String?
   organizationId  String
   createdAt       DateTime            @default(now())
   approvedAt      DateTime?
@@ -751,6 +888,9 @@ model StockTransfer {
 
   fromWarehouse Warehouse              @relation("TransferFrom", fields: [fromWarehouseId], references: [id])
   toWarehouse   Warehouse              @relation("TransferTo", fields: [toWarehouseId], references: [id])
+  requestedBy   User                   @relation("TransferRequestedBy", fields: [requestedById], references: [id])
+  approvedBy    User?                  @relation("TransferApprovedBy", fields: [approvedById], references: [id])
+  completedBy   User?                  @relation("TransferCompletedBy", fields: [completedById], references: [id])
   organization  Organization           @relation(fields: [organizationId], references: [id])
   items         StockTransferItem[]
   transactions  InventoryTransaction[]
@@ -786,7 +926,7 @@ model StockAdjustment {
   quantityAfter   Decimal               @db.Decimal(15, 3)
   delta           Decimal               @db.Decimal(15, 3)
   note            String?
-  adjustedBy      String?
+  adjustedById    String
   inventoryItemId String
   materialId      String
   warehouseId     String
@@ -796,6 +936,7 @@ model StockAdjustment {
   inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
   material      Material      @relation(fields: [materialId], references: [id])
   warehouse     Warehouse     @relation(fields: [warehouseId], references: [id])
+  adjustedBy    User          @relation(fields: [adjustedById], references: [id])
   organization  Organization  @relation(fields: [organizationId], references: [id])
 
   @@unique([code, organizationId])
@@ -838,36 +979,77 @@ model InventoryAudit {
   @@map("inventory_audits")
 }
 
+enum VendorStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProcurementPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/// DRAFT → PENDING → APPROVED | REJECTED | CHANGES_REQUESTED (→ edit → PENDING). Open orders can be CANCELLED.
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING
+  CHANGES_REQUESTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum RfqStatus {
+  OPEN
+  EVALUATING
+  AWARDED
+  CANCELLED
+}
+
+enum RfqInvitationStatus {
+  INVITED
+  QUOTED
+  DECLINED
+}
+
+enum DeliveryStatus {
+  SCHEDULED
+  IN_TRANSIT
+  RECEIVED
+  CANCELLED
+}
+
 model Vendor {
-  id                    String    @id @default(uuid())
-  name                  String
-  code                  String
-  categories            String[]
-  status                String    @default("active")
-  rating                Float     @default(0)
-  performanceScore      Float     @default(0)
-  onTimeDeliveryPercent Float     @default(0)
-  deliveryAccuracy      Float     @default(0)
-  qualityRating         Float     @default(0)
-  responseTimeHours     Float     @default(0)
-  projectCount          Int       @default(0)
-  totalOrders           Int       @default(0)
-  outstandingBalance    Decimal   @default(0) @db.Decimal(15, 2)
-  lastOrderDate         DateTime?
-  contactPerson         String?
-  phone                 String?
-  email                 String?
-  gstNumber             String?
-  paymentTerms          String?
-  city                  String?
-  state                 String?
-  aiRecommendation      String?
-  organizationId        String
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id                 String       @id @default(uuid())
+  name               String
+  code               String
+  categories         String[]
+  status             VendorStatus @default(ACTIVE)
+  rating             Float        @default(0)
+  performanceScore   Float        @default(0)
+  deliveryAccuracy   Float        @default(0)
+  qualityRating      Float        @default(0)
+  responseTimeHours  Float        @default(0)
+  contactPerson      String?
+  phone              String?
+  email              String?
+  gstNumber          String?
+  paymentTerms       String?
+  city               String?
+  state              String?
+  aiRecommendation   String?
+  organizationId     String
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   organization   Organization    @relation(fields: [organizationId], references: [id])
   purchaseOrders PurchaseOrder[]
+  rfqInvitations RfqInvitation[]
+  awardedRfqs    Rfq[]           @relation("RfqAwardedVendor")
+  invoices       Invoice[]
+  payments       Payment[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -875,63 +1057,81 @@ model Vendor {
 }
 
 model PurchaseOrder {
-  id               String   @id @default(uuid())
+  id               String              @id @default(uuid())
   poNumber         String
   category         String
-  createdBy        String
-  approver         String
-  requestedDate    DateTime @default(now())
+  status           PurchaseOrderStatus @default(DRAFT)
+  priority         ProcurementPriority @default(MEDIUM)
+  requestedDate    DateTime            @default(now())
   expectedDelivery DateTime
-  amount           Decimal  @default(0) @db.Decimal(15, 2)
-  approvalStatus   String   @default("pending")
-  deliveryStatus   String   @default("not_started")
-  priority         String   @default("medium")
-  deliveryAddress  String   @default("")
-  notes            String   @default("")
+  amount           Decimal             @default(0) @db.Decimal(15, 2)
+  deliveryAddress  String              @default("")
+  notes            String              @default("")
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+  reviewNote       String?
+  requestedById    String?
+  reviewedById     String?
   projectId        String?
   vendorId         String?
   organizationId   String
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
-  organization Organization      @relation(fields: [organizationId], references: [id])
-  project      Project?          @relation(fields: [projectId], references: [id])
-  vendor       Vendor?           @relation(fields: [vendorId], references: [id])
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  project      Project?         @relation(fields: [projectId], references: [id])
+  vendor       Vendor?          @relation(fields: [vendorId], references: [id])
+  requestedBy  User?            @relation("PurchaseOrderRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewedBy   User?            @relation("PurchaseOrderReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   items        PoLineItem[]
   timeline     PoApprovalStep[]
+  deliveries   Delivery[]
+  sourceRfq    Rfq?             @relation("RfqPurchaseOrder")
+  invoices     Invoice[]
 
   @@unique([poNumber, organizationId])
   @@index([organizationId])
+  @@index([organizationId, status])
   @@index([projectId])
+  @@index([vendorId])
   @@map("purchase_orders")
 }
 
 model PoLineItem {
-  id              String  @id @default(uuid())
-  purchaseOrderId String
-  description     String
-  category        String
-  unit            String
-  quantity        Decimal @default(0) @db.Decimal(15, 3)
-  rate            Decimal @default(0) @db.Decimal(15, 2)
-  taxPercent      Float   @default(0)
-  discountPercent Float   @default(0)
-  sortOrder       Int     @default(0)
+  id               String  @id @default(uuid())
+  purchaseOrderId  String
+  description      String
+  category         String
+  unit             String
+  quantity         Decimal @default(0) @db.Decimal(15, 3)
+  rate             Decimal @default(0) @db.Decimal(15, 2)
+  taxPercent       Float   @default(0)
+  discountPercent  Float   @default(0)
+  /// Running total of goods received against this line across all GRNs.
+  receivedQuantity Decimal @default(0) @db.Decimal(15, 3)
+  sortOrder        Int     @default(0)
+  /// Catalogue material this line buys; receipts of linked lines are posted to stock. Null for services and hire.
+  materialId       String?
 
-  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrder PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  material      Material?      @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  deliveryItems DeliveryItem[]
+  invoiceItems  InvoiceItem[]
 
   @@index([purchaseOrderId])
+  @@index([materialId])
   @@map("po_line_items")
 }
 
+/// Append-only history of a purchase order: one row per lifecycle event.
 model PoApprovalStep {
-  id              String    @id @default(uuid())
+  id              String   @id @default(uuid())
   purchaseOrderId String
   stage           String
   actor           String
-  date            DateTime?
-  note            String    @default("")
-  sortOrder       Int       @default(0)
+  date            DateTime @default(now())
+  note            String   @default("")
+  sortOrder       Int      @default(0)
 
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 
@@ -940,61 +1140,143 @@ model PoApprovalStep {
 }
 
 model Rfq {
-  id                String   @id @default(uuid())
-  rfqNumber         String
-  title             String
-  category          String
-  vendorsInvited    Int      @default(0)
-  responsesReceived Int      @default(0)
-  issuedDate        DateTime @default(now())
-  closingDate       DateTime
-  status            String   @default("open")
-  priority          String   @default("medium")
-  estimatedValue    Decimal  @default(0) @db.Decimal(15, 2)
-  createdBy         String
-  projectId         String?
-  organizationId    String
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String              @id @default(uuid())
+  rfqNumber       String
+  title           String
+  description     String?
+  category        String
+  status          RfqStatus           @default(OPEN)
+  priority        ProcurementPriority @default(MEDIUM)
+  issuedDate      DateTime            @default(now())
+  closingDate     DateTime
+  estimatedValue  Decimal             @default(0) @db.Decimal(15, 2)
+  awardedAt       DateTime?
+  createdById     String?
+  awardedVendorId String?
+  purchaseOrderId String?             @unique
+  projectId       String?
+  organizationId  String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  project      Project?     @relation(fields: [projectId], references: [id])
+  organization  Organization    @relation(fields: [organizationId], references: [id])
+  project       Project?        @relation(fields: [projectId], references: [id])
+  createdBy     User?           @relation("RfqCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  awardedVendor Vendor?         @relation("RfqAwardedVendor", fields: [awardedVendorId], references: [id])
+  purchaseOrder PurchaseOrder?  @relation("RfqPurchaseOrder", fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  items         RfqItem[]
+  invitations   RfqInvitation[]
 
   @@unique([rfqNumber, organizationId])
   @@index([organizationId])
   @@map("rfqs")
 }
 
+model RfqItem {
+  id          String  @id @default(uuid())
+  rfqId       String
+  description String
+  unit        String
+  quantity    Decimal @db.Decimal(15, 3)
+  sortOrder   Int     @default(0)
+
+  rfq        Rfq            @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  quoteItems RfqQuoteItem[]
+
+  @@index([rfqId])
+  @@map("rfq_items")
+}
+
+/// A vendor invited to an RFQ, carrying the vendor's quote once it is recorded.
+model RfqInvitation {
+  id           String              @id @default(uuid())
+  rfqId        String
+  vendorId     String
+  status       RfqInvitationStatus @default(INVITED)
+  invitedAt    DateTime            @default(now())
+  respondedAt  DateTime?
+  leadTimeDays Int?
+  validUntil   DateTime?
+  taxPercent   Float               @default(0)
+  /// Quote grand total including tax, stored for sorting and comparison.
+  quotedAmount Decimal?            @db.Decimal(15, 2)
+  notes        String?
+
+  rfq        Rfq            @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendor     Vendor         @relation(fields: [vendorId], references: [id])
+  quoteItems RfqQuoteItem[]
+
+  @@unique([rfqId, vendorId])
+  @@index([vendorId])
+  @@map("rfq_invitations")
+}
+
+model RfqQuoteItem {
+  id           String  @id @default(uuid())
+  invitationId String
+  rfqItemId    String
+  rate         Decimal @db.Decimal(15, 2)
+
+  invitation RfqInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  rfqItem    RfqItem       @relation(fields: [rfqItemId], references: [id], onDelete: Cascade)
+
+  @@unique([invitationId, rfqItemId])
+  @@map("rfq_quote_items")
+}
+
+/// A shipment against a purchase order. Receiving it records a GRN with per-line quantities.
 model Delivery {
-  id             String    @id @default(uuid())
-  poNumber       String
-  vendorName     String
-  projectName    String
-  category       String
-  status         String    @default("pending")
-  scheduledDate  DateTime
-  actualDate     DateTime?
-  itemSummary    String    @default("")
-  delayDays      Int       @default(0)
-  trackingId     String    @default("")
-  organizationId String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id              String         @id @default(uuid())
+  grnNumber       String?
+  purchaseOrderId String
+  status          DeliveryStatus @default(SCHEDULED)
+  scheduledDate   DateTime
+  receivedAt      DateTime?
+  trackingId      String?
+  notes           String?
+  receivedById    String?
+  /// Store the received goods were posted into (null when nothing on the GRN is a stocked material).
+  warehouseId     String?
+  organizationId  String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  purchaseOrder PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id])
+  warehouse     Warehouse?     @relation(fields: [warehouseId], references: [id])
+  receivedBy    User?          @relation("DeliveryReceiver", fields: [receivedById], references: [id], onDelete: SetNull)
+  items         DeliveryItem[]
 
+  @@unique([grnNumber, organizationId])
   @@index([organizationId])
+  @@index([purchaseOrderId])
   @@map("deliveries")
+}
+
+model DeliveryItem {
+  id           String  @id @default(uuid())
+  deliveryId   String
+  poLineItemId String
+  quantity     Decimal @db.Decimal(15, 3)
+
+  delivery   Delivery   @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  poLineItem PoLineItem @relation(fields: [poLineItemId], references: [id])
+
+  @@index([deliveryId])
+  @@index([poLineItemId])
+  @@map("delivery_items")
 }
 
 // ─── Finance ─────────────────────────────────────────────────────────────────
 
+/// Vendor bills (payables): DRAFT → PENDING_APPROVAL → APPROVED → PARTIALLY_PAID → PAID, or REJECTED. Overdue is derived from dueDate.
 enum InvoiceStatus {
   DRAFT
-  SENT
+  PENDING_APPROVAL
   APPROVED
+  PARTIALLY_PAID
   PAID
-  OVERDUE
+  REJECTED
   CANCELLED
 }
 
@@ -1007,41 +1289,77 @@ enum PaymentStatus {
 }
 
 model Invoice {
-  id             String        @id @default(uuid())
-  invoiceNumber  String
-  vendorName     String
-  vendorId       String?
-  projectId      String?
-  organizationId String
-  category       String        @default("General")
-  description    String        @default("")
-  amount         Decimal       @default(0) @db.Decimal(15, 2)
-  taxAmount      Decimal       @default(0) @db.Decimal(15, 2)
-  totalAmount    Decimal       @default(0) @db.Decimal(15, 2)
-  status         InvoiceStatus @default(DRAFT)
-  issuedDate     DateTime      @default(now())
-  dueDate        DateTime
-  paidDate       DateTime?
-  notes          String        @default("")
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id              String        @id @default(uuid())
+  /// The vendor's own bill number, unique per vendor within an organization.
+  invoiceNumber   String
+  vendorName      String
+  vendorId        String?
+  purchaseOrderId String?
+  projectId       String?
+  organizationId  String
+  category        String        @default("General")
+  description     String        @default("")
+  amount          Decimal       @default(0) @db.Decimal(15, 2)
+  taxAmount       Decimal       @default(0) @db.Decimal(15, 2)
+  totalAmount     Decimal       @default(0) @db.Decimal(15, 2)
+  status          InvoiceStatus @default(DRAFT)
+  issuedDate      DateTime      @default(now())
+  dueDate         DateTime
+  paidDate        DateTime?
+  notes           String        @default("")
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  reviewNote      String?
+  createdById     String?
+  reviewedById    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  project      Project?     @relation(fields: [projectId], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id])
-  payments     Payment[]
+  project       Project?       @relation(fields: [projectId], references: [id])
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  vendor        Vendor?        @relation(fields: [vendorId], references: [id])
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  createdBy     User?          @relation("InvoiceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  reviewedBy    User?          @relation("InvoiceReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  items         InvoiceItem[]
+  payments      Payment[]
 
-  @@unique([invoiceNumber, organizationId])
+  @@unique([organizationId, vendorName, invoiceNumber])
   @@index([organizationId])
+  @@index([organizationId, status])
   @@index([projectId])
-  @@index([status])
+  @@index([vendorId])
+  @@index([purchaseOrderId])
   @@map("invoices")
 }
 
+model InvoiceItem {
+  id           String  @id @default(uuid())
+  invoiceId    String
+  /// Set when the line bills goods from a purchase order; drives the 3-way match.
+  poLineItemId String?
+  description  String
+  unit         String
+  quantity     Decimal @db.Decimal(15, 3)
+  rate         Decimal @db.Decimal(15, 2)
+  taxPercent   Float   @default(0)
+  sortOrder    Int     @default(0)
+
+  invoice    Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  poLineItem PoLineItem? @relation(fields: [poLineItemId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId])
+  @@index([poLineItemId])
+  @@map("invoice_items")
+}
+
+/// PENDING → APPROVED → PAID, or REJECTED / CANCELLED. Paid payments roll up into the invoice status.
 model Payment {
   id             String        @id @default(uuid())
   paymentNumber  String
   invoiceId      String?
   vendorName     String
+  vendorId       String?
   projectId      String?
   organizationId String
   category       String        @default("General")
@@ -1051,19 +1369,27 @@ model Payment {
   reference      String        @default("")
   paidDate       DateTime?
   dueDate        DateTime
-  approvedBy     String?
   notes          String        @default("")
+  requestedById  String?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  reviewNote     String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   invoice      Invoice?     @relation(fields: [invoiceId], references: [id])
+  vendor       Vendor?      @relation(fields: [vendorId], references: [id])
   project      Project?     @relation(fields: [projectId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
+  requestedBy  User?        @relation("PaymentRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewedBy   User?        @relation("PaymentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@unique([paymentNumber, organizationId])
   @@index([organizationId])
   @@index([projectId])
   @@index([status])
+  @@index([invoiceId])
+  @@index([vendorId])
   @@map("payments")
 }
 
@@ -1124,21 +1450,6 @@ model PushDevice {
   @@map("push_devices")
 }
 
-model NotificationPreference {
-  userId              String  @id
-  checkIns            Boolean @default(true)
-  checkInBlockers     Boolean @default(true)
-  reviews             Boolean @default(true)
-  recognition         Boolean @default(true)
-  goals               Boolean @default(true)
-  systemAnnouncements Boolean @default(true)
-  workspace           Boolean @default(true)
-  weeklyDigest        Boolean @default(true)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  @@map("notification_preferences")
-}
 // ─── Reports ───────────────────────────────────────────────────────────────────
 
 model Report {
@@ -1215,4 +1526,137 @@ model ReportSchedule {
   @@index([organizationId])
   @@index([nextRunAt])
   @@map("report_schedules")
+}
+// ─── AI ──────────────────────────────────────────────────────────────────────
+
+enum AiProvider {
+  GEMINI
+  GROQ
+  HUGGINGFACE
+}
+
+/// Where the key for a call came from: the tenant's own key, or the platform's key under an approved trial/top-up.
+enum AiKeySource {
+  ORGANIZATION
+  PLATFORM
+}
+
+enum AiAccessRequestKind {
+  TRIAL
+  TOP_UP
+}
+
+enum AiAccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// A tenant's own provider key, encrypted with AI_KEYS_ENCRYPTION_KEY. Only the last four characters are ever shown.
+model AiCredential {
+  id             String     @id @default(uuid())
+  organizationId String
+  provider       AiProvider
+  encryptedKey   String
+  keyHint        String
+  model          String
+  lastVerifiedAt DateTime?
+  createdById    String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider])
+  @@map("ai_credentials")
+}
+
+/// Which of its own keys a tenant uses. Without one, the tenant can only use AI under an approved platform allowance.
+model AiOrgSetting {
+  organizationId String      @id
+  activeProvider AiProvider?
+  updatedAt      DateTime    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("ai_org_settings")
+}
+
+/// The platform's own keys, managed by platform super admins and used for approved trials and top-ups.
+model PlatformAiCredential {
+  provider       AiProvider @id
+  encryptedKey   String
+  keyHint        String
+  model          String
+  isDefault      Boolean    @default(false)
+  lastVerifiedAt DateTime?
+  updatedByEmail String
+  updatedAt      DateTime   @updatedAt
+
+  @@map("platform_ai_credentials")
+}
+
+/// A tenant asking to use the platform's AI: a first free trial, or more requests afterwards.
+model AiAccessRequest {
+  id                String                @id @default(uuid())
+  organizationId    String
+  kind              AiAccessRequestKind
+  status            AiAccessRequestStatus @default(PENDING)
+  requestedRequests Int
+  reason            String?
+  requestedById     String
+  createdAt         DateTime              @default(now())
+  decidedByEmail    String?
+  decidedAt         DateTime?
+  decisionNote      String?
+  grantedRequests   Int?
+  startsAt          DateTime?
+  expiresAt         DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestedBy  User         @relation("AiAccessRequester", fields: [requestedById], references: [id])
+
+  @@index([status, createdAt])
+  @@index([organizationId, status])
+  @@map("ai_access_requests")
+}
+
+/// One row per AI call, successful or not. Platform-funded calls count against the tenant's allowance.
+model AiUsage {
+  id               String      @id @default(uuid())
+  organizationId   String
+  userId           String
+  feature          String
+  provider         AiProvider
+  model            String
+  source           AiKeySource
+  success          Boolean
+  errorCode        String?
+  promptTokens     Int?
+  completionTokens Int?
+  latencyMs        Int?
+  createdAt        DateTime    @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, source, success, createdAt])
+  @@map("ai_usage")
+}
+
+/// Cached AI Command Center insights, so the page doesn't spend tokens on every visit.
+model AiInsightSnapshot {
+  id             String     @id @default(uuid())
+  organizationId String
+  content        Json
+  provider       AiProvider
+  model          String
+  generatedById  String
+  createdAt      DateTime   @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("ai_insight_snapshots")
 }

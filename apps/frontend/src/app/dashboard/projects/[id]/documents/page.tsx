@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@sitepilot/ui';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@sitepilot/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sitepilot/ui';
 import { useDocuments, useUploadDocument, useDeleteDocument, useDocumentDownloadUrl, type ProjectDocument } from '@/hooks/api/use-documents';
+import { Can } from '@/components/shared/Can';
 
 const categories = ['All Documents', 'pdf', 'doc', 'image', 'file'];
 const categoryLabels: Record<string, string> = { pdf: 'PDF', doc: 'Document', image: 'Image', file: 'Other' };
@@ -93,10 +94,12 @@ export default function DocumentsPage({ params }: { params: { id: string } }) {
           <p className="text-muted-foreground">Manage and track all project documentation.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={handleUploadClick} disabled={uploadMutation.isPending}>
-            <Upload className="mr-2 h-4 w-4" />
-            {uploadMutation.isPending ? 'Uploading…' : 'Upload'}
-          </Button>
+          <Can permission="document.upload">
+            <Button onClick={handleUploadClick} disabled={uploadMutation.isPending}>
+              <Upload className="mr-2 h-4 w-4" />
+              {uploadMutation.isPending ? 'Uploading…' : 'Upload'}
+            </Button>
+          </Can>
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
         </div>
       </div>
@@ -147,7 +150,7 @@ export default function DocumentsPage({ params }: { params: { id: string } }) {
               <FileArchive className="h-12 w-12 mb-4 text-primary/30" />
               <h3 className="font-semibold text-lg text-foreground mb-1">No documents yet</h3>
               <p className="text-sm text-center mb-4">Upload your first document using the Upload button above.</p>
-              <Button variant="outline" onClick={handleUploadClick}><Upload className="mr-2 h-4 w-4" /> Upload Document</Button>
+              <Can permission="document.upload"><Button variant="outline" onClick={handleUploadClick}><Upload className="mr-2 h-4 w-4" /> Upload Document</Button></Can>
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -193,7 +196,7 @@ export default function DocumentsPage({ params }: { params: { id: string } }) {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => handleDownload(doc)}><Download className="mr-2 h-4 w-4" /> Download</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(doc)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                            <Can permission="document.delete"><DropdownMenuItem className="text-destructive" onClick={() => handleDelete(doc)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem></Can>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </td>
@@ -224,9 +227,11 @@ export default function DocumentsPage({ params }: { params: { id: string } }) {
                   <Button className="flex-1" onClick={() => handleDownload(selectedDoc)} disabled={downloadMutation.isPending}>
                     <Download className="mr-2 h-4 w-4" /> Download
                   </Button>
-                  <Button className="flex-1" variant="destructive" onClick={() => handleDelete(selectedDoc)} disabled={deleteMutation.isPending}>
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                  </Button>
+                  <Can permission="document.delete">
+                    <Button className="flex-1" variant="destructive" onClick={() => handleDelete(selectedDoc)} disabled={deleteMutation.isPending}>
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </Button>
+                  </Can>
                 </div>
               </div>
               <div className="p-6 space-y-4 overflow-y-auto">

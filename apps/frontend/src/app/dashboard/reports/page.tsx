@@ -24,6 +24,7 @@ import {
   type ReportSchedule,
   type ReportTemplate,
 } from '@/hooks/api/use-reports';
+import { Can } from '@/components/shared/Can';
 
 const iconMap: Record<string, React.ElementType> = {
   LayoutDashboard, PieChart, Users, BarChart3, ShoppingCart, Package, Wallet, ShieldAlert,
@@ -151,14 +152,19 @@ export default function ReportsPage() {
                     <CardDescription className="h-10">{template.description}</CardDescription>
                   </CardHeader>
                   <CardContent className="flex-1 flex items-end">
-                    <div className="w-full flex gap-2 pt-4 border-t">
-                      <Button variant="outline" className="flex-1" onClick={() => handleGenerate(template)} disabled={generateMutation.isPending}>
-                        {generateMutation.isPending ? 'Generating...' : 'Generate'}
-                      </Button>
-                      <Button variant="outline" size="icon" title="Schedule Report" onClick={() => openScheduler(template)}>
-                        <Calendar className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Can
+                      permission="report.manage"
+                      fallback={<p className="w-full pt-4 border-t text-xs text-muted-foreground">Ask a project manager or admin to generate this report.</p>}
+                    >
+                      <div className="w-full flex gap-2 pt-4 border-t">
+                        <Button variant="outline" className="flex-1" onClick={() => handleGenerate(template)} disabled={generateMutation.isPending}>
+                          {generateMutation.isPending ? 'Generating...' : 'Generate'}
+                        </Button>
+                        <Button variant="outline" size="icon" title="Schedule Report" onClick={() => openScheduler(template)}>
+                          <Calendar className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </Can>
                   </CardContent>
                 </Card>
               );
@@ -206,7 +212,7 @@ export default function ReportsPage() {
                         <td className="px-4 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button variant="ghost" size="sm"><Download className="mr-2 h-4 w-4" /> Download</Button>
-                            <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => deleteReportMutation.mutate(item.id)}><Trash2 className="h-4 w-4" /></Button>
+                            <Can permission="report.manage"><Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" aria-label="Delete report" onClick={() => deleteReportMutation.mutate(item.id)}><Trash2 className="h-4 w-4" /></Button></Can>
                           </div>
                         </td>
                       </tr>
@@ -256,12 +262,14 @@ export default function ReportsPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant={schedule.enabled ? 'default' : 'secondary'}>{schedule.enabled ? 'Active' : 'Paused'}</Badge>
-                        <Button variant="ghost" size="icon" onClick={() => toggleScheduleMutation.mutate(schedule.id)}>
-                          {schedule.enabled ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => deleteScheduleMutation.mutate(schedule.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <Can permission="report.manage">
+                          <Button variant="ghost" size="icon" aria-label={schedule.enabled ? 'Pause schedule' : 'Resume schedule'} onClick={() => toggleScheduleMutation.mutate(schedule.id)}>
+                            {schedule.enabled ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" aria-label="Delete schedule" onClick={() => deleteScheduleMutation.mutate(schedule.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </Can>
                       </div>
                     </div>
                   </CardContent>

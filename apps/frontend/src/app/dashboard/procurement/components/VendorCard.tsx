@@ -6,7 +6,7 @@ import { Card, CardContent, Avatar, AvatarFallback, Badge } from '@sitepilot/ui'
 import { Star, ChevronRight } from 'lucide-react';
 import { formatCompactINR } from './procurement-format';
 import { format } from 'date-fns';
-import type { Vendor } from '@/data/procurement-demo';
+import type { Vendor } from '@/features/procurement/types';
 
 const AVATAR_COLORS = [
   'bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500',
@@ -60,7 +60,11 @@ export function VendorCard({ vendor, onClick }: VendorCardProps): React.ReactEle
   return (
     <Card
       onClick={onClick}
-      className="hover:shadow-md transition-all cursor-pointer group"
+      onKeyDown={(event) => { if (event.key === 'Enter') onClick(); }}
+      tabIndex={0}
+      role="button"
+      aria-label={`Open ${vendor.name}`}
+      className={`hover:shadow-md transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${vendor.status === 'INACTIVE' ? 'opacity-70' : ''}`}
     >
       <CardContent className="p-5 space-y-4">
         <div className="flex items-start gap-3">
@@ -73,7 +77,9 @@ export function VendorCard({ vendor, onClick }: VendorCardProps): React.ReactEle
             <p className="font-semibold leading-tight group-hover:text-primary transition-colors truncate">
               {vendor.name}
             </p>
-            <p className="text-xs text-muted-foreground">{vendor.code}</p>
+            <p className="text-xs text-muted-foreground">
+              {vendor.code}{vendor.status === 'INACTIVE' && ' · Inactive'}
+            </p>
           </div>
           <div className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 shrink-0">
             <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
@@ -97,14 +103,19 @@ export function VendorCard({ vendor, onClick }: VendorCardProps): React.ReactEle
             value={vendor.performanceScore}
             valueClass={scoreColor(vendor.performanceScore)}
           />
-          <Metric label="On-Time" value={`${vendor.onTimeDeliveryPercent}%`} />
-          <Metric label="Projects" value={vendor.projectCount} />
+          <Metric
+            label="On-Time"
+            value={vendor.stats.onTimeDeliveryPercent === null ? '—' : `${vendor.stats.onTimeDeliveryPercent}%`}
+          />
+          <Metric label="Projects" value={vendor.stats.projectCount} />
           <Metric label="Outstanding" value={formatCompactINR(vendor.outstandingBalance)} />
         </div>
 
         <div className="flex items-center justify-between border-t pt-3">
           <span className="text-xs text-muted-foreground">
-            Last order {format(new Date(vendor.lastOrderDate), 'dd MMM yyyy')}
+            {vendor.stats.lastOrderDate
+              ? `Last order ${format(new Date(vendor.stats.lastOrderDate), 'dd MMM yyyy')}`
+              : 'No orders yet'}
           </span>
           <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
         </div>

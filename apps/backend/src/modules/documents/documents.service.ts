@@ -25,7 +25,14 @@ export class DocumentsService {
     file: Express.Multer.File,
     options: { dailyReportId?: string } = {},
   ) {
-    const key = `organizations/${organizationId}/projects/${projectId}/documents/${uuidv4()}-${file.originalname}`;
+    // The project id comes from the URL, so confirm it belongs to the caller before writing to storage.
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+
+    const key = `organizations/${organizationId}/projects/${projectId}/documents/${uuidv4()}-${safeFileName(file.originalname)}`;
     const url = await this.storage.upload(key, file.buffer, file.mimetype);
 
     return this.prisma.document.create({
@@ -72,4 +79,10 @@ export class DocumentsService {
     if (mimeType.includes('word') || mimeType.includes('document')) return 'doc';
     return 'file';
   }
+}
+
+/** Keeps the storage key to one path segment of ordinary characters, whatever the uploaded name was. */
+function safeFileName(name: string): string {
+  const cleaned = name.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^\.+/, '').slice(-120);
+  return cleaned || 'file';
 }

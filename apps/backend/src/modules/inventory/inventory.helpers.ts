@@ -22,6 +22,14 @@ export function round2(value: number): number {
 }
 
 /**
+ * Stock free to issue or transfer. Damaged and lost stock is written out of `quantity` by its adjustment,
+ * so it must not be subtracted again here; `damaged` only records how much was written off.
+ */
+export function availableStock(quantity: number, reserved: number): number {
+  return Math.max(0, quantity - reserved);
+}
+
+/**
  * Stock status is derived at runtime (never persisted), mirroring the Materials module.
  * Damaged stock is already excluded from `available` by the caller.
  */
@@ -50,11 +58,6 @@ export function sortByKey<T extends Record<string, unknown>>(
     if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
     return String(av ?? '').localeCompare(String(bv ?? '')) * dir;
   });
-}
-
-/** Generate a sequential human-readable document code, e.g. TRF-0007. */
-export function buildCode(prefix: string, existingCount: number): string {
-  return `${prefix}-${String(existingCount + 1).padStart(4, '0')}`;
 }
 
 export function parseBool(value: string | undefined): boolean {

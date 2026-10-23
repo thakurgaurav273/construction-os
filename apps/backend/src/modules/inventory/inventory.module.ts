@@ -8,6 +8,10 @@ import { InventoryItemsService } from './inventory-items.service';
 import { InventoryTransactionsService } from './inventory-transactions.service';
 import { InventoryTransfersService } from './inventory-transfers.service';
 import { InventoryWarehousesService } from './inventory-warehouses.service';
+import { InventoryReorderService } from './inventory-reorder.service';
+import { StockLedgerService } from './stock-ledger.service';
+import { InventoryTransferWorkflowService } from './inventory-transfer-workflow.service';
+import { WarehouseSetupService } from './warehouse-setup.service';
 
 @Module({
   imports: [DatabaseModule, AuthModule],
@@ -19,6 +23,11 @@ import { InventoryWarehousesService } from './inventory-warehouses.service';
     InventoryTransactionsService,
     InventoryAdjustmentsService,
     InventoryDashboardService,
+    StockLedgerService,
+    InventoryReorderService,
+    InventoryTransferWorkflowService,
+    WarehouseSetupService,
   ],
+  exports: [StockLedgerService],
 })
 export class InventoryModule {}

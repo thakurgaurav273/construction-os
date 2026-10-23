@@ -1,48 +1,103 @@
-import { Controller, Post, Patch, Body, Get, UseGuards } from '@nestjs/common';
-import { AuthService } from './auth.service';
+import {
+  Body, Controller, Get, HttpCode, HttpStatus, Logger, Post, Req, Res, UseGuards,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import type { Request, Response } from 'express';
+import { AUTH_COOKIES, AUTH_RATE_LIMIT } from './auth.constants';
+import { clearAuthCookies, readCookie, setAuthCookies } from './auth-cookies';
+import { AuthService, SessionView } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password.dto';
 import { RegisterDto } from './dto/register.dto';
-import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { PasswordResetService } from './password-reset.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthenticatedUser } from './strategies/jwt.strategy';
+import { Audit } from '../../common/audit';
 
+/**
+ * Session tokens are only ever sent as HttpOnly cookies, never in a response body, so page scripts
+ * (and anything injected into them) can't read them.
+ */
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  private readonly logger = new Logger(AuthController.name);
 
+  constructor(
+    private readonly authService: AuthService,
+    private readonly passwordReset: PasswordResetService,
+    private readonly config: ConfigService,
+  ) {}
+
+  @UseGuards(ThrottlerGuard)
+  @Throttle(AUTH_RATE_LIMIT)
+  @Audit('auth.registered')
   @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response): Promise<SessionView> {
+    const { session, tokens } = await this.authService.register(dto);
+    setAuthCookies(res, this.config, tokens);
+    return session;
   }
 
+  @UseGuards(ThrottlerGuard)
+  @Throttle(AUTH_RATE_LIMIT)
+  @HttpCode(HttpStatus.OK)
+  @Audit('auth.signed_in')
   @Post('login')
-  login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<SessionView> {
+    const { session, tokens } = await this.authService.login(dto);
+    setAuthCookies(res, this.config, tokens);
+    return session;
   }
 
+  @HttpCode(HttpStatus.OK)
   @Post('refresh')
-  refresh(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refreshToken(refreshToken);
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<{ success: true }> {
+    try {
+      setAuthCookies(res, this.config, await this.authService.refresh(readCookie(req, AUTH_COOKIES.refresh)));
+      return { success: true };
+    } catch (error) {
+      clearAuthCookies(res, this.config);
+      throw error;
+    }
   }
 
+  /** Works with an expired access token: the refresh cookie identifies the session to end. */
+  @HttpCode(HttpStatus.OK)
   @Post('logout')
-  @UseGuards(JwtAuthGuard)
-  logout(@Body('refreshToken') refreshToken: string) {
-    return this.authService.logout(refreshToken);
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<{ success: true }> {
+    await this.authService.logout(readCookie(req, AUTH_COOKIES.refresh));
+    clearAuthCookies(res, this.config);
+    return { success: true };
   }
 
+  /** Always answers the same way and returns before any email is sent, so it can't reveal which emails have accounts. */
+  @UseGuards(ThrottlerGuard)
+  @Throttle(AUTH_RATE_LIMIT)
+  @HttpCode(HttpStatus.OK)
+  @Post('forgot-password')
+  forgotPassword(@Body() dto: ForgotPasswordDto): { success: true; message: string; data: null } {
+    this.passwordReset.requestReset(dto).catch((error: unknown) => {
+      this.logger.error('Password reset request failed', error instanceof Error ? error.stack : undefined);
+    });
+    return { success: true, message: 'If an account exists for that email, a reset link is on its way.', data: null };
+  }
+
+  @UseGuards(ThrottlerGuard)
+  @Throttle(AUTH_RATE_LIMIT)
+  @HttpCode(HttpStatus.OK)
+  @Post('reset-password')
+  async resetPassword(@Body() dto: ResetPasswordDto, @Res({ passthrough: true }) res: Response): Promise<{ success: true }> {
+    await this.passwordReset.resetPassword(dto);
+    clearAuthCookies(res, this.config);
+    return { success: true };
+  }
+
+  /** The signed-in member, including their current role and permissions in this organization. */
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  getMe(@CurrentUser() user: Record<string, unknown>) {
+  getMe(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
     return user;
-  }
-
-  @Patch('organization')
-  @UseGuards(JwtAuthGuard)
-  updateOrganization(
-    @CurrentUser() user: Record<string, unknown>,
-    @Body() dto: UpdateOrganizationDto,
-  ) {
-    return this.authService.updateOrganization(user.organizationId as string, dto);
   }
 }

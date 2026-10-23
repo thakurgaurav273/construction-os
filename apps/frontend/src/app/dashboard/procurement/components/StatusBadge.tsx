@@ -4,13 +4,13 @@ import React from 'react';
 import { Badge } from '@sitepilot/ui';
 import type { BadgeProps } from '@sitepilot/ui';
 import {
-  CheckCircle2, Clock, XCircle, RotateCcw, FileEdit,
-  Truck, PackageCheck, AlertTriangle, Circle,
-  DoorOpen, Scale, Award, Flame, ArrowUp, Minus,
+  CheckCircle2, Clock, XCircle, RotateCcw, FileEdit, Ban,
+  Truck, PackageCheck, AlertTriangle, Circle, CalendarClock, PackageOpen,
+  DoorOpen, Scale, Award, Flame, ArrowUp, Minus, PauseCircle,
 } from 'lucide-react';
 import type {
-  ApprovalStatus, DeliveryStatus, RfqStatus, ProcurementPriority,
-} from '@/data/procurement-demo';
+  DeliveryStatus, PoDeliveryStatus, ProcurementPriority, PurchaseOrderStatus, RfqStatus, VendorStatus,
+} from '@/features/procurement/types';
 
 type Variant = NonNullable<BadgeProps['variant']>;
 
@@ -20,58 +20,69 @@ interface StatusMeta {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-const APPROVAL_META: Record<ApprovalStatus, StatusMeta> = {
-  draft: { label: 'Draft', variant: 'secondary', icon: FileEdit },
-  pending: { label: 'Pending', variant: 'warning', icon: Clock },
-  approved: { label: 'Approved', variant: 'success', icon: CheckCircle2 },
-  rejected: { label: 'Rejected', variant: 'destructive', icon: XCircle },
-  changes_requested: { label: 'Changes', variant: 'info', icon: RotateCcw },
+/** Order-level and shipment-level delivery states share one badge; DELAYED is derived from isDelayed. */
+export type DeliveryBadgeValue = PoDeliveryStatus | DeliveryStatus | 'DELAYED';
+
+const APPROVAL_META: Record<PurchaseOrderStatus, StatusMeta> = {
+  DRAFT: { label: 'Draft', variant: 'secondary', icon: FileEdit },
+  PENDING: { label: 'Pending', variant: 'warning', icon: Clock },
+  CHANGES_REQUESTED: { label: 'Changes', variant: 'info', icon: RotateCcw },
+  APPROVED: { label: 'Approved', variant: 'success', icon: CheckCircle2 },
+  REJECTED: { label: 'Rejected', variant: 'destructive', icon: XCircle },
+  CANCELLED: { label: 'Cancelled', variant: 'outline', icon: Ban },
 };
 
-const DELIVERY_META: Record<DeliveryStatus, StatusMeta> = {
-  not_started: { label: 'Not Started', variant: 'outline', icon: Circle },
-  pending: { label: 'Pending', variant: 'warning', icon: Clock },
-  in_transit: { label: 'In Transit', variant: 'info', icon: Truck },
-  delivered: { label: 'Delivered', variant: 'success', icon: PackageCheck },
-  delayed: { label: 'Delayed', variant: 'destructive', icon: AlertTriangle },
+const DELIVERY_META: Record<DeliveryBadgeValue, StatusMeta> = {
+  NOT_STARTED: { label: 'Not Started', variant: 'outline', icon: Circle },
+  SCHEDULED: { label: 'Scheduled', variant: 'warning', icon: CalendarClock },
+  IN_TRANSIT: { label: 'In Transit', variant: 'info', icon: Truck },
+  PARTIAL: { label: 'Partial', variant: 'info', icon: PackageOpen },
+  DELIVERED: { label: 'Delivered', variant: 'success', icon: PackageCheck },
+  RECEIVED: { label: 'Received', variant: 'success', icon: PackageCheck },
+  CANCELLED: { label: 'Cancelled', variant: 'outline', icon: Ban },
+  DELAYED: { label: 'Delayed', variant: 'destructive', icon: AlertTriangle },
 };
 
 const RFQ_META: Record<RfqStatus, StatusMeta> = {
-  draft: { label: 'Draft', variant: 'secondary', icon: FileEdit },
-  open: { label: 'Open', variant: 'info', icon: DoorOpen },
-  closing_soon: { label: 'Closing Soon', variant: 'warning', icon: Clock },
-  evaluating: { label: 'Evaluating', variant: 'default', icon: Scale },
-  awarded: { label: 'Awarded', variant: 'success', icon: Award },
+  OPEN: { label: 'Open', variant: 'info', icon: DoorOpen },
+  EVALUATING: { label: 'Evaluating', variant: 'default', icon: Scale },
+  AWARDED: { label: 'Awarded', variant: 'success', icon: Award },
+  CANCELLED: { label: 'Cancelled', variant: 'outline', icon: Ban },
 };
 
 const PRIORITY_META: Record<ProcurementPriority, StatusMeta> = {
-  low: { label: 'Low', variant: 'secondary', icon: Minus },
-  medium: { label: 'Medium', variant: 'info', icon: ArrowUp },
-  high: { label: 'High', variant: 'warning', icon: ArrowUp },
-  critical: { label: 'Critical', variant: 'destructive', icon: Flame },
+  LOW: { label: 'Low', variant: 'secondary', icon: Minus },
+  MEDIUM: { label: 'Medium', variant: 'info', icon: ArrowUp },
+  HIGH: { label: 'High', variant: 'warning', icon: ArrowUp },
+  CRITICAL: { label: 'Critical', variant: 'destructive', icon: Flame },
 };
 
-interface StatusBadgeProps {
-  kind: 'approval' | 'delivery' | 'rfq' | 'priority';
-  value: ApprovalStatus | DeliveryStatus | RfqStatus | ProcurementPriority;
-  showIcon?: boolean;
-  className?: string;
+const VENDOR_META: Record<VendorStatus, StatusMeta> = {
+  ACTIVE: { label: 'Active', variant: 'success', icon: CheckCircle2 },
+  INACTIVE: { label: 'Inactive', variant: 'outline', icon: PauseCircle },
+};
+
+type StatusBadgeProps = { showIcon?: boolean; className?: string } & (
+  | { kind: 'approval'; value: PurchaseOrderStatus }
+  | { kind: 'delivery'; value: DeliveryBadgeValue }
+  | { kind: 'rfq'; value: RfqStatus }
+  | { kind: 'priority'; value: ProcurementPriority }
+  | { kind: 'vendor'; value: VendorStatus }
+);
+
+function resolveMeta(props: StatusBadgeProps): StatusMeta {
+  switch (props.kind) {
+    case 'approval': return APPROVAL_META[props.value];
+    case 'delivery': return DELIVERY_META[props.value];
+    case 'rfq': return RFQ_META[props.value];
+    case 'priority': return PRIORITY_META[props.value];
+    case 'vendor': return VENDOR_META[props.value];
+  }
 }
 
-function resolveMeta(kind: StatusBadgeProps['kind'], value: string): StatusMeta {
-  if (kind === 'approval') return APPROVAL_META[value as ApprovalStatus];
-  if (kind === 'delivery') return DELIVERY_META[value as DeliveryStatus];
-  if (kind === 'rfq') return RFQ_META[value as RfqStatus];
-  return PRIORITY_META[value as ProcurementPriority];
-}
-
-export function StatusBadge({
-  kind,
-  value,
-  showIcon = true,
-  className = '',
-}: StatusBadgeProps): React.ReactElement {
-  const meta = resolveMeta(kind, value);
+export function StatusBadge(props: StatusBadgeProps): React.ReactElement {
+  const { showIcon = true, className = '' } = props;
+  const meta = resolveMeta(props);
   const Icon = meta.icon;
   return (
     <Badge variant={meta.variant} className={`gap-1 font-medium whitespace-nowrap ${className}`}>

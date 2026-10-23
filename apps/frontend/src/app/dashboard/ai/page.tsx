@@ -1,221 +1,109 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
-import { Button, Skeleton } from '@sitepilot/ui';
-import {
-  Sparkles, FileText, Building2, IndianRupee, TrendingUp, Wand2, ShieldAlert, Gauge,
-} from 'lucide-react';
+import React from 'react';
+import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { Badge, Button, Card, CardContent, Skeleton, cn } from '@sitepilot/ui';
+import { AlertOctagon, AlertTriangle, Info, MessageSquare, RefreshCw, Sparkles } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { AiUnavailableNotice } from '@/features/ai/components/AiUnavailableNotice';
+import { useAiInsights, useAiStatus, useRefreshAiInsights, type AiInsight } from '@/hooks/api/use-ai';
+import { getApiErrorMessage } from '@/lib/api/errors';
 
-import { ProcurementKpiCard } from '../procurement/components/ProcurementKpiCard';
-import { formatCompactINR } from '../procurement/components/procurement-format';
-import { ExecutiveSummary } from './components/ExecutiveSummary';
-import { ForecastCard } from './components/ForecastCard';
-import { CrossProjectInsights } from './components/CrossProjectInsights';
-import { SuggestedActions } from './components/SuggestedActions';
-import { OrganizationTimeline } from './components/OrganizationTimeline';
-import {
-  executiveSummary,
-  crossProjectInsights,
-  forecastCards,
-  suggestedActions,
-  organizationTimeline,
-  portfolioBudget,
-  budgetUtilization,
-  activeProjectCount,
-  flaggedProjectCount,
-  forecastSavings,
-  portfolioRiskIndex,
-  onTimeProbability,
-  pendingActionCount,
-  type SuggestedAction,
-} from './data/command-center-demo';
-
-// The forecast chart pulls in Recharts, so load it on demand to keep the
-// initial route bundle light - same pattern as the procurement analytics tab.
-const AiForecastChart = dynamic(
-  () => import('./components/AiForecastChart').then((mod) => mod.AiForecastChart),
-  {
-    ssr: false,
-    loading: () => <Skeleton className="h-80 w-full rounded-xl" />,
-  },
-);
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.06 } },
-};
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 300, damping: 24 } },
+const SEVERITY: Record<AiInsight['severity'], { icon: LucideIcon; label: string; className: string }> = {
+  critical: { icon: AlertOctagon, label: 'Critical', className: 'border-red-200 bg-red-50/60 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300' },
+  warning: { icon: AlertTriangle, label: 'Needs attention', className: 'border-amber-200 bg-amber-50/60 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300' },
+  info: { icon: Info, label: 'FYI', className: 'border-blue-200 bg-blue-50/60 text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-300' },
 };
 
+const ORDER: AiInsight['severity'][] = ['critical', 'warning', 'info'];
+
+function InsightCard({ insight }: { insight: AiInsight }): React.ReactElement {
+  const severity = SEVERITY[insight.severity];
+  const Icon = severity.icon;
+  return (
+    <Card className={cn('border', severity.className)}>
+      <CardContent className="flex gap-3 p-4">
+        <Icon className="mt-0.5 h-5 w-5 shrink-0" />
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold text-foreground">{insight.title}</p>
+            <Badge variant="outline" className="text-[10px] capitalize">{insight.area}</Badge>
+            {insight.project && <Badge variant="secondary" className="text-[10px]">{insight.project}</Badge>}
+          </div>
+          <p className="text-sm text-foreground/80">{insight.detail}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** AI Command Center: model-written insights from the organization's live data, refreshed on demand. */
 export default function AiCommandCenterPage(): React.ReactElement {
-  const [isClient, setIsClient] = useState(false);
-  useEffect(() => { setIsClient(true); }, []);
-  if (!isClient) return <></>;
+  const { data: status, isLoading: statusLoading } = useAiStatus();
+  const { data: snapshot, isLoading, isError, refetch } = useAiInsights();
+  const refresh = useRefreshAiInsights();
 
-  function handleRunAction(action: SuggestedAction): void {
-    toast.success(`${action.actionLabel} (demo)`, { description: action.title });
+  async function regenerate(): Promise<void> {
+    try {
+      await refresh.mutateAsync();
+      toast.success('Insights updated');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Couldn’t generate insights. Try again.'));
+    }
   }
 
+  const sorted = [...(snapshot?.insights ?? [])].sort((a, b) => ORDER.indexOf(a.severity) - ORDER.indexOf(b.severity));
+  const unavailable = status?.mode === 'NONE' ? status.blockedReason : null;
+
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row items-start justify-between gap-4"
-      >
+    <div className="mx-auto max-w-5xl flex-1 space-y-6 p-4 pt-6 md:p-8">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div>
-          <h2 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
-            <Sparkles className="h-7 w-7 text-primary" />
-            AI Command Center
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            {activeProjectCount} active projects · {flaggedProjectCount} need attention · {pendingActionCount} AI actions ready
+          <h2 className="flex items-center gap-2 text-3xl font-bold tracking-tight"><Sparkles className="h-7 w-7 text-violet-500" /> AI Command Center</h2>
+          <p className="mt-1 text-muted-foreground">
+            What needs attention across your projects, written by AI from live budgets, schedules, approvals, deliveries, stock and attendance.
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => toast('AI assistant opening (demo)')}>
-            <Wand2 className="mr-1.5 h-4 w-4" /> Ask AI
-          </Button>
-          <Button onClick={() => toast.success('Executive report generating (demo)')}>
-            <FileText className="mr-1.5 h-4 w-4" /> Generate Report
-          </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild><Link href="/dashboard/ai-assistant"><MessageSquare className="mr-1.5 h-4 w-4" /> Ask a question</Link></Button>
+          {!unavailable && (
+            <Button onClick={() => { void regenerate(); }} disabled={refresh.isPending}>
+              <RefreshCw className={cn('mr-1.5 h-4 w-4', refresh.isPending && 'animate-spin')} /> {snapshot ? 'Refresh' : 'Generate insights'}
+            </Button>
+          )}
         </div>
-      </motion.div>
+      </div>
 
-      {/* Executive summary */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-        <ExecutiveSummary
-          data={executiveSummary}
-          onAsk={() => toast('AI assistant opening (demo)')}
+      {snapshot && (
+        <p className="text-xs text-muted-foreground">
+          Generated {formatDistanceToNow(new Date(snapshot.generatedAt), { addSuffix: true })} by {snapshot.model}. AI can be wrong; check figures before acting.
+        </p>
+      )}
+
+      {statusLoading || isLoading || refresh.isPending ? (
+        <div className="space-y-3">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-24 w-full rounded-xl" />)}</div>
+      ) : isError ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title="Unable to load insights"
+          description="Check your connection and try again."
+          action={<Button variant="outline" onClick={() => refetch()}>Retry</Button>}
         />
-      </motion.div>
-
-      {/* Executive overview - KPI cards */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
-      >
-        <motion.div variants={itemVariants}>
-          <ProcurementKpiCard
-            title="Portfolio Value"
-            value={formatCompactINR(portfolioBudget)}
-            description="across all projects"
-            icon={<Building2 className="h-4 w-4" />}
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <ProcurementKpiCard
-            title="Budget Utilization"
-            value={`${budgetUtilization}%`}
-            description="of sanctioned budget"
-            icon={<Gauge className="h-4 w-4" />}
-            trendLabel="on plan"
-            trendDirection="up"
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <ProcurementKpiCard
-            title="On-Time Probability"
-            value={`${onTimeProbability}%`}
-            description="modelled completion"
-            icon={<TrendingUp className="h-4 w-4" />}
-            trendLabel="stable"
-            trendDirection="up"
-            accentClass="border-emerald-200 dark:border-emerald-800/30"
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <ProcurementKpiCard
-            title="Forecast Savings"
-            value={formatCompactINR(forecastSavings)}
-            description="AI-identified"
-            icon={<IndianRupee className="h-4 w-4" />}
-            trendLabel="6 opportunities"
-            trendDirection="up"
-            accentClass="border-emerald-200 dark:border-emerald-800/30"
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <ProcurementKpiCard
-            title="Risk Index"
-            value={`${portfolioRiskIndex}/100`}
-            description="moderate exposure"
-            icon={<ShieldAlert className="h-4 w-4" />}
-            trendLabel="2 fewer"
-            trendDirection="down"
-            invertTrendColor
-            accentClass="border-amber-200 dark:border-amber-800/30"
-          />
-        </motion.div>
-        <motion.div variants={itemVariants}>
-          <ProcurementKpiCard
-            title="AI Actions"
-            value={pendingActionCount}
-            description="ready to action"
-            icon={<Wand2 className="h-4 w-4" />}
-            trendLabel="review queue"
-            trendDirection="up"
-          />
-        </motion.div>
-      </motion.div>
-
-      {/* Forecast + suggested actions */}
-      <div className="grid gap-6 xl:grid-cols-3">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="xl:col-span-2 space-y-6"
-        >
-          <AiForecastChart />
-          <div className="grid gap-4 sm:grid-cols-2">
-            {forecastCards.map((card) => (
-              <ForecastCard key={card.id} data={card} />
-            ))}
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: 16 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-          className="xl:col-span-1"
-        >
-          <SuggestedActions
-            actions={suggestedActions}
-            onRun={handleRunAction}
-            className="sticky top-6"
-          />
-        </motion.div>
-      </div>
-
-      {/* Cross-project insights + organization timeline */}
-      <div className="grid gap-6 xl:grid-cols-3">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          className="xl:col-span-2"
-        >
-          <CrossProjectInsights insights={crossProjectInsights} />
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="xl:col-span-1"
-        >
-          <OrganizationTimeline events={organizationTimeline} />
-        </motion.div>
-      </div>
+      ) : sorted.length > 0 ? (
+        <div className="space-y-3">{sorted.map((insight, index) => <InsightCard key={`${insight.title}-${index}`} insight={insight} />)}</div>
+      ) : unavailable ? (
+        <AiUnavailableNotice reason={unavailable} />
+      ) : (
+        <EmptyState
+          icon={Sparkles}
+          title="No insights yet"
+          description="Generate insights to see budget, schedule, procurement and stock risks across your projects."
+          action={<Button onClick={() => { void regenerate(); }}>Generate insights</Button>}
+        />
+      )}
     </div>
   );
 }

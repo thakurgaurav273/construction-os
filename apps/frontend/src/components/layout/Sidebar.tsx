@@ -18,15 +18,22 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Lightbulb,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@sitepilot/ui';
+import type { Permission } from '@sitepilot/types';
 import { useAuthStore } from '@/store/auth.store';
+import { UserMenu } from '@/features/auth/components/UserMenu';
+import { useOrganizationSettings } from '@/hooks/api/use-settings';
+import { useCan } from '@/hooks/api/use-access';
 
 interface NavItem {
   name: string;
   href: string;
   icon: LucideIcon;
+  /** Hidden for members whose role doesn't grant it. */
+  permission?: Permission;
 }
 
 interface NavGroup {
@@ -46,7 +53,8 @@ const navigation: NavGroup[] = [
     items: [
       { name: 'Projects',      href: '/dashboard/projects',      icon: Briefcase },
       { name: 'Daily Reports', href: '/dashboard/daily-reports', icon: FileText },
-      { name: 'AI Assistant',  href: '/dashboard/ai-assistant',  icon: Sparkles },
+      { name: 'AI Assistant',  href: '/dashboard/ai-assistant',  icon: Sparkles, permission: 'ai.use' },
+      { name: 'AI Insights',   href: '/dashboard/ai',            icon: Lightbulb, permission: 'ai.use' },
     ],
   },
   {
@@ -61,7 +69,7 @@ const navigation: NavGroup[] = [
   {
     group: 'Business',
     items: [
-      { name: 'Finance', href: '/dashboard/finance',  icon: DollarSign },
+      { name: 'Finance', href: '/dashboard/finance',  icon: DollarSign, permission: 'finance.view' },
       { name: 'Reports', href: '/dashboard/reports',  icon: BarChart3 },
     ],
   },
@@ -75,7 +83,8 @@ const navigation: NavGroup[] = [
 
 function isItemActive(href: string, pathname: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard';
-  return pathname.startsWith(href);
+  // Whole path segments only, so /dashboard/ai doesn't light up on /dashboard/ai-assistant.
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function Sidebar() {
@@ -83,6 +92,11 @@ export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const user = useAuthStore((state) => state.user);
   const organization = useAuthStore((state) => state.organization);
+  const { data: organizationSettings } = useOrganizationSettings();
+  const can = useCan();
+  const visibleNavigation = navigation
+    .map((group) => ({ ...group, items: group.items.filter((item) => !item.permission || can(item.permission)) }))
+    .filter((group) => group.items.length > 0);
 
   const userInitials = user?.name
     ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
@@ -102,9 +116,14 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex h-16 items-center px-4 border-b border-sidebar-border shrink-0">
         <div className="flex items-center gap-3 overflow-hidden">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-xs shrink-0">
-            {orgInitials}
-          </div>
+          {organizationSettings?.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, not a static asset
+            <img src={organizationSettings.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded-md border bg-background object-contain" />
+          ) : (
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-xs shrink-0">
+              {orgInitials}
+            </div>
+          )}
           <AnimatePresence>
             {!isCollapsed && (
               <motion.div
@@ -115,7 +134,7 @@ export function Sidebar() {
                 className="overflow-hidden"
               >
                 <span className="block font-semibold text-sm text-sidebar-foreground whitespace-nowrap truncate leading-tight">
-                  {organization?.name ?? 'SitePilot'}
+                  {organizationSettings?.name ?? organization?.name ?? 'SitePilot'}
                 </span>
                 <span className="block text-[10px] text-muted-foreground whitespace-nowrap leading-tight">
                   Construction ERP
@@ -137,7 +156,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-5">
-        {navigation.map((group) => (
+        {visibleNavigation.map((group) => (
           <div key={group.group}>
             <AnimatePresence>
               {!isCollapsed && (
@@ -205,29 +224,38 @@ export function Sidebar() {
 
       {/* User */}
       <div className="p-3 border-t border-sidebar-border shrink-0">
-        <div className={cn('flex items-center gap-3 overflow-hidden', isCollapsed && 'justify-center')}>
-          <div className="h-8 w-8 rounded-full bg-primary/10 border flex items-center justify-center text-xs font-semibold text-primary shrink-0">
-            {userInitials}
-          </div>
-          <AnimatePresence>
-            {!isCollapsed && (
-              <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.2 }}
-                className="flex flex-col overflow-hidden"
-              >
-                <span className="text-sm font-medium text-sidebar-foreground truncate leading-tight">
-                  {user?.name ?? 'User'}
-                </span>
-                <span className="text-xs text-muted-foreground truncate">
-                  {user?.email ?? ''}
-                </span>
-              </motion.div>
+        <UserMenu side={isCollapsed ? 'right' : 'top'}>
+          <button
+            type="button"
+            aria-label="Account menu"
+            className={cn(
+              'flex w-full items-center gap-3 overflow-hidden rounded-md p-1 text-left transition-colors hover:bg-sidebar-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              isCollapsed && 'justify-center',
             )}
-          </AnimatePresence>
-        </div>
+          >
+            <div className="h-8 w-8 rounded-full bg-primary/10 border flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+              {userInitials}
+            </div>
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex flex-col overflow-hidden"
+                >
+                  <span className="text-sm font-medium text-sidebar-foreground truncate leading-tight">
+                    {user?.name ?? 'User'}
+                  </span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {user?.email ?? ''}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </button>
+        </UserMenu>
       </div>
     </motion.div>
   );

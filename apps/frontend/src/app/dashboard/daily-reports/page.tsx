@@ -15,6 +15,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { REPORT_STATUS_OPTIONS } from '@/features/daily-reports/constants';
 import { OrganizationReportsTable } from '@/features/daily-reports/components/OrganizationReportsTable';
 import { SelectProjectDialog } from '@/features/daily-reports/components/SelectProjectDialog';
+import { Can } from '@/components/shared/Can';
 
 const PAGE_SIZE = 20;
 const ALL = 'all';
@@ -72,9 +73,11 @@ export default function DailyReportsPage() {
             Site progress reports across all projects — review submissions and track what&apos;s pending.
           </p>
         </div>
-        <Button onClick={() => setSelectProjectOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> New Report
-        </Button>
+        <Can permission="dailyReport.write">
+          <Button onClick={() => setSelectProjectOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> New Report
+          </Button>
+        </Can>
         <SelectProjectDialog
           open={selectProjectOpen}
           onOpenChange={setSelectProjectOpen}

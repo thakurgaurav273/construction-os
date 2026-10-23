@@ -10,6 +10,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, CardDescription, Badg
 import { CheckCircle2, Clock, XCircle, Calendar, ClipboardCheck } from 'lucide-react';
 import { useAttendanceTrend, type Worker, type WorkforceStats } from '@/hooks/api/use-workforce';
 import { formatCheckIn } from '@/features/workforce/utils/attendance';
+import { Can } from '@/components/shared/Can';
 
 const PRESENT_COLOR  = '#10b981';
 const LATE_COLOR     = '#f59e0b';
@@ -82,9 +83,11 @@ export function AttendanceTab({ workers, stats, onMarkAttendance }: AttendanceTa
           <p className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">{stats.notMarkedToday} workers</span> haven&apos;t been marked today.
           </p>
-          <Button size="sm" onClick={onMarkAttendance}>
-            <ClipboardCheck className="mr-2 h-4 w-4" /> Mark Attendance
-          </Button>
+          <Can permission="attendance.mark">
+            <Button size="sm" onClick={onMarkAttendance}>
+              <ClipboardCheck className="mr-2 h-4 w-4" /> Mark Attendance
+            </Button>
+          </Can>
         </div>
       )}
 

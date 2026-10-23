@@ -1,0 +1,134 @@
+import { createHash, randomBytes, randomUUID } from 'crypto';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../../database/prisma.service';
+import { ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_SECONDS } from './auth.constants';
+
+export type TokenType = 'access' | 'refresh';
+
+export interface TokenPayload {
+  sub: string;
+  organizationId: string;
+  type: TokenType;
+  jti: string;
+}
+
+export interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+}
+
+const MIN_SECRET_LENGTH = 32;
+
+/** There is deliberately no fallback: a missing or weak secret stops the API from starting. */
+function requireSecret(config: ConfigService, name: string): string {
+  const secret = config.get<string>(name)?.trim();
+  if (!secret || secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(`${name} must be set to a random value of at least ${MIN_SECRET_LENGTH} characters.`);
+  }
+  return secret;
+}
+
+/** Stored tokens are hashed, so a leaked database row can't be replayed as a session. */
+export function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+export function generateOpaqueToken(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+/**
+ * Issues and rotates session tokens. Access and refresh tokens use different secrets and carry a `type`
+ * claim, so neither can stand in for the other. Every token has a random `jti`, which keeps two logins in
+ * the same second from producing identical tokens.
+ */
+@Injectable()
+export class TokenService {
+  private readonly accessSecret: string;
+  private readonly refreshSecret: string;
+
+  constructor(
+    private readonly jwt: JwtService,
+    private readonly prisma: PrismaService,
+    config: ConfigService,
+  ) {
+    this.accessSecret = requireSecret(config, 'JWT_ACCESS_SECRET');
+    this.refreshSecret = requireSecret(config, 'JWT_REFRESH_SECRET');
+    if (this.accessSecret === this.refreshSecret) {
+      throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different.');
+    }
+  }
+
+  get accessTokenSecret(): string {
+    return this.accessSecret;
+  }
+
+  async issue(userId: string, organizationId: string): Promise<TokenPair> {
+    const accessToken = this.sign(userId, organizationId, 'access');
+    const refreshToken = this.sign(userId, organizationId, 'refresh');
+    await this.prisma.refreshToken.create({
+      data: {
+        token: hashToken(refreshToken),
+        userId,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000),
+      },
+    });
+    return { accessToken, refreshToken };
+  }
+
+  /**
+   * Swaps a refresh token for a new pair; the old one can't be used again. Presenting a refresh token
+   * that was already rotated means it was copied, so every session of that user is ended.
+   */
+  async rotate(refreshToken: string): Promise<{ payload: TokenPayload; tokens: TokenPair }> {
+    const payload = this.verify(refreshToken, 'refresh');
+    const stored = await this.prisma.refreshToken.findUnique({ where: { token: hashToken(refreshToken) } });
+    if (!stored || stored.userId !== payload.sub || stored.expiresAt < new Date()) {
+      throw new UnauthorizedException('Your session has expired. Sign in again.');
+    }
+
+    const { count } = await this.prisma.refreshToken.updateMany({
+      where: { id: stored.id, revoked: false },
+      data: { revoked: true },
+    });
+    if (count === 0) {
+      await this.revokeAll(payload.sub);
+      throw new UnauthorizedException('Your session has expired. Sign in again.');
+    }
+    return { payload, tokens: await this.issue(payload.sub, payload.organizationId) };
+  }
+
+  async revoke(refreshToken: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({ where: { token: hashToken(refreshToken) }, data: { revoked: true } });
+  }
+
+  async revokeAll(userId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({ where: { userId, revoked: false }, data: { revoked: true } });
+  }
+
+  /** Verifies signature, expiry and token type. Throws 401 for anything else. */
+  verify(token: string, type: TokenType): TokenPayload {
+    try {
+      const payload = this.jwt.verify<TokenPayload>(token, {
+        secret: type === 'access' ? this.accessSecret : this.refreshSecret,
+      });
+      if (payload.type !== type) throw new Error('Wrong token type');
+      return payload;
+    } catch {
+      throw new UnauthorizedException('Your session has expired. Sign in again.');
+    }
+  }
+
+  private sign(userId: string, organizationId: string, type: TokenType): string {
+    return this.jwt.sign(
+      { sub: userId, organizationId, type },
+      {
+        secret: type === 'access' ? this.accessSecret : this.refreshSecret,
+        expiresIn: type === 'access' ? ACCESS_TOKEN_TTL_SECONDS : REFRESH_TOKEN_TTL_SECONDS,
+        jwtid: randomUUID(),
+      },
+    );
+  }
+}

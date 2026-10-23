@@ -1,54 +1,46 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import {
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  WebSocketGateway,
-  WebSocketServer,
-} from '@nestjs/websockets';
+import { OnGatewayConnection, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { TokenService } from '../auth/token.service';
+import { AUTH_COOKIES } from '../auth/auth.constants';
+import { readCookieFromHeader } from '../auth/auth-cookies';
 
+/** One room per member per organization, so someone in two organizations only hears about the one they're in. */
+function roomFor(organizationId: string, userId: string): string {
+  return `org:${organizationId}:user:${userId}`;
+}
+
+/** Live delivery of new notifications. Allowed origins come from the CORS-aware adapter set up in main.ts. */
 @Injectable()
-@WebSocketGateway({
-  namespace: '/notifications',
-  cors: { origin: '*', credentials: true },
-})
-export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+@WebSocketGateway({ namespace: '/notifications' })
+export class NotificationsGateway implements OnGatewayConnection {
   private readonly logger = new Logger(NotificationsGateway.name);
-  private userSockets = new Map<string, Set<string>>();
 
   @WebSocketServer()
   server: Server;
 
-  constructor(private jwt: JwtService) {}
+  constructor(private readonly tokens: TokenService) {}
 
-  handleConnection(client: Socket) {
-    const token = client.handshake.auth?.token ?? client.handshake.query?.token;
+  async handleConnection(client: Socket): Promise<void> {
+    // Browsers send the access cookie with the handshake; other clients can pass the token explicitly.
+    const token = readCookieFromHeader(client.handshake.headers.cookie, AUTH_COOKIES.access) ?? client.handshake.auth?.token;
     if (!token || typeof token !== 'string') {
-      client.disconnect();
+      client.disconnect(true);
       return;
     }
-
     try {
-      const payload = this.jwt.verify<{ sub: string }>(token);
-      client.data.userId = payload.sub;
-      if (!this.userSockets.has(payload.sub)) this.userSockets.set(payload.sub, new Set());
-      this.userSockets.get(payload.sub)!.add(client.id);
+      const payload = this.tokens.verify(token, 'access');
+      await client.join(roomFor(payload.organizationId, payload.sub));
     } catch {
-      client.disconnect();
+      client.disconnect(true);
     }
   }
 
-  handleDisconnect(client: Socket) {
-    const userId = client.data?.userId as string | undefined;
-    if (userId) this.userSockets.get(userId)?.delete(client.id);
-  }
-
-  emitToUser(userId: string, event: string, payload: unknown): void {
-    const socketIds = this.userSockets.get(userId);
-    if (!socketIds || socketIds.size === 0) return;
-    for (const id of socketIds) {
-      this.server.to(id).emit(event, payload);
+  emitToUser(organizationId: string, userId: string, event: string, payload: unknown): void {
+    if (!this.server) {
+      this.logger.warn('WebSocket server not ready; skipping live delivery');
+      return;
     }
+    this.server.to(roomFor(organizationId, userId)).emit(event, payload);
   }
 }

@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { InventoryItemQueryDto } from './dto/inventory-query.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import {
+  availableStock,
   deriveInventoryStatus,
   num,
   paginate,
@@ -40,7 +41,7 @@ function mapItem(item: ItemWithRels) {
   const incoming = num(item.incoming);
   const reorderLevel = num(item.reorderLevel);
   const unitCost = num(item.material.unitCost);
-  const available = Math.max(0, quantity - reserved - damaged);
+  const available = availableStock(quantity, reserved);
   return {
     id: item.id,
     materialId: item.materialId,
@@ -168,7 +169,7 @@ export class InventoryItemsService {
     const damaged = num(item.damaged);
     const unitCost = num(item.material.unitCost);
     const reorderLevel = num(item.reorderLevel);
-    const available = Math.max(0, quantity - reserved - damaged);
+    const available = availableStock(quantity, reserved);
 
     const consumptionByProject = new Map<string, { projectId: string; projectName: string; quantity: number }>();
     for (const row of consumptionRows) {
@@ -241,15 +242,17 @@ export class InventoryItemsService {
   async update(id: string, organizationId: string, dto: UpdateInventoryItemDto) {
     const existing = await this.prisma.inventoryItem.findFirst({ where: { id, organizationId } });
     if (!existing) throw new NotFoundException('Inventory item not found');
+    if (dto.locationId) {
+      const location = await this.prisma.warehouseLocation.findFirst({
+        where: { id: dto.locationId, warehouseId: existing.warehouseId, organizationId },
+        select: { id: true },
+      });
+      if (!location) throw new BadRequestException('Choose a bin location in the same store.');
+    }
 
     const updated = await this.prisma.inventoryItem.update({
       where: { id },
-      data: {
-        reorderLevel: dto.reorderLevel,
-        damaged: dto.damaged,
-        incoming: dto.incoming,
-        locationId: dto.locationId,
-      },
+      data: { reorderLevel: dto.reorderLevel, locationId: dto.locationId },
       include: ITEM_INCLUDE,
     });
     return mapItem(updated);

@@ -14,6 +14,7 @@ import {
   useCreateAdjustment, type AdjustmentReason,
 } from '@/hooks/api/use-inventory';
 import { formatNumber } from '@/lib/utils';
+import { getApiErrorMessage } from '@/lib/api/errors';
 import { ADJUSTMENT_REASON_LABELS } from './inventory-format';
 
 const REASONS = Object.keys(ADJUSTMENT_REASON_LABELS) as AdjustmentReason[];
@@ -83,8 +84,8 @@ export function AdjustmentDialog({
       });
       toast.success(`Stock adjusted for ${materialName}`);
       onOpenChange(false);
-    } catch {
-      toast.error('Unable to record the adjustment. Please try again.');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Couldn't record the adjustment. Try again."));
     }
   }
 

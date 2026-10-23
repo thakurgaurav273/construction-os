@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { subDays } from 'date-fns';
 import { PrismaService } from '../../database/prisma.service';
-import { deriveInventoryStatus, num, round2 } from './inventory.helpers';
+import { availableStock, deriveInventoryStatus, num, round2 } from './inventory.helpers';
 
 const CARD_INCLUDE = {
   project: { select: { id: true, name: true } },
@@ -51,10 +51,9 @@ export class InventoryWarehousesService {
     for (const item of w.items) {
       const quantity = num(item.quantity);
       const reserved = num(item.reserved);
-      const damaged = num(item.damaged);
       const reorderLevel = num(item.reorderLevel);
       const unitCost = num(item.material.unitCost);
-      const available = Math.max(0, quantity - reserved - damaged);
+      const available = availableStock(quantity, reserved);
       inventoryValue += quantity * unitCost;
       reservedValue += reserved * unitCost;
       totalQuantity += quantity;
@@ -119,10 +118,9 @@ export class InventoryWarehousesService {
     const items = warehouse.items.map((item) => {
       const quantity = num(item.quantity);
       const reserved = num(item.reserved);
-      const damaged = num(item.damaged);
       const reorderLevel = num(item.reorderLevel);
       const unitCost = num(item.material.unitCost);
-      const available = Math.max(0, quantity - reserved - damaged);
+      const available = availableStock(quantity, reserved);
       const status = deriveInventoryStatus(available, reorderLevel);
       inventoryValue += quantity * unitCost;
       reservedValue += reserved * unitCost;
@@ -136,7 +134,7 @@ export class InventoryWarehousesService {
         unit: item.material.unit,
         quantity,
         reserved,
-        damaged,
+        damaged: num(item.damaged),
         available,
         reorderLevel,
         value: round2(quantity * unitCost),

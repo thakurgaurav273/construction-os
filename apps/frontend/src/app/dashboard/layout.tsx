@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ThemeProvider } from 'next-themes';
+import { BrandThemeStyle } from '@/features/branding/components/BrandThemeStyle';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -12,6 +13,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <BrandThemeStyle />
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar />
         

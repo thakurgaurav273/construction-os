@@ -18,6 +18,9 @@ import { InventoryTab } from './components/InventoryTab';
 import { MovementsTab } from './components/MovementsTab';
 import { SuppliersTab } from './components/SuppliersTab';
 import { useMaterials } from '@/hooks/api/use-materials';
+import { Can } from '@/components/shared/Can';
+import { downloadCsv } from '@/lib/download-csv';
+import { format } from 'date-fns';
 
 // Analytics is chart-heavy and sits behind a tab, so load it on demand.
 const AnalyticsTab = dynamic(
@@ -47,36 +50,20 @@ export default function MaterialsPage(): React.ReactElement {
     setDrawerOpen(true);
   }
 
-  function handleExport() {
+  function handleExport(): void {
     if (materialsList.length === 0) {
       toast.error('No materials to export');
       return;
     }
-    
-    const headers = ['Name', 'SKU', 'Category', 'Supplier', 'Quantity', 'Unit', 'Unit Cost', 'Status'];
-    const csvContent = [
-      headers.join(','),
-      ...materialsList.map(m => [
-        `"${m.name}"`,
-        `"${m.sku}"`,
-        `"${m.categoryName || ''}"`,
-        `"${m.supplierName || ''}"`,
-        m.quantity,
-        `"${m.unit}"`,
-        m.unitCost,
-        `"${m.status}"`
-      ].join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `materials_export_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success('Export downloaded successfully');
+    downloadCsv(
+      `materials_${format(new Date(), 'yyyy-MM-dd')}.csv`,
+      ['Name', 'SKU', 'Category', 'Supplier', 'Quantity', 'Unit', 'Unit Cost', 'Status'],
+      materialsList.map((material) => [
+        material.name, material.sku, material.categoryName, material.supplierName,
+        material.quantity, material.unit, material.unitCost, material.status,
+      ]),
+    );
+    toast.success(`Exported ${materialsList.length} materials`);
   }
 
   return (
@@ -97,9 +84,11 @@ export default function MaterialsPage(): React.ReactElement {
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-1.5 h-4 w-4" /> Export
           </Button>
-          <Button onClick={() => setFormOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" /> Add Material
-          </Button>
+          <Can permission="material.manage">
+            <Button onClick={() => setFormOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" /> Add Material
+            </Button>
+          </Can>
         </div>
       </motion.div>
 

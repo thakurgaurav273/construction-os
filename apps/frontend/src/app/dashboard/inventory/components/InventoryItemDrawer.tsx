@@ -19,6 +19,8 @@ import {
 } from './inventory-format';
 import { InventoryStatusBadge } from './InventoryStatusBadge';
 import { AdjustmentDialog } from './AdjustmentDialog';
+import { Can } from '@/components/shared/Can';
+import { ReorderButton } from '@/features/procurement/components/ReorderButton';
 
 interface InventoryItemDrawerProps {
   itemId: string | null;
@@ -241,17 +243,12 @@ function ItemDrawerBody({ item }: { item: InventoryItemDetail }): React.ReactEle
 
       {/* Footer */}
       <div className="shrink-0 border-t bg-background px-5 py-3 grid grid-cols-2 gap-2">
-        <Button size="sm" className="gap-1.5" onClick={() => setAdjustOpen(true)}>
-          <SlidersHorizontal className="h-3.5 w-3.5" /> Adjust Stock
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => toast(`Reorder drafted for ${item.materialName} (demo)`)}
-          className="gap-1.5"
-        >
-          <Truck className="h-3.5 w-3.5" /> Reorder
-        </Button>
+        <Can permission="inventory.adjust" fallback={<span />}>
+          <Button size="sm" className="gap-1.5 w-full" onClick={() => setAdjustOpen(true)}>
+            <SlidersHorizontal className="h-3.5 w-3.5" /> Adjust Stock
+          </Button>
+        </Can>
+        <ReorderButton materialId={item.materialId} warehouseId={item.warehouse.id} className="w-full" />
       </div>
 
       <AdjustmentDialog

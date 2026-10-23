@@ -1,20 +1,15 @@
 'use client';
 
 import React from 'react';
-import { toast } from 'sonner';
 import {
-  Badge, Button, ScrollArea, Skeleton, cn,
+  Badge, ScrollArea, Skeleton, cn,
   Sheet, SheetContent, SheetTitle,
 } from '@sitepilot/ui';
-import {
-  X, ArrowRight, Check, Package, AlertTriangle, CheckCircle2, XCircle, Ban,
-} from 'lucide-react';
-import {
-  useTransfer, useUpdateTransfer,
-  type TransferDetail, type TransferAction,
-} from '@/hooks/api/use-inventory';
+import { X, ArrowRight, Check, Package, AlertTriangle } from 'lucide-react';
+import { useTransfer, type TransferDetail } from '@/hooks/api/use-inventory';
 import { formatDate, formatNumber } from '@/lib/utils';
 import { getTransferStatusMeta } from './inventory-format';
+import { TransferActions } from './TransferActions';
 
 interface TransferDrawerProps {
   transferId: string | null;
@@ -22,49 +17,8 @@ interface TransferDrawerProps {
   onClose: () => void;
 }
 
-interface ActionButton {
-  action: TransferAction;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  variant: 'default' | 'outline';
-}
-
-function actionsForStatus(status: TransferDetail['status']): ActionButton[] {
-  if (status === 'PENDING') {
-    return [
-      { action: 'approve', label: 'Approve', icon: CheckCircle2, variant: 'default' },
-      { action: 'reject', label: 'Reject', icon: XCircle, variant: 'outline' },
-    ];
-  }
-  if (status === 'APPROVED' || status === 'IN_TRANSIT') {
-    return [
-      { action: 'complete', label: 'Complete', icon: CheckCircle2, variant: 'default' },
-      { action: 'cancel', label: 'Cancel', icon: Ban, variant: 'outline' },
-    ];
-  }
-  return [];
-}
-
-function TransferDrawerBody({
-  transfer,
-  onClose,
-}: {
-  transfer: TransferDetail;
-  onClose: () => void;
-}): React.ReactElement {
-  const updateTransfer = useUpdateTransfer();
+function TransferDrawerBody({ transfer }: { transfer: TransferDetail }): React.ReactElement {
   const meta = getTransferStatusMeta(transfer.status);
-  const actions = actionsForStatus(transfer.status);
-
-  async function runAction(action: TransferAction): Promise<void> {
-    try {
-      await updateTransfer.mutateAsync({ id: transfer.id, action });
-      toast.success(`Transfer ${transfer.code} ${action}d`);
-      if (action === 'complete' || action === 'reject' || action === 'cancel') onClose();
-    } catch {
-      toast.error(`Unable to ${action} this transfer. Please try again.`);
-    }
-  }
 
   return (
     <>
@@ -96,14 +50,25 @@ function TransferDrawerBody({
                   )}>
                     <Check className="h-3.5 w-3.5" />
                   </div>
-                  <div className="flex items-center justify-between flex-1 gap-2">
-                    <span className={cn('text-sm', step.done ? 'font-medium' : 'text-muted-foreground')}>{step.stage}</span>
-                    {step.date && <span className="text-xs text-muted-foreground">{formatDate(step.date)}</span>}
+                  <div className="flex items-center justify-between flex-1 gap-2 min-w-0">
+                    <span className={cn('text-sm truncate', step.done ? 'font-medium' : 'text-muted-foreground')}>
+                      {step.stage}{step.actor ? <span className="font-normal text-muted-foreground"> · {step.actor}</span> : null}
+                    </span>
+                    {step.date && <span className="text-xs text-muted-foreground shrink-0">{formatDate(step.date)}</span>}
                   </div>
                 </div>
               ))}
             </div>
           </div>
+
+          {transfer.reviewNote && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30">
+              <h4 className="text-sm font-semibold mb-1.5">
+                {transfer.status === 'CANCELLED' ? 'Cancellation note' : 'Reason for rejection'}
+              </h4>
+              <p className="text-sm text-muted-foreground">{transfer.reviewNote}</p>
+            </div>
+          )}
 
           {transfer.note && (
             <div className="rounded-xl border bg-card p-4">
@@ -132,26 +97,7 @@ function TransferDrawerBody({
         </div>
       </ScrollArea>
 
-      {/* Footer */}
-      {actions.length > 0 && (
-        <div className="shrink-0 border-t bg-background px-5 py-3 grid grid-cols-2 gap-2">
-          {actions.map((a) => {
-            const Icon = a.icon;
-            return (
-              <Button
-                key={a.action}
-                size="sm"
-                variant={a.variant}
-                className="gap-1.5"
-                disabled={updateTransfer.isPending}
-                onClick={() => runAction(a.action)}
-              >
-                <Icon className="h-3.5 w-3.5" /> {a.label}
-              </Button>
-            );
-          })}
-        </div>
-      )}
+      <TransferActions transfer={transfer} />
     </>
   );
 }
@@ -183,7 +129,7 @@ export function TransferDrawer({ transferId, open, onClose }: TransferDrawerProp
             <Skeleton className="h-40 w-full rounded-xl" />
           </div>
         ) : (
-          <TransferDrawerBody transfer={transfer} onClose={onClose} />
+          <TransferDrawerBody transfer={transfer} />
         )}
       </SheetContent>
     </Sheet>

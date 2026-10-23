@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -7,9 +8,10 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { CorsIoAdapter } from './common/websocket/cors-io.adapter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['error', 'warn', 'log'],
   });
 
@@ -24,6 +26,11 @@ async function bootstrap() {
     .filter(Boolean);
   const corsOrigins = configuredOrigins.length > 0 ? configuredOrigins : [frontendUrl];
 
+  // Behind a reverse proxy, rate limits must key on the client's IP rather than the proxy's.
+  // Set TRUST_PROXY to the number of proxy hops; leave it unset when clients connect directly.
+  const trustedProxyHops = Number(config.get<string>('TRUST_PROXY') ?? 0);
+  if (trustedProxyHops > 0) app.set('trust proxy', trustedProxyHops);
+
   app.use(helmet());
   app.use(cookieParser(config.get<string>('COOKIE_SECRET')));
 
@@ -33,6 +40,8 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
+
+  app.useWebSocketAdapter(new CorsIoAdapter(app, corsOrigins));
 
   app.setGlobalPrefix('api');
 

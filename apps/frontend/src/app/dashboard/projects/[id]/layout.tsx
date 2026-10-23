@@ -4,12 +4,15 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ChevronRight, ArrowLeft, Building2, MapPin, Calendar, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, ArrowLeft, Building2, MapPin, Calendar, CheckCircle2, Archive, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { Badge, Button, Skeleton, cn } from '@sitepilot/ui';
 import { useProject } from '@/hooks/api/use-projects';
 import { ProjectFormDialog } from '../components/ProjectFormDialog';
+import { Can } from '@/components/shared/Can';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { ProjectActionsMenu } from '../components/ProjectActionsMenu';
 
 const tabs = [
   { name: 'Overview',        href: '' },
@@ -25,10 +28,10 @@ const tabs = [
 ];
 
 function statusVariant(status: string) {
-  if (status === 'ACTIVE')    return 'default' as const;
-  if (status === 'ON_HOLD')   return 'secondary' as const;
+  if (status === 'ACTIVE') return 'default' as const;
   if (status === 'COMPLETED') return 'outline' as const;
-  return 'destructive' as const;
+  if (status === 'CANCELLED') return 'destructive' as const;
+  return 'secondary' as const;
 }
 
 function statusLabel(status: string) {
@@ -44,7 +47,7 @@ export default function ProjectDetailLayout({
 }) {
   const pathname = usePathname();
   const projectId = params.id;
-  const { data: project, isLoading } = useProject(projectId);
+  const { data: project, isLoading, isError, refetch } = useProject(projectId);
   const [editOpen, setEditOpen] = useState(false);
 
   return (
@@ -102,14 +105,16 @@ export default function ProjectDetailLayout({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <Button variant="outline" disabled={!project} onClick={() => setEditOpen(true)}>
-              Project Settings
-            </Button>
-            <Button disabled={!project} onClick={() => setEditOpen(true)}>
-              Update Progress
-            </Button>
-          </div>
+          {project && (
+            <div className="flex items-center gap-3 shrink-0">
+              {project.status !== 'ARCHIVED' && (
+                <Can permission="project.update">
+                  <Button onClick={() => setEditOpen(true)}>Edit Project</Button>
+                </Can>
+              )}
+              <ProjectActionsMenu project={project} />
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -146,8 +151,29 @@ export default function ProjectDetailLayout({
       </div>
 
       <div className="flex-1 overflow-y-auto bg-muted/20 p-4 md:p-8">
-        <div className="max-w-7xl mx-auto w-full h-full">
-          {children}
+        <div className="max-w-7xl mx-auto w-full h-full space-y-6">
+          {project?.status === 'ARCHIVED' && (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+              <Archive className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                This project was archived{project.archivedAt ? ` on ${format(new Date(project.archivedAt), 'dd MMM yyyy')}` : ''}.
+                Its records stay readable, but it can&apos;t be edited until it&apos;s restored.
+              </p>
+            </div>
+          )}
+          {isError ? (
+            <EmptyState
+              icon={AlertTriangle}
+              title="Unable to load this project"
+              description="It may have been deleted, or you may be offline."
+              action={(
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+                  <Button asChild><Link href="/dashboard/projects">Back to projects</Link></Button>
+                </div>
+              )}
+            />
+          ) : children}
         </div>
       </div>
 

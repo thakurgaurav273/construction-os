@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 
 export interface Project {
@@ -15,8 +15,37 @@ export interface Project {
   spent: number;
   startDate: string | null;
   expectedCompletion: string | null;
+  archivedAt: string | null;
   memberCount: number;
 }
+
+/** Lightweight project for pickers and filters; archived projects are never offered. */
+export interface ProjectOption {
+  id: string;
+  name: string;
+  code: string;
+  status: string;
+  progress: number;
+  location: string | null;
+}
+
+export interface ProjectListFilters {
+  search?: string;
+  status?: string;
+  priority?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ProjectPage {
+  items: Project[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export type ProjectMemberRole = 'MANAGER' | 'ENGINEER' | 'VIEWER';
 
 export interface AvailableMember {
   id: string;
@@ -63,13 +92,28 @@ export interface ProjectDetail extends Project {
   }[];
 }
 
+/** Every project that can take new work, for pickers and filters. */
 export function useProjects() {
-  return useQuery<Project[]>({
-    queryKey: ['projects'],
+  return useQuery<ProjectOption[]>({
+    queryKey: ['projects', 'options'],
     queryFn: async () => {
-      const res = await apiClient.get('/projects');
+      const res = await apiClient.get('/projects/options');
       return res.data.data ?? res.data;
     },
+    staleTime: 30_000,
+  });
+}
+
+/** The paginated projects list, filtered on the server. */
+export function useProjectList(filters: ProjectListFilters) {
+  return useQuery<ProjectPage>({
+    queryKey: ['projects', 'list', filters],
+    queryFn: async () => {
+      const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== undefined && value !== ''));
+      const res = await apiClient.get('/projects', { params });
+      return res.data.data ?? res.data;
+    },
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
 }
@@ -137,4 +181,37 @@ export function useAddProjectMember() {
       qc.invalidateQueries({ queryKey: ['project', variables.id] });
     },
   });
+}
+
+function useProjectMutation<TVariables extends { id: string }>(request: (variables: TVariables) => Promise<unknown>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: request,
+    onSuccess: (_result, variables) => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      qc.invalidateQueries({ queryKey: ['project', variables.id] });
+    },
+  });
+}
+
+export function useArchiveProject() {
+  return useProjectMutation(({ id }: { id: string }) => apiClient.post(`/projects/${id}/archive`));
+}
+
+export function useRestoreProject() {
+  return useProjectMutation(({ id }: { id: string }) => apiClient.post(`/projects/${id}/restore`));
+}
+
+export function useDeleteProject() {
+  return useProjectMutation(({ id }: { id: string }) => apiClient.delete(`/projects/${id}`));
+}
+
+export function useChangeProjectMemberRole() {
+  return useProjectMutation(({ id, userId, role }: { id: string; userId: string; role: ProjectMemberRole }) =>
+    apiClient.patch(`/projects/${id}/members/${userId}`, { role }));
+}
+
+export function useRemoveProjectMember() {
+  return useProjectMutation(({ id, userId }: { id: string; userId: string }) =>
+    apiClient.delete(`/projects/${id}/members/${userId}`));
 }
