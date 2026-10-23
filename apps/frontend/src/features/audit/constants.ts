@@ -2,6 +2,9 @@
 export const AUDIT_ENTITY_FILTERS: { value: string; label: string }[] = [
   { value: 'purchase_order', label: 'Purchase orders' },
   { value: 'invoice', label: 'Invoices' },
+  { value: 'ra_bill', label: 'RA bills' },
+  { value: 'contract', label: 'Contracts' },
+  { value: 'client', label: 'Clients' },
   { value: 'payment', label: 'Payments' },
   { value: 'stock_transfer', label: 'Stock transfers' },
   { value: 'stock_adjustment', label: 'Stock adjustments' },

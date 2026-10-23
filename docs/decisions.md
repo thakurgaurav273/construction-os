@@ -1214,6 +1214,53 @@ Members could sign out only the browser they were using. They had no way to see 
 
 ---
 
+# ADR-031 - Billing: One RA Bill Model for Both Directions
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Contractors bill their clients in running account (RA) bills against a BOQ, and certify their subcontractors' RA bills the same way. Every organization keeps these in its own spreadsheet layout (see the MIPL "RA Bill 04" sample: an abstract plus a measurement book with Nos × L × B × H rows, steel weights, deductions for openings, and quantities held back). SitePilot needs one way to hold this data regardless of layout.
+
+---
+
+## Decision
+
+- **One fixed model for everyone, with a direction per contract.** `Contract.direction` is CLIENT (we bill a `Client`, money in) or SUBCONTRACT (a `Vendor` bills us, money out). BOQ items, measurement books, bills, taxes and deductions are shared by both; only the party and the meaning of "certify" differ.
+- **Measurements are the source of the claim.** Each bill has measurement rows per BOQ line (DIMENSIONS, STEEL, DIRECT, optionally deductions). The server computes every row and the line's claimed quantity; the client never sends quantities for computed rows.
+- **Claimed vs certified per line.** Certifying records how much was accepted; the difference is held on that bill. "Previous" on a bill is the certified total of the contract's earlier certified bills, so bills run in sequence with at most one open bill per contract.
+- **Rates freeze at certification.** Lines keep the BOQ rate they were certified at, so a later rate revision re-prices only the open bill.
+- **Taxes and deductions are data, not code.** Each contract holds rules (percent of gross or fixed, add or deduct), copied onto every new bill and editable per bill. This covers GST, TDS, BOCW, security deposit, retention, safety holds and advance recovery without per-organization logic.
+- **Certification rules differ by direction.** On a subcontract, certifying approves money we owe, so the preparer can't certify (maker-checker), like purchase orders and payments. On a client contract, certifying records the client's own certificate, so whoever has `billing.certify` can enter it.
+- **Permissions:** `billing.view`, `contract.manage`, `billing.prepare`, `billing.certify`. Site engineers prepare measurement books; project managers certify; finance sets up contracts and prepares bills.
+- Stored `grossAmount` / `netAmount` on each bill are refreshed with every change, so lists never recompute bills; the detail view recomputes the abstract from lines.
+
+---
+
+## Alternatives
+
+- **Separate modules for client billing and subcontractor billing**: simpler individually, but would duplicate BOQs, measurement books and the abstract, and block the planned margin view (client rate vs subcontract rate per item).
+- **AI reading each organization's bill sheet every time**: flexible, but not deterministic or auditable for money. Spreadsheet import (phase 3) will instead learn a layout once and apply it in code, as in ADR-029.
+- **Per-organization code or "skills" for their formats**: doesn't scale and hides business rules; layouts and deduction rules are data instead.
+
+---
+
+## Consequences
+
+- Finance integration comes next (phase 2): subcontract bills will create vendor bills; client bills will become receivables. Until then, certified bills don't move money in Finance.
+- A cancelled bill keeps its sequence number, so numbering can have gaps (RA-02 cancelled, next is RA-03). This keeps the history honest.
+- Bills are capped at 300 measurement rows per BOQ line and 500 BOQ lines per contract.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

@@ -48,6 +48,9 @@ export class NotificationRulesService implements OnModuleInit {
     'daily_report.submitted': (event) => this.dailyReportSubmitted(event),
     'daily_report.approved': (event) => this.dailyReportDecided(event, NotificationType.SUCCESS, 'approved'),
     'daily_report.rejected': (event) => this.dailyReportDecided(event, NotificationType.WARNING, 'sent back'),
+    'ra_bill.submitted': (event) => this.raBillSubmitted(event),
+    'ra_bill.certified': (event) => this.raBillDecided(event, NotificationType.SUCCESS, 'certified'),
+    'ra_bill.changes_requested': (event) => this.raBillDecided(event, NotificationType.WARNING, 'sent back'),
     'invoice.submitted': (event) => this.invoiceSubmitted(event),
     'invoice.approved': (event) => this.invoiceDecided(event, NotificationType.SUCCESS, 'approved'),
     'invoice.rejected': (event) => this.invoiceDecided(event, NotificationType.ERROR, 'rejected'),
@@ -142,6 +145,42 @@ export class NotificationRulesService implements OnModuleInit {
       title: `Daily report ${verb}`,
       body: `${event.actorName} ${verb} your ${report.project.name} report for ${formatDay(report.date)}.${reviewNote(event)}`,
       link: `/dashboard/projects/${report.projectId}/daily-reports/${event.entityId}`,
+    }];
+  }
+
+  private findRaBill(id: string | null) {
+    return this.prisma.raBill.findUnique({
+      where: { id: id ?? '' },
+      select: { sequence: true, projectId: true, preparedById: true, contract: { select: { code: true, direction: true } } },
+    });
+  }
+
+  /** Only subcontract bills wait on someone here; a client bill waits on the client. */
+  private async raBillSubmitted(event: DomainEvent): Promise<NotificationPlan[]> {
+    const bill = await this.findRaBill(event.entityId);
+    if (!bill || bill.contract.direction !== 'SUBCONTRACT') return [];
+    const code = `RA-${String(bill.sequence).padStart(2, '0')}`;
+    return [{
+      recipients: await this.recipients.withPermission('billing.certify', event.organizationId, event.actorId, bill.projectId),
+      category: 'approvals',
+      type: NotificationType.INFO,
+      title: `${code} on ${bill.contract.code} needs certification`,
+      body: `${event.actorName} submitted a subcontractor RA bill for certification.`,
+      link: `/dashboard/billing/ra-bills/${event.entityId}`,
+    }];
+  }
+
+  private async raBillDecided(event: DomainEvent, type: NotificationType, verb: string): Promise<NotificationPlan[]> {
+    const bill = await this.findRaBill(event.entityId);
+    if (!bill) return [];
+    const code = `RA-${String(bill.sequence).padStart(2, '0')}`;
+    return [{
+      recipients: this.recipients.only(bill.preparedById, event.actorId),
+      category: 'decisions',
+      type,
+      title: `${code} on ${bill.contract.code} ${verb}`,
+      body: `${event.actorName} ${verb} the RA bill you prepared.${reviewNote(event)}`,
+      link: `/dashboard/billing/ra-bills/${event.entityId}`,
     }];
   }
 

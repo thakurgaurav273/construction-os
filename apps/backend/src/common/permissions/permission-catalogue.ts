@@ -36,6 +36,10 @@ export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
   'payment.approve': { group: 'Finance', label: 'Approve payments' },
   'payment.release': { group: 'Finance', label: 'Record released payments' },
   'report.manage': { group: 'Reports', label: 'Generate and schedule reports' },
+  'billing.view': { group: 'Billing', label: 'View contracts and RA bills' },
+  'contract.manage': { group: 'Billing', label: 'Set up clients, contracts, BOQs and deductions' },
+  'billing.prepare': { group: 'Billing', label: 'Prepare RA bills and measurement books' },
+  'billing.certify': { group: 'Billing', label: 'Certify RA bills' },
   'members.manage': { group: 'Administration', label: 'Invite members and change roles' },
   'organization.manage': { group: 'Administration', label: 'Edit organization settings' },
   'audit.view': { group: 'Administration', label: 'View the audit log' },
@@ -64,8 +68,10 @@ export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     // Project managers certify bills for work on their sites; finance releases the money.
     'finance.view', 'invoice.approve',
     'report.manage',
+    'billing.view', 'contract.manage', 'billing.prepare', 'billing.certify',
   ],
-  SITE_ENGINEER: [...SITE_BASICS, 'po.create'],
+  // Site engineers keep the measurement book; certifying stays with project managers.
+  SITE_ENGINEER: [...SITE_BASICS, 'po.create', 'billing.view', 'billing.prepare'],
   STORE_MANAGER: [
     'ai.use', 'document.upload', 'delivery.receive', 'material.manage', 'material.issue', 'inventory.adjust', 'inventory.transfer',
     'warehouse.manage',
@@ -74,6 +80,7 @@ export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
   FINANCE: [
     'ai.use', 'document.upload', 'finance.view', 'invoice.create', 'invoice.approve',
     'payment.request', 'payment.approve', 'payment.release', 'report.manage',
+    'billing.view', 'contract.manage', 'billing.prepare',
   ],
   VIEWER: [],
 };

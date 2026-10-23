@@ -14,6 +14,7 @@ import {
   Warehouse,
   Users,
   DollarSign,
+  Receipt,
   BarChart3,
   Settings,
   ChevronLeft,
@@ -70,6 +71,7 @@ const navigation: NavGroup[] = [
     group: 'Business',
     items: [
       { name: 'Finance', href: '/dashboard/finance',  icon: DollarSign, permission: 'finance.view' },
+      { name: 'Billing', href: '/dashboard/billing',  icon: Receipt, permission: 'billing.view' },
       { name: 'Reports', href: '/dashboard/reports',  icon: BarChart3 },
     ],
   },

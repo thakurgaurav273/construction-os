@@ -172,6 +172,21 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 
 > Verified 2026-10-24: 45 backend unit tests (incl. contrast), 6 API checks (hex/contrast validation, permissions, audit, members read it) and a headless-browser run (preset → save re-themes the app instantly, other member in dark mode gets the lighter shade, read-only for non-admins, too-light colour blocked, default restored).
 
+### T21. Billing (RA bills) — phase 1  `[x]`
+- [x] One module for both directions (ADR-031): client contracts (we bill a client) and subcontracts (a vendor bills us); new `Client` records; contracts per project with the party's WO/PO number
+- [x] BOQ per contract (item no, DSR/NS code, unit, quantity, rate, extra items), saved as a whole list; lines already billed can be edited but not removed; paste rows straight from Excel/Numbers
+- [x] Taxes and deductions per contract (percent of gross or fixed: GST, TDS, BOCW, security deposit, retention, safety hold, advance recovery), copied onto each bill and editable per bill
+- [x] RA bills in sequence (one open bill per contract); measurement book per BOQ line: Nos × L × B × H, steel (nos × cut length × kg/m), direct quantity, deduction rows; claimed quantity = measurement total
+- [x] Abstract: previous (certified on earlier bills) / this bill / up to date, quantities and amounts, over-BOQ flag; gross → taxes/deductions → net payable
+- [x] Workflow: Draft → Submitted → Certified, or sent back with a note; cancel open bills. Certifying records certified quantity per line (less than claimed = held, with reason) and freezes the rate. Subcontract bills are maker-checker; client bills record the client's certificate
+- [x] Permissions `billing.view`, `contract.manage`, `billing.prepare`, `billing.certify`; audit log, project activity, bill timeline, notifications (subcontract bill awaiting certification, bill certified / sent back)
+- [x] `/dashboard/billing` (RA bills, contracts, clients), contract page, bill page; loading, empty, error and restricted states; phone layout
+- [ ] Phase 2: subcontract bills create a vendor bill in Finance; client bills become receivables with payments received; retention ledger and release
+- [ ] Phase 3: import RA bills / measurement books with a saved per-organization layout (AI-proposed once, deterministic after); print/export in the organization's format
+- [ ] Phase 4: link subcontract items to client BOQ items for margin per item; recover issued materials from subcontractor bills
+
+> Verified 2026-10-24: 71 HTTP checks (permissions per role, client validation, contract party rules, BOQ duplicates and in-use protection, measurement maths incl. deductions and steel, totals with five tax/deduction lines, one open bill, locked submitted bills, certified ≤ claimed, held quantities, frozen rates after a rate revision, previous quantities on the next bill, over-BOQ flag, send back / cancel / close rules, subcontract maker-checker, list filters, notifications, audit, timeline), 5 unit tests for the billing maths, and a headless-browser run (finance creates a contract, pastes a BOQ, starts and measures a bill with a deduction, submits; the PM records certification with a hold; site engineer read-only on a phone with no horizontal scroll; procurement sees the restricted state).
+
 ### T14. Background jobs
 - [ ] BullMQ + Redis queue module
 

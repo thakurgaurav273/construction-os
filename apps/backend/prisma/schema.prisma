@@ -119,6 +119,8 @@ model User {
   notificationPreferences NotificationPreference[]
   aiAccessRequests        AiAccessRequest[]   @relation("AiAccessRequester")
   aiConversations         AiConversation[]
+  preparedRaBills         RaBill[]            @relation("RaBillPreparer")
+  certifiedRaBills        RaBill[]            @relation("RaBillCertifier")
 
   @@map("users")
 }
@@ -181,6 +183,9 @@ model Organization {
   aiInsightSnapshots      AiInsightSnapshot[]
   aiConversations         AiConversation[]
   importTemplates         ImportTemplate[]
+  clients                 Client[]
+  contracts               Contract[]
+  raBills                 RaBill[]
 
   @@map("organizations")
 }
@@ -332,6 +337,8 @@ model Project {
   generatedReports      GeneratedReport[]
   materialIssues        MaterialIssue[]
   aiConversations       AiConversation[]
+  contracts             Contract[]
+  raBills               RaBill[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -1062,6 +1069,7 @@ model Vendor {
   awardedRfqs    Rfq[]           @relation("RfqAwardedVendor")
   invoices       Invoice[]
   payments       Payment[]
+  contracts      Contract[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -1752,4 +1760,265 @@ model ImportTemplate {
   @@unique([organizationId, entity, name])
   @@index([organizationId, entity, headerSignature])
   @@map("import_templates")
+}
+
+// ─── Billing (RA bills) ──────────────────────────────────────────────────────
+
+/// Which way a contract's bills go. CLIENT: we bill the client (money in). SUBCONTRACT: a subcontractor bills us (money out).
+enum ContractDirection {
+  CLIENT
+  SUBCONTRACT
+}
+
+enum ContractStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum BillAdjustmentEffect {
+  ADD
+  DEDUCT
+}
+
+enum BillAdjustmentCalculation {
+  /// Percentage of the bill's gross amount, e.g. CGST 9% or security deposit 10%.
+  PERCENT
+  /// A fixed amount on each bill, e.g. mobilisation advance recovery.
+  FIXED
+}
+
+enum RaBillStatus {
+  DRAFT
+  SUBMITTED
+  CHANGES_REQUESTED
+  CERTIFIED
+  CANCELLED
+}
+
+enum MeasurementType {
+  /// Nos × length × breadth × height; blank dimensions count as 1.
+  DIMENSIONS
+  /// Steel by weight: nos × cut length × kg per metre.
+  STEEL
+  /// The quantity is entered as is, e.g. trips or lump sums.
+  DIRECT
+}
+
+/// Someone we bill: the owner or main contractor on a client contract.
+model Client {
+  id             String   @id @default(uuid())
+  name           String
+  contactPerson  String?
+  email          String?
+  phone          String?
+  gstNumber      String?
+  address        String?
+  organizationId String
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  contracts    Contract[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("clients")
+}
+
+/// A work order or PO with an agreed BOQ, billed in running account (RA) bills. The other party is a client
+/// (direction CLIENT) or a vendor acting as subcontractor (direction SUBCONTRACT), never both.
+model Contract {
+  id             String            @id @default(uuid())
+  /// Our number, e.g. CT-0003.
+  code           String
+  direction      ContractDirection
+  /// The party's own work order / PO number, e.g. 5500044952-025-1041.
+  reference      String?
+  title          String
+  status         ContractStatus    @default(ACTIVE)
+  startDate      DateTime?
+  endDate        DateTime?
+  notes          String            @default("")
+  projectId      String
+  clientId       String?
+  vendorId       String?
+  organizationId String
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization             @relation(fields: [organizationId], references: [id])
+  project      Project                  @relation(fields: [projectId], references: [id])
+  client       Client?                  @relation(fields: [clientId], references: [id])
+  vendor       Vendor?                  @relation(fields: [vendorId], references: [id])
+  items        ContractItem[]
+  adjustments  ContractAdjustmentRule[]
+  bills        RaBill[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, direction])
+  @@index([projectId])
+  @@map("contracts")
+}
+
+/// One BOQ line: what may be billed, in which unit, up to which quantity, at which rate.
+model ContractItem {
+  id          String   @id @default(uuid())
+  contractId  String
+  /// The party's item number, e.g. 50.1.
+  itemNo      String
+  /// Schedule of rates code, e.g. DSR 2.32 or NS-1.1.
+  rateCode    String?
+  description String
+  unit        String
+  quantity    Decimal  @db.Decimal(15, 3)
+  rate        Decimal  @db.Decimal(15, 2)
+  /// Extra / non-scheduled item added after award.
+  isExtra     Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contract     Contract            @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  lines        RaBillLine[]
+  measurements RaBillMeasurement[]
+
+  @@unique([contractId, itemNo])
+  @@index([contractId])
+  @@map("contract_items")
+}
+
+/// Taxes and deductions applied to every bill of a contract; copied onto each new bill, where they can be changed.
+model ContractAdjustmentRule {
+  id          String                    @id @default(uuid())
+  contractId  String
+  label       String
+  effect      BillAdjustmentEffect
+  calculation BillAdjustmentCalculation
+  /// Percent for PERCENT, rupees for FIXED.
+  value       Decimal                   @db.Decimal(15, 2)
+  sortOrder   Int                       @default(0)
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@map("contract_adjustment_rules")
+}
+
+/// A running account bill. Quantities are claimed through the measurement book and certified per BOQ line;
+/// "previous" quantities are the certified totals of the contract's earlier bills.
+model RaBill {
+  id              String       @id @default(uuid())
+  contractId      String
+  projectId       String
+  organizationId  String
+  /// 1, 2, 3… within the contract (RA-01, RA-02…).
+  sequence        Int
+  /// The party's own bill number, if different.
+  reference       String?
+  periodFrom      DateTime
+  periodTo        DateTime
+  status          RaBillStatus @default(DRAFT)
+  notes           String       @default("")
+  /// Totals as of the last change; fixed once the bill is certified.
+  grossAmount     Decimal      @default(0) @db.Decimal(15, 2)
+  netAmount       Decimal      @default(0) @db.Decimal(15, 2)
+  preparedById    String?
+  submittedAt     DateTime?
+  certifiedById   String?
+  certifiedAt     DateTime?
+  reviewNote      String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  contract     Contract            @relation(fields: [contractId], references: [id])
+  project      Project             @relation(fields: [projectId], references: [id])
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  preparedBy   User?               @relation("RaBillPreparer", fields: [preparedById], references: [id], onDelete: SetNull)
+  certifiedBy  User?               @relation("RaBillCertifier", fields: [certifiedById], references: [id], onDelete: SetNull)
+  lines        RaBillLine[]
+  measurements RaBillMeasurement[]
+  adjustments  RaBillAdjustment[]
+  events       RaBillEvent[]
+
+  @@unique([contractId, sequence])
+  @@index([organizationId, status])
+  @@index([projectId])
+  @@map("ra_bills")
+}
+
+/// One BOQ line on a bill. Claimed is the measurement book total; certified is what was accepted.
+model RaBillLine {
+  id                String   @id @default(uuid())
+  billId            String
+  contractItemId    String
+  claimedQuantity   Decimal  @db.Decimal(15, 3)
+  certifiedQuantity Decimal? @db.Decimal(15, 3)
+  /// The BOQ rate, frozen at certification so later rate revisions don't change certified bills.
+  rate              Decimal? @db.Decimal(15, 2)
+  /// Why less was certified than claimed, e.g. "held due to deviation".
+  certificationNote String?
+
+  bill         RaBill       @relation(fields: [billId], references: [id], onDelete: Cascade)
+  contractItem ContractItem @relation(fields: [contractItemId], references: [id])
+
+  @@unique([billId, contractItemId])
+  @@index([contractItemId])
+  @@map("ra_bill_lines")
+}
+
+/// One row of the measurement book. Deductions (e.g. door openings) subtract from the item's total.
+model RaBillMeasurement {
+  id             String          @id @default(uuid())
+  billId         String
+  contractItemId String
+  description    String
+  type           MeasurementType
+  nos            Decimal?        @db.Decimal(15, 4)
+  length         Decimal?        @db.Decimal(15, 4)
+  breadth        Decimal?        @db.Decimal(15, 4)
+  height         Decimal?        @db.Decimal(15, 4)
+  /// kg per metre for STEEL. Inputs keep 4 decimals because widths are often averaged, e.g. (26.1 + 25.9 + 25.8 + 25.95) / 4.
+  unitWeight     Decimal?        @db.Decimal(15, 4)
+  /// Computed from the inputs (entered for DIRECT); negative for deductions.
+  quantity       Decimal         @db.Decimal(15, 3)
+  isDeduction    Boolean         @default(false)
+  sortOrder      Int             @default(0)
+
+  bill         RaBill       @relation(fields: [billId], references: [id], onDelete: Cascade)
+  contractItem ContractItem @relation(fields: [contractItemId], references: [id])
+
+  @@index([billId, contractItemId])
+  @@map("ra_bill_measurements")
+}
+
+model RaBillAdjustment {
+  id          String                    @id @default(uuid())
+  billId      String
+  label       String
+  effect      BillAdjustmentEffect
+  calculation BillAdjustmentCalculation
+  value       Decimal                   @db.Decimal(15, 2)
+  sortOrder   Int                       @default(0)
+
+  bill RaBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("ra_bill_adjustments")
+}
+
+/// The bill's timeline: created, submitted, sent back, certified, cancelled.
+model RaBillEvent {
+  id        String   @id @default(uuid())
+  billId    String
+  stage     String
+  actorName String
+  note      String   @default("")
+  createdAt DateTime @default(now())
+
+  bill RaBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("ra_bill_events")
 }
