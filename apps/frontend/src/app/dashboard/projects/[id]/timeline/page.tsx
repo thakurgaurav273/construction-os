@@ -66,9 +66,8 @@ export default function ProjectTimelinePage({ params }: { params: { id: string }
                 return (
                   <motion.div
                     key={item.id}
-                    initial={{ opacity: 0, x: -20 }}
+                    initial={false}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.08 }}
                     className="relative pl-8 md:pl-12 pr-6"
                   >
                     <div

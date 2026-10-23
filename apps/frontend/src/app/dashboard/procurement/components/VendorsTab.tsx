@@ -119,9 +119,8 @@ export function VendorsTab({ vendors, onSelect }: VendorsTabProps): React.ReactE
           {filtered.map((vendor, idx) => (
             <motion.div
               key={vendor.id}
-              initial={{ opacity: 0, y: 8 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.03 }}
             >
               <VendorCard vendor={vendor} onClick={() => onSelect(vendor)} />
             </motion.div>

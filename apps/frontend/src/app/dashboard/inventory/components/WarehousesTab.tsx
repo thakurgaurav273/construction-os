@@ -143,7 +143,7 @@ export function WarehousesTab({ onSelect }: WarehousesTabProps): React.ReactElem
         </div>
       )}
       <motion.div
-        initial={{ opacity: 0 }}
+        initial={false}
         animate={{ opacity: 1 }}
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
       >

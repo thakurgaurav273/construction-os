@@ -21,12 +21,12 @@ import {
   Lightbulb,
   type LucideIcon,
 } from 'lucide-react';
-import { cn } from '@sitepilot/ui';
+import { Skeleton, cn } from '@sitepilot/ui';
 import type { Permission } from '@sitepilot/types';
-import { useAuthStore } from '@/store/auth.store';
+import { useAuthHydrated, useAuthStore } from '@/store/auth.store';
 import { UserMenu } from '@/features/auth/components/UserMenu';
 import { useOrganizationSettings } from '@/hooks/api/use-settings';
-import { useCan } from '@/hooks/api/use-access';
+import { useCan, useCurrentAccess } from '@/hooks/api/use-access';
 
 interface NavItem {
   name: string;
@@ -92,10 +92,13 @@ export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const user = useAuthStore((state) => state.user);
   const organization = useAuthStore((state) => state.organization);
-  const { data: organizationSettings } = useOrganizationSettings();
+  const hydrated = useAuthHydrated();
+  const { data: organizationSettings, isLoading: settingsLoading } = useOrganizationSettings();
+  const { data: access } = useCurrentAccess();
   const can = useCan();
+  // Until access is known, permission-gated items hold their place as skeletons instead of popping in.
   const visibleNavigation = navigation
-    .map((group) => ({ ...group, items: group.items.filter((item) => !item.permission || can(item.permission)) }))
+    .map((group) => ({ ...group, items: group.items.filter((item) => !item.permission || !access || can(item.permission)) }))
     .filter((group) => group.items.length > 0);
 
   const userInitials = user?.name
@@ -116,7 +119,9 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex h-16 items-center px-4 border-b border-sidebar-border shrink-0">
         <div className="flex items-center gap-3 overflow-hidden">
-          {organizationSettings?.logoUrl ? (
+          {!hydrated || settingsLoading ? (
+            <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
+          ) : organizationSettings?.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, not a static asset
             <img src={organizationSettings.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded-md border bg-background object-contain" />
           ) : (
@@ -124,7 +129,7 @@ export function Sidebar() {
               {orgInitials}
             </div>
           )}
-          <AnimatePresence>
+          <AnimatePresence initial={false}>
             {!isCollapsed && (
               <motion.div
                 initial={{ opacity: 0, width: 0 }}
@@ -133,9 +138,13 @@ export function Sidebar() {
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <span className="block font-semibold text-sm text-sidebar-foreground whitespace-nowrap truncate leading-tight">
-                  {organizationSettings?.name ?? organization?.name ?? 'SitePilot'}
-                </span>
+                {hydrated ? (
+                  <span className="block font-semibold text-sm text-sidebar-foreground whitespace-nowrap truncate leading-tight">
+                    {organizationSettings?.name ?? organization?.name ?? 'SitePilot'}
+                  </span>
+                ) : (
+                  <Skeleton className="mb-1 h-3.5 w-28" />
+                )}
                 <span className="block text-[10px] text-muted-foreground whitespace-nowrap leading-tight">
                   Construction ERP
                 </span>
@@ -158,7 +167,7 @@ export function Sidebar() {
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-5">
         {visibleNavigation.map((group) => (
           <div key={group.group}>
-            <AnimatePresence>
+            <AnimatePresence initial={false}>
               {!isCollapsed && (
                 <motion.p
                   initial={{ opacity: 0 }}
@@ -174,6 +183,14 @@ export function Sidebar() {
 
             <div className="space-y-0.5 px-2">
               {group.items.map((item) => {
+                if (item.permission && !access) {
+                  return (
+                    <div key={item.href} className={cn('flex h-9 items-center gap-3 px-2.5', isCollapsed && 'justify-center px-0')} aria-hidden="true">
+                      <Skeleton className="h-4 w-4 shrink-0 rounded" />
+                      {!isCollapsed && <Skeleton className="h-3.5 w-24" />}
+                    </div>
+                  );
+                }
                 const active = isItemActive(item.href, pathname);
                 return (
                   <Link
@@ -201,7 +218,7 @@ export function Sidebar() {
                         active ? 'text-primary' : 'text-muted-foreground group-hover:text-sidebar-accent-foreground',
                       )}
                     />
-                    <AnimatePresence>
+                    <AnimatePresence initial={false}>
                       {!isCollapsed && (
                         <motion.span
                           initial={{ opacity: 0, width: 0 }}
@@ -233,10 +250,14 @@ export function Sidebar() {
               isCollapsed && 'justify-center',
             )}
           >
-            <div className="h-8 w-8 rounded-full bg-primary/10 border flex items-center justify-center text-xs font-semibold text-primary shrink-0">
-              {userInitials}
-            </div>
-            <AnimatePresence>
+            {hydrated ? (
+              <div className="h-8 w-8 rounded-full bg-primary/10 border flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+                {userInitials}
+              </div>
+            ) : (
+              <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
+            )}
+            <AnimatePresence initial={false}>
               {!isCollapsed && (
                 <motion.div
                   initial={{ opacity: 0, width: 0 }}
@@ -245,12 +266,21 @@ export function Sidebar() {
                   transition={{ duration: 0.2 }}
                   className="flex flex-col overflow-hidden"
                 >
-                  <span className="text-sm font-medium text-sidebar-foreground truncate leading-tight">
-                    {user?.name ?? 'User'}
-                  </span>
-                  <span className="text-xs text-muted-foreground truncate">
-                    {user?.email ?? ''}
-                  </span>
+                  {hydrated ? (
+                    <>
+                      <span className="text-sm font-medium text-sidebar-foreground truncate leading-tight">
+                        {user?.name ?? 'User'}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {user?.email ?? ''}
+                      </span>
+                    </>
+                  ) : (
+                    <div className="space-y-1.5 py-0.5">
+                      <Skeleton className="h-3.5 w-24" />
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

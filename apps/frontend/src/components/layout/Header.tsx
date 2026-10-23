@@ -1,9 +1,9 @@
 'use client';
 
 import { Search, Menu, UserCircle } from 'lucide-react';
-import { Button } from '@sitepilot/ui';
+import { Button, Skeleton } from '@sitepilot/ui';
 import { usePathname } from 'next/navigation';
-import { useAuthStore } from '@/store/auth.store';
+import { useAuthHydrated, useAuthStore } from '@/store/auth.store';
 
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
 import { UserMenu } from '@/features/auth/components/UserMenu';
@@ -11,6 +11,7 @@ import { UserMenu } from '@/features/auth/components/UserMenu';
 export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void, onSearchClick: () => void }) {
   const pathname = usePathname();
   const organizationName = useAuthStore((state) => state.organization?.name);
+  const hydrated = useAuthHydrated();
   
   const segments = pathname.split('/').filter(Boolean);
   const currentPath = segments.length > 0 
@@ -33,7 +34,7 @@ export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void
       <div className="flex flex-1 items-center justify-between gap-x-4 self-stretch lg:gap-x-6">
         
         <div className="flex items-center text-sm font-medium text-muted-foreground hidden sm:flex">
-          <span>{organizationName ?? 'SitePilot'}</span>
+          {hydrated ? <span>{organizationName ?? 'SitePilot'}</span> : <Skeleton className="h-4 w-24" />}
           <span className="mx-2 text-border">/</span>
           <span className="text-foreground">{currentPath}</span>
         </div>

@@ -247,9 +247,8 @@ export function MaterialsTable({ onSelect }: MaterialsTableProps): React.ReactEl
                   {items.map((material, idx) => (
                     <motion.tr
                       key={material.id}
-                      initial={{ opacity: 0, y: 4 }}
+                      initial={false}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.02 }}
                       onClick={() => onSelect(material.id)}
                       className="border-b last:border-0 hover:bg-muted/40 transition-colors cursor-pointer group"
                     >

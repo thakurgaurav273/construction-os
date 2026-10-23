@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { CommandPalette } from '@/components/CommandPalette';
-import { ThemeProvider } from 'next-themes';
 import { BrandThemeStyle } from '@/features/branding/components/BrandThemeStyle';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -12,7 +11,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <>
       <BrandThemeStyle />
       <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar />
@@ -25,13 +24,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onSearchClick={() => setCommandPaletteOpen(true)} 
           />
           
-          <main className="flex-1 overflow-y-auto bg-muted/20 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
+          <main className="flex-1 overflow-y-auto bg-muted/20">
             {children}
           </main>
         </div>
         
         <CommandPalette open={commandPaletteOpen} setOpen={setCommandPaletteOpen} />
       </div>
-    </ThemeProvider>
+    </>
   );
 }

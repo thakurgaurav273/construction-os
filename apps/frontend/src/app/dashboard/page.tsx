@@ -99,7 +99,7 @@ export default function DashboardPage() {
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: -16 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col sm:flex-row items-start justify-between gap-4"
       >
@@ -125,7 +125,7 @@ export default function DashboardPage() {
           {[1,2,3,4].map((i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
         </div>
       ) : (
-        <motion.div variants={containerVariants} initial="hidden" animate="show"
+        <motion.div variants={containerVariants} initial={false} animate="show"
           className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <motion.div variants={itemVariants}>
             <Card className="hover:shadow-md transition-all group">
@@ -193,7 +193,7 @@ export default function DashboardPage() {
       )}
 
       {/* Charts Row */}
-      <motion.div variants={containerVariants} initial="hidden" animate={isLoading ? 'hidden' : 'show'}
+      <motion.div variants={containerVariants} initial={false} animate="show"
         className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <motion.div variants={itemVariants} className="col-span-4">
           <Card className="h-full">
@@ -272,7 +272,7 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* Project Overview */}
-      <motion.div variants={itemVariants} initial="hidden" animate={isLoading ? 'hidden' : 'show'}>
+      <motion.div variants={itemVariants} initial={false} animate="show">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -324,7 +324,7 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* Activity & Workforce */}
-      <motion.div variants={containerVariants} initial="hidden" animate={isLoading ? 'hidden' : 'show'}
+      <motion.div variants={containerVariants} initial={false} animate="show"
         className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <motion.div variants={itemVariants} className="col-span-2">
           <Card>

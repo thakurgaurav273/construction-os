@@ -123,9 +123,8 @@ export function RfqTab({ rfqs, onSelect }: RfqTabProps): React.ReactElement {
                   return (
                     <motion.tr
                       key={rfq.id}
-                      initial={{ opacity: 0, y: 4 }}
+                      initial={false}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.02 }}
                       onClick={() => onSelect(rfq)}
                       onKeyDown={(event) => { if (event.key === 'Enter') onSelect(rfq); }}
                       tabIndex={0}

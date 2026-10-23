@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/auth.store';
+import { clearDeviceCache } from '@/lib/device-cache';
 import { authApi } from '../api/auth.api';
 
 /**
@@ -23,6 +24,7 @@ export function useSignOut(): { signOut: () => Promise<void>; isSigningOut: bool
       toast.warning('Signed out on this device. The server could not be reached to end the session.');
     } finally {
       clearAuth();
+      clearDeviceCache();
       queryClient.clear();
       setIsSigningOut(false);
       router.replace('/login');

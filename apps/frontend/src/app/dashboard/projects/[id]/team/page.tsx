@@ -58,16 +58,15 @@ export default function ProjectTeamPage({ params }: { params: { id: string } }) 
         />
       ) : (
         <motion.div
-          initial={{ opacity: 0 }}
+          initial={false}
           animate={{ opacity: 1 }}
           className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         >
           {members.map((member, i) => (
             <motion.div
               key={member.id}
-              initial={{ opacity: 0, y: 10 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
             >
               <Card className="h-full hover:shadow-md transition-shadow">
                 <CardContent className="p-6">

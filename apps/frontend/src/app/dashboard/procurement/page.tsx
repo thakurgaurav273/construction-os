@@ -108,7 +108,7 @@ export default function ProcurementPage(): React.ReactElement {
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <motion.div
-        initial={{ opacity: 0, y: -16 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col sm:flex-row items-start justify-between gap-4"
       >
@@ -146,9 +146,8 @@ export default function ProcurementPage(): React.ReactElement {
 
       <div className="grid gap-6 xl:grid-cols-4">
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
           className="xl:col-span-3 min-w-0"
         >
           <Tabs value={tab} onValueChange={setTab}>
@@ -197,9 +196,8 @@ export default function ProcurementPage(): React.ReactElement {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, x: 16 }}
+          initial={false}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
           className="xl:col-span-1"
         >
           <AiInsightPanel title="AI Procurement Insights" insights={insights} onSelect={handleInsight} className="sticky top-6" />

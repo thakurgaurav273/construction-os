@@ -25,16 +25,14 @@ export function ComingSoonPage({
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-12rem)] p-6 md:p-8">
       <motion.div
-        initial={{ opacity: 0, y: 24 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
         className="max-w-lg w-full"
       >
         <div className="text-center mb-8">
           <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
+            initial={false}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.3 }}
             className={`inline-flex h-20 w-20 items-center justify-center rounded-2xl ${iconBg} mb-6`}
           >
             <Icon className={`h-10 w-10 ${iconColor}`} />

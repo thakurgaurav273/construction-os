@@ -36,7 +36,7 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6 max-w-6xl mx-auto"
     >

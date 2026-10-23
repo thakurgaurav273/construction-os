@@ -66,7 +66,7 @@ export default function ProjectBudgetPage({ params }: { params: { id: string } }
   ];
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+    <motion.div initial={false} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">

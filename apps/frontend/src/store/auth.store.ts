@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Organization, User } from '@sitepilot/types';
@@ -24,3 +25,15 @@ export const useAuthStore = create<AuthState>()(
     { name: 'auth-storage' },
   ),
 );
+
+/**
+ * False on the server and during hydration, true once the persisted session has been read. Until then
+ * `user` is always null, so the shell shows placeholders instead of a wrong value ("?", "SitePilot").
+ */
+export function useAuthHydrated(): boolean {
+  return useSyncExternalStore(
+    (onChange) => useAuthStore.persist.onFinishHydration(onChange),
+    () => useAuthStore.persist.hasHydrated(),
+    () => false,
+  );
+}

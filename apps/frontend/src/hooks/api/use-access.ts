@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { CurrentAccess, Permission } from '@sitepilot/types';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/store/auth.store';
+import { DEVICE_CACHE_KEYS, readDeviceCache, writeDeviceCache } from '@/lib/device-cache';
 
 interface MeResponse {
   id: string;
@@ -23,14 +24,19 @@ export function useCurrentAccess() {
     queryFn: async () => {
       const res = await apiClient.get('/auth/me');
       const me: MeResponse = res.data.data ?? res.data;
-      return {
+      const access: CurrentAccess = {
         userId: me.id,
         organizationId: me.organizationId,
         role: me.role,
         permissions: me.permissions,
         isPlatformAdmin: me.isPlatformAdmin ?? false,
       };
+      writeDeviceCache(DEVICE_CACHE_KEYS.access(me.id), access);
+      return access;
     },
+    // Last-known access paints the navigation correctly at once; it is treated as stale and re-checked.
+    initialData: () => (userId ? readDeviceCache<CurrentAccess>(DEVICE_CACHE_KEYS.access(userId)) : undefined),
+    initialDataUpdatedAt: 0,
     enabled: !!userId,
     staleTime: 60_000,
   });

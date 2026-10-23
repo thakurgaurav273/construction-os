@@ -78,7 +78,7 @@ export function DeliveriesTab({ deliveries, analytics, onOpenOrder }: Deliveries
         {STATUS_CARDS.map((card, idx) => {
           const Icon = card.icon;
           return (
-            <motion.div key={card.key} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
+            <motion.div key={card.key} initial={false} animate={{ opacity: 1, y: 0 }}>
               <Card className={card.border}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -181,9 +181,8 @@ export function DeliveriesTab({ deliveries, analytics, onOpenOrder }: Deliveries
                     filtered.map((delivery, idx) => (
                       <motion.tr
                         key={delivery.id}
-                        initial={{ opacity: 0, y: 4 }}
+                        initial={false}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: Math.min(idx, 20) * 0.02 }}
                         onClick={() => onOpenOrder(delivery.purchaseOrder.id)}
                         onKeyDown={(event) => { if (event.key === 'Enter') onOpenOrder(delivery.purchaseOrder.id); }}
                         tabIndex={0}

@@ -57,9 +57,8 @@ function MovementRow({ movement, index }: { movement: MaterialMovement; index: n
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 4 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.02 }}
       className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 hover:bg-muted/40 transition-colors"
     >
       <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${meta.iconBgClass} shrink-0`}>

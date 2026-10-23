@@ -90,7 +90,7 @@ export default function InventoryPage(): React.ReactElement {
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: -16 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col sm:flex-row items-start justify-between gap-4"
       >
@@ -112,9 +112,8 @@ export default function InventoryPage(): React.ReactElement {
 
       {/* Tabs */}
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
       >
         <Tabs defaultValue="items">
           <TabsList className="mb-4 flex-wrap h-auto">

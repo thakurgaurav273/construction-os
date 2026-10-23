@@ -90,7 +90,7 @@ export default function WorkforcePage(): React.ReactElement {
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       {/* Page Header */}
       <motion.div
-        initial={{ opacity: 0, y: -16 }}
+        initial={false}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-col sm:flex-row items-start justify-between gap-4"
       >
@@ -171,9 +171,8 @@ export default function WorkforcePage(): React.ReactElement {
       {/* Main Content + Alerts */}
       <div className="grid gap-6 xl:grid-cols-4">
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
           className="xl:col-span-3"
         >
           {isLoading && <Skeleton className="h-[420px] w-full rounded-xl" />}
@@ -219,9 +218,8 @@ export default function WorkforcePage(): React.ReactElement {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, x: 16 }}
+          initial={false}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
           className="xl:col-span-1"
         >
           <WorkforceAlerts stats={stats} onMarkAttendance={() => setAttendanceOpen(true)} />

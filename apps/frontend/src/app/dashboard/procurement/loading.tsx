@@ -3,7 +3,7 @@ import { Skeleton } from '@sitepilot/ui';
 
 export default function ProcurementLoading(): React.ReactElement {
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 animate-in fade-in duration-500">
+    <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
         <div className="space-y-2">

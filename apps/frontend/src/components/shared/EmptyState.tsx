@@ -22,7 +22,7 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
         'flex flex-col items-center justify-center text-center rounded-xl border border-dashed border-border/60 bg-muted/20 px-6 py-16',

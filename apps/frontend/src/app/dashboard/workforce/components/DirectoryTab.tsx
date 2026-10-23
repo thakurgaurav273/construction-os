@@ -150,9 +150,8 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
                 paginated.map((worker, idx) => (
                   <motion.tr
                     key={worker.id}
-                    initial={{ opacity: 0, y: 4 }}
+                    initial={false}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.02 }}
                     onClick={() => onSelectWorker(worker)}
                     className="border-b last:border-0 hover:bg-muted/40 transition-colors cursor-pointer group"
                   >

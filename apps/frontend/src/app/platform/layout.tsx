@@ -20,7 +20,15 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8">
         {isLoading ? (
-          <Skeleton className="h-64 w-full rounded-xl" />
+          // Same frame as the console (title, tabs, panel) so the page drops in without shifting.
+          <div className="space-y-6" aria-busy="true" aria-label="Loading platform console">
+            <div className="space-y-2">
+              <Skeleton className="h-9 w-64 rounded-md" />
+              <Skeleton className="h-4 w-96 max-w-full rounded-md" />
+            </div>
+            <Skeleton className="h-10 w-[28rem] max-w-full rounded-lg" />
+            <Skeleton className="h-72 w-full rounded-xl" />
+          </div>
         ) : access?.isPlatformAdmin ? children : (
           <EmptyState
             icon={ShieldAlert}

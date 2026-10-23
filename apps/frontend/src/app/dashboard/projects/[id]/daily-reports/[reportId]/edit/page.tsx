@@ -61,7 +61,7 @@ export default function EditDailyReportPage({ params }: { params: { id: string; 
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
       className="max-w-4xl mx-auto space-y-8 pb-20"
     >

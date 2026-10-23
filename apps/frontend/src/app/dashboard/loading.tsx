@@ -1,65 +1,22 @@
+import React from 'react';
 import { Skeleton } from '@sitepilot/ui';
 
-export default function DashboardLoading() {
+/**
+ * Shown for any dashboard route while its code loads. It mirrors the shared page frame (title,
+ * description, one content panel) rather than any one page, so the page's own skeleton follows
+ * without the layout jumping.
+ */
+export default function DashboardLoading(): React.ReactElement {
   return (
-    <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto w-full">
-      {/* Header Skeleton */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-64 rounded-md" />
-          <Skeleton className="h-4 w-96 rounded-md" />
-        </div>
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-10 w-24 rounded-md" />
-          <Skeleton className="h-10 w-32 rounded-md" />
-        </div>
+    <div className="mx-auto w-full max-w-7xl flex-1 space-y-6 p-4 pt-6 md:p-8" aria-busy="true" aria-label="Loading page">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-56 rounded-md" />
+        <Skeleton className="h-4 w-80 max-w-full rounded-md" />
       </div>
-
-      {/* Stats Grid Skeleton */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
-            <div className="flex flex-row items-center justify-between pb-2">
-              <Skeleton className="h-4 w-24 rounded-md" />
-              <Skeleton className="h-4 w-4 rounded-full" />
-            </div>
-            <Skeleton className="h-8 w-32 rounded-md mt-2" />
-            <Skeleton className="h-3 w-48 rounded-md mt-3" />
-          </div>
-        ))}
-      </div>
-
-      {/* Main Content Area Skeleton */}
-      <div className="grid gap-6 md:grid-cols-7">
-        <div className="md:col-span-5 rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-border/60">
-            <Skeleton className="h-6 w-48 rounded-md mb-2" />
-            <Skeleton className="h-4 w-72 rounded-md" />
-          </div>
-          <div className="p-6 space-y-4">
-            <Skeleton className="h-12 w-full rounded-md" />
-            <Skeleton className="h-12 w-full rounded-md" />
-            <Skeleton className="h-12 w-full rounded-md" />
-            <Skeleton className="h-12 w-full rounded-md" />
-            <Skeleton className="h-12 w-full rounded-md" />
-          </div>
-        </div>
-
-        <div className="md:col-span-2 space-y-6">
-          <div className="rounded-xl border border-border/60 bg-card shadow-sm p-6">
-            <Skeleton className="h-6 w-32 rounded-md mb-4" />
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Skeleton className="h-10 w-10 rounded-full shrink-0" />
-                  <div className="space-y-2 flex-1">
-                    <Skeleton className="h-4 w-full rounded-md" />
-                    <Skeleton className="h-3 w-3/4 rounded-md" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+      <div className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b p-4"><Skeleton className="h-9 w-full max-w-sm rounded-md" /></div>
+        <div className="space-y-3 p-4">
+          {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-10 w-full rounded-md" />)}
         </div>
       </div>
     </div>
