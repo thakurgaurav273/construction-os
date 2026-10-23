@@ -27,6 +27,7 @@ const OPEN_WRITES = new Set([
   'NotificationsController.markAllRead',
   'NotificationsController.markRead',
   'NotificationsController.remove',
+  'NotificationsController.updatePreferences',
 ]);
 
 function requiredPermissions(controller: ControllerClass, handler: unknown): Permission[] {

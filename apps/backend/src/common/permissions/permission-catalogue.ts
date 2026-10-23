@@ -77,3 +77,8 @@ export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
 export function permissionsForRole(role: OrgRole): Permission[] {
   return [...new Set(ROLE_PERMISSIONS[role])];
 }
+
+/** Roles whose defaults include the permission, e.g. to find who can approve something. */
+export function rolesWithPermission(permission: Permission): OrgRole[] {
+  return Object.values(OrgRole).filter((role) => ROLE_PERMISSIONS[role].includes(permission));
+}

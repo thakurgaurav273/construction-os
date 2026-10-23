@@ -16,6 +16,7 @@ const UNAUDITED_WRITES = new Set([
   'NotificationsController.markAllRead',
   'NotificationsController.markRead',
   'NotificationsController.remove',
+  'NotificationsController.updatePreferences',
 ]);
 
 describe('audit coverage', () => {

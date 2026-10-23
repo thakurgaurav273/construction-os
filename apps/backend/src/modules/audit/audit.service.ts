@@ -4,6 +4,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { AUDIT_ACTIONS, AuditAction, isAuditAction } from '../../common/audit';
 import { AuditLogQueryDto } from './dto/audit-query.dto';
 import { AuditValue } from './audit-metadata';
+import { DomainEventsService } from '../../common/events';
 
 export interface AuditEntry {
   action: AuditAction;
@@ -46,7 +47,10 @@ const MAX_USER_AGENT_LENGTH = 300;
 export class AuditService {
   private readonly logger = new Logger(AuditService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: DomainEventsService,
+  ) {}
 
   /**
    * Writes one entry. A failed write is logged rather than thrown: by the time it runs, the action itself
@@ -54,7 +58,7 @@ export class AuditService {
    */
   async record(entry: AuditEntry): Promise<void> {
     try {
-      await this.prisma.auditLog.create({
+      const saved = await this.prisma.auditLog.create({
         data: {
           action: entry.action,
           entityType: AUDIT_ACTIONS[entry.action].entityType,
@@ -67,6 +71,18 @@ export class AuditService {
           userAgent: entry.userAgent?.slice(0, MAX_USER_AGENT_LENGTH) ?? null,
           organizationId: entry.organizationId,
         },
+      });
+      // Every audited action doubles as a domain event (e.g. for notifications).
+      this.events.publish({
+        action: entry.action,
+        organizationId: saved.organizationId,
+        actorId: saved.actorId,
+        actorName: saved.actorName,
+        entityType: saved.entityType,
+        entityId: saved.entityId,
+        projectId: saved.projectId,
+        metadata: saved.metadata,
+        occurredAt: saved.createdAt,
       });
     } catch (error) {
       this.logger.error(

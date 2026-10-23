@@ -157,12 +157,16 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 ### T14. Background jobs
 - [ ] BullMQ + Redis queue module
 
-### T15. Notifications
-- [ ] Emit notifications from domain events (PO approved, report submitted, transfer approved…)
-- [x] Fix WebSocket gateway secret (it had none, so every connection was rejected; now verifies the access cookie)
-- [ ] Frontend socket client
-- [ ] Header: correct type icons, timestamps, mark-all-read
-- [ ] Notification preferences endpoint + UI
+### T15. Notifications  `[x]`
+- [x] Emit notifications from domain events: every audited action is published on an in-process event bus; rules turn them into notifications — PO submitted/approved/rejected/sent back, daily report submitted/approved/sent back, bill submitted/approved/rejected, payment requested/approved (+ "ready to release")/rejected/released, transfer requested/approved/rejected/received, role changed, added to a project. Approvers are found by permission (preferring the project team), and nobody is told about their own action
+- [x] Fix WebSocket gateway secret (done in T5); rooms per organization + member; socket CORS uses the API's allowed origins; frontend socket client (`socket.io-client`) with toast + Open, 60 s polling fallback
+- [x] Header bell: type icons by severity, relative timestamps, real unread count, click opens the linked page and marks it read, working "Mark all as read" (opening the bell no longer marks everything read)
+- [x] Notification preferences: `GET/PUT /notifications/preferences`, per category (waiting for you / your requests / team / general) × in-app / email; Settings → Notifications tab; approvals are emailed by default. Replaced the unused legacy `notification_preferences` table
+- [x] DTOs for list query, device registration and preferences (removed `any`)
+- [ ] Email delivery depends on `RESEND_API_KEY` (stubbed to the log without it); push needs a real Firebase provider
+- [ ] Notification centre page with history beyond the latest 20
+
+> Verified 2026-10-24: migration on a fresh DB (matches the schema exactly), 34 unit tests, 21 HTTP/socket checks (live delivery, permission-based recipients, no self-notifications, preferences mute in-app, email routing, read state, isolation, transfer flow) and a headless-browser run (live toast while the app is open, bell → open link → marked read, preferences tab).
 
 ### T16. Reports
 - [ ] Real PDF / Excel generation (queued), stored in object storage, download button

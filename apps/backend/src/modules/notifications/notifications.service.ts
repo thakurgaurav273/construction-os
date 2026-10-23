@@ -1,136 +1,182 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Notification } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { MailService } from '../../common/mail/mail.service';
+import type { DomainEvent } from '../../common/events';
 import { PushService } from './push/push.service';
 import { NotificationsGateway } from './notifications.gateway';
+import {
+  NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_KEYS, NotificationCategory, isNotificationCategory,
+} from './notification-categories';
+import type { NotificationPlan } from './notification-rules.service';
+import { NotificationQueryDto, RegisterDeviceDto, UpdatePreferencesDto } from './dto/notification.dto';
+import { escapeHtml } from '../../common/utils/escape-html';
 
-export interface NotifyInput {
-  userId: string;
-  orgId: string;
-  type: string;
-  title: string;
-  body: string;
-  entityType?: string;
-  entityId?: string;
-  actionUrl?: string;
+export interface NotificationPage {
+  items: Notification[];
+  total: number;
+  unread: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
+
+export interface CategoryPreferenceView {
+  category: NotificationCategory;
+  label: string;
+  description: string;
+  inApp: boolean;
+  email: boolean;
+}
+
+interface Channels { inApp: boolean; email: boolean }
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
   constructor(
-    private prisma: PrismaService,
-    private push: PushService,
-    private gateway: NotificationsGateway,
+    private readonly prisma: PrismaService,
+    private readonly push: PushService,
+    private readonly gateway: NotificationsGateway,
+    private readonly mail: MailService,
+    private readonly config: ConfigService,
   ) {}
 
-  async notify(input: NotifyInput): Promise<void> {
-    const notification = await this.prisma.notification.create({
-      data: {
-        organizationId: input.orgId,
-        userId: input.userId,
-        type: input.type as any,
-        title: input.title,
-        message: input.body,
-        entityType: input.entityType,
-        entityId: input.entityId,
-      },
+  /** Sends one plan to each recipient on the channels they've chosen for its category. */
+  async deliver(event: DomainEvent, plan: NotificationPlan): Promise<void> {
+    const recipients = [...new Set(plan.recipients)];
+    if (recipients.length === 0) return;
+    const channels = await this.channelsFor(recipients, event.organizationId, plan.category);
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: recipients }, status: 'ACTIVE' },
+      select: { id: true, email: true, name: true },
     });
 
-    // Fire and forget - never let push failure break the main flow
-    const results = await Promise.allSettled([
-      this.push.sendToUser(input.userId, { title: input.title, body: input.body }),
-      Promise.resolve(this.gateway.emitToUser(input.userId, 'notification:new', notification)),
-    ]);
-
-    for (const result of results) {
-      if (result.status === 'rejected') {
-        this.logger.error(`Notification channel failed: ${result.reason}`);
+    for (const user of users) {
+      const choice = channels.get(user.id) ?? NOTIFICATION_CATEGORIES[plan.category].defaults;
+      if (choice.inApp) {
+        const notification = await this.prisma.notification.create({
+          data: {
+            organizationId: event.organizationId,
+            userId: user.id,
+            type: plan.type,
+            category: plan.category,
+            event: event.action,
+            title: plan.title,
+            message: plan.body,
+            link: plan.link,
+            entityType: event.entityType,
+            entityId: event.entityId,
+          },
+        });
+        this.gateway.emitToUser(event.organizationId, user.id, 'notification:new', notification);
+        this.push.sendToUser(user.id, { title: plan.title, body: plan.body }).catch((error: unknown) => {
+          this.logger.warn(`Push failed for user ${user.id}: ${error instanceof Error ? error.message : String(error)}`);
+        });
       }
+      if (choice.email) void this.sendEmail(user, plan);
     }
   }
 
-  async registerDevice(userId: string, orgId: string, dto: RegisterDeviceDto) {
-    return this.prisma.pushDevice.upsert({
-      where: { token: dto.token },
-      update: {
-        userId,
-        organizationId: orgId,
-        platform: dto.platform,
-        browser: dto.browser,
-        deviceName: dto.deviceName,
-        active: true,
-        lastSeenAt: new Date(),
-      },
-      create: {
-        userId,
-        organizationId: orgId,
-        token: dto.token,
-        platform: dto.platform,
-        browser: dto.browser,
-        deviceName: dto.deviceName,
-      },
+  async list(userId: string, organizationId: string, query: NotificationQueryDto): Promise<NotificationPage> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const mine = { userId, organizationId };
+    const where = { ...mine, ...(query.unreadOnly && { read: false }) };
+    const [items, total, unread] = await Promise.all([
+      this.prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+      this.prisma.notification.count({ where }),
+      this.prisma.notification.count({ where: { ...mine, read: false } }),
+    ]);
+    return { items, total, unread, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) };
+  }
+
+  async unreadCount(userId: string, organizationId: string): Promise<{ count: number }> {
+    return { count: await this.prisma.notification.count({ where: { userId, organizationId, read: false } }) };
+  }
+
+  async markRead(id: string, userId: string, organizationId: string): Promise<Notification> {
+    await this.findMine(id, userId, organizationId);
+    return this.prisma.notification.update({ where: { id }, data: { read: true } });
+  }
+
+  async markAllRead(userId: string, organizationId: string): Promise<{ updated: number }> {
+    const { count } = await this.prisma.notification.updateMany({ where: { userId, organizationId, read: false }, data: { read: true } });
+    return { updated: count };
+  }
+
+  async remove(id: string, userId: string, organizationId: string): Promise<{ id: string }> {
+    await this.findMine(id, userId, organizationId);
+    await this.prisma.notification.delete({ where: { id } });
+    return { id };
+  }
+
+  async getPreferences(userId: string, organizationId: string): Promise<CategoryPreferenceView[]> {
+    const saved = await this.prisma.notificationPreference.findMany({ where: { userId, organizationId } });
+    return NOTIFICATION_CATEGORY_KEYS.map((category) => {
+      const info = NOTIFICATION_CATEGORIES[category];
+      const row = saved.find((preference) => preference.category === category);
+      return {
+        category,
+        label: info.label,
+        description: info.description,
+        inApp: row?.inApp ?? info.defaults.inApp,
+        email: row?.email ?? info.defaults.email,
+      };
     });
   }
 
-  async unregisterDevice(userId: string, token: string) {
+  async updatePreferences(userId: string, organizationId: string, dto: UpdatePreferencesDto): Promise<CategoryPreferenceView[]> {
+    await this.prisma.$transaction(dto.preferences
+      .filter((preference) => isNotificationCategory(preference.category))
+      .map((preference) => this.prisma.notificationPreference.upsert({
+        where: { userId_organizationId_category: { userId, organizationId, category: preference.category } },
+        create: { userId, organizationId, category: preference.category, inApp: preference.inApp, email: preference.email },
+        update: { inApp: preference.inApp, email: preference.email },
+      })));
+    return this.getPreferences(userId, organizationId);
+  }
+
+  async registerDevice(userId: string, organizationId: string, dto: RegisterDeviceDto) {
+    const device = { userId, organizationId, platform: dto.platform, browser: dto.browser, deviceName: dto.deviceName };
+    return this.prisma.pushDevice.upsert({
+      where: { token: dto.token },
+      update: { ...device, active: true, lastSeenAt: new Date() },
+      create: { ...device, token: dto.token },
+    });
+  }
+
+  async unregisterDevice(userId: string, token: string): Promise<{ token: string }> {
     const device = await this.prisma.pushDevice.findFirst({ where: { token, userId } });
     if (!device) throw new NotFoundException('Device not found');
     await this.prisma.pushDevice.delete({ where: { token } });
-    return { message: 'Device unregistered' };
+    return { token };
   }
 
-  async list(userId: string, orgId: string, options?: { page?: number; limit?: number; isRead?: boolean }) {
-    const page = options?.page ?? 1;
-    const limit = options?.limit ?? 20;
-    const where = { userId, organizationId: orgId, ...(options?.isRead !== undefined && { read: options.isRead }) };
-
-    const [data, total] = await Promise.all([
-      this.prisma.notification.findMany({
-        where,
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.notification.count({ where }),
-    ]);
-
-    return { data, total, page, limit };
+  private async channelsFor(userIds: string[], organizationId: string, category: NotificationCategory): Promise<Map<string, Channels>> {
+    const rows = await this.prisma.notificationPreference.findMany({
+      where: { userId: { in: userIds }, organizationId, category },
+      select: { userId: true, inApp: true, email: true },
+    });
+    return new Map(rows.map((row) => [row.userId, { inApp: row.inApp, email: row.email }]));
   }
 
-  async markRead(id: string, userId: string, orgId: string) {
-    const notification = await this.prisma.notification.findFirst({ where: { id, userId, organizationId: orgId } });
-    if (!notification) throw new NotFoundException('Notification not found');
-    return this.prisma.notification.update({
-      where: { id },
-      data: { read: true },
+  private async sendEmail(user: { email: string; name: string }, plan: NotificationPlan): Promise<void> {
+    const appUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173').replace(/\/$/, '');
+    await this.mail.sendEmail({
+      to: user.email,
+      subject: plan.title,
+      html: `<p>Hi ${escapeHtml(user.name)},</p><p>${escapeHtml(plan.body)}</p><p><a href="${appUrl}${plan.link}">Open in SitePilot</a></p>
+<p style="color:#888;font-size:12px">You can change which emails you get in Settings → Notifications.</p>`,
+    }).catch((error: unknown) => {
+      this.logger.warn(`Notification email failed: ${error instanceof Error ? error.message : String(error)}`);
     });
   }
 
-  async markAllRead(userId: string, orgId: string) {
-    await this.prisma.notification.updateMany({
-      where: { userId, organizationId: orgId, read: false },
-      data: { read: true },
-    });
-    return { message: 'All notifications marked as read' };
-  }
-
-  async unreadCount(userId: string, orgId: string) {
-    const count = await this.prisma.notification.count({ where: { userId, organizationId: orgId, read: false } });
-    return { count };
-  }
-
-  async remove(id: string, userId: string, orgId: string) {
-    const notification = await this.prisma.notification.findFirst({ where: { id, userId, organizationId: orgId } });
+  private async findMine(id: string, userId: string, organizationId: string): Promise<void> {
+    const notification = await this.prisma.notification.findFirst({ where: { id, userId, organizationId }, select: { id: true } });
     if (!notification) throw new NotFoundException('Notification not found');
-    await this.prisma.notification.delete({ where: { id } });
-    return { message: 'Notification deleted' };
   }
-}
-
-export class RegisterDeviceDto {
-  token!: string;
-  platform!: string;
-  browser?: string;
-  deviceName?: string;
 }

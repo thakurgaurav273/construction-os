@@ -8,6 +8,7 @@ import { PASSWORD_RESET_TTL_MINUTES } from './auth.constants';
 import { AuthService, PASSWORD_HASH_ROUNDS } from './auth.service';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password.dto';
 import { TokenService, generateOpaqueToken, hashToken } from './token.service';
+import { escapeHtml } from '../../common/utils/escape-html';
 
 const INVALID_LINK = 'This reset link is invalid or has expired. Request a new one.';
 
@@ -85,8 +86,4 @@ export class PasswordResetService {
       entityId: record.userId,
     });
   }
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char);
 }

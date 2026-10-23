@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Building2, Users, Shield, Palette, Plug, Key, History, Trash2, CheckCircle2, Settings2, Mail } from 'lucide-react';
+import { Bell, Building2, Users, Shield, Palette, Plug, Key, History, Trash2, CheckCircle2, Settings2, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@sitepilot/ui';
 import { Button } from '@sitepilot/ui';
 import { Input } from '@sitepilot/ui';
@@ -31,6 +31,7 @@ import { useCurrentAccess } from '@/hooks/api/use-access';
 import { useAuthStore } from '@/store/auth.store';
 import { Can } from '@/components/shared/Can';
 import { AuditLogsTab } from '@/features/audit/components/AuditLogsTab';
+import { NotificationPreferencesTab } from '@/features/notifications/components/NotificationPreferencesTab';
 import { OrganizationSettingsTab } from '@/features/settings/components/OrganizationSettingsTab';
 
 /** Must match OrgRole on the backend. */
@@ -39,6 +40,7 @@ const ROLES = ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_ENGINEER', 'STORE_MANA
 const tabs = [
   { id: 'organization', name: 'Organization', icon: Building2 },
   { id: 'members', name: 'Members & Roles', icon: Users },
+  { id: 'notifications', name: 'Notifications', icon: Bell },
   { id: 'security', name: 'Security & Auth', icon: Shield },
   { id: 'branding', name: 'Branding', icon: Palette },
   { id: 'integrations', name: 'Integrations', icon: Plug },
@@ -53,6 +55,17 @@ export default function SettingsPage() {
   // Only owners can hand out or take away the Owner role (enforced server-side too).
   const assignableRoles = ROLES.filter((role) => role !== 'OWNER' || access?.role === 'OWNER');
   const [activeTab, setActiveTab] = useState('organization');
+
+  // Other screens link straight to a tab, e.g. /dashboard/settings#notifications.
+  useEffect(() => {
+    const openTabFromHash = (): void => {
+      const tab = window.location.hash.slice(1);
+      if (tabs.some((candidate) => candidate.id === tab)) setActiveTab(tab);
+    };
+    openTabFromHash();
+    window.addEventListener('hashchange', openTabFromHash);
+    return () => window.removeEventListener('hashchange', openTabFromHash);
+  }, []);
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -272,7 +285,9 @@ export default function SettingsPage() {
 
           {activeTab === 'audit' && <AuditLogsTab />}
 
-          {activeTab !== 'organization' && activeTab !== 'members' && activeTab !== 'audit' && (
+          {activeTab === 'notifications' && <NotificationPreferencesTab />}
+
+          {activeTab !== 'organization' && activeTab !== 'members' && activeTab !== 'audit' && activeTab !== 'notifications' && (
             <Card className="border-dashed border-border/60 bg-gradient-to-b from-muted/10 to-muted/30 shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)]">
               <div className="flex flex-col items-center justify-center p-20 text-center text-muted-foreground">
                 <div className="h-16 w-16 rounded-2xl bg-background border shadow-sm flex items-center justify-center mb-6">

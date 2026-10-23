@@ -116,6 +116,7 @@ model User {
   transfersApproved    StockTransfer[]    @relation("TransferApprovedBy")
   transfersCompleted   StockTransfer[]    @relation("TransferCompletedBy")
   stockAdjustments     StockAdjustment[]
+  notificationPreferences NotificationPreference[]
 
   @@map("users")
 }
@@ -168,6 +169,7 @@ model Organization {
   reportSchedules       ReportSchedule[]
   materialIssues        MaterialIssue[]
   auditLogs             AuditLog[]
+  notificationPreferences NotificationPreference[]
 
   @@map("organizations")
 }
@@ -433,6 +435,12 @@ model Notification {
   title          String
   message        String
   read           Boolean          @default(false)
+  /// Preference group, e.g. "approvals" or "decisions".
+  category       String           @default("general")
+  /// Event that caused it, e.g. "purchase_order.approved".
+  event          String?
+  /// In-app path to open, e.g. "/dashboard/procurement".
+  link           String?
   entityType     String?
   entityId       String?
   userId         String
@@ -443,8 +451,26 @@ model Notification {
   organization Organization @relation(fields: [organizationId], references: [id])
 
   @@index([userId, read])
+  @@index([userId, organizationId, createdAt])
   @@index([organizationId])
   @@map("notifications")
+}
+
+/// A member's delivery choice for one notification category. Missing rows mean the category's defaults.
+model NotificationPreference {
+  id             String   @id @default(uuid())
+  userId         String
+  organizationId String
+  category       String
+  inApp          Boolean  @default(true)
+  email          Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId, category])
+  @@map("notification_preferences")
 }
 
 // ─── Workforce ───────────────────────────────────────────────────────────────
@@ -1416,21 +1442,6 @@ model PushDevice {
   @@map("push_devices")
 }
 
-model NotificationPreference {
-  userId              String  @id
-  checkIns            Boolean @default(true)
-  checkInBlockers     Boolean @default(true)
-  reviews             Boolean @default(true)
-  recognition         Boolean @default(true)
-  goals               Boolean @default(true)
-  systemAnnouncements Boolean @default(true)
-  workspace           Boolean @default(true)
-  weeklyDigest        Boolean @default(true)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  @@map("notification_preferences")
-}
 // ─── Reports ───────────────────────────────────────────────────────────────────
 
 model Report {

@@ -1002,6 +1002,47 @@ Finished or abandoned projects cluttered every list and picker, and there was no
 
 ---
 
+# ADR-026 - Notifications from Domain Events
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+A notification service, WebSocket gateway and push stub existed, but nothing ever called them, so the bell only showed seeded rows. The handbook asks for event-driven notifications: business logic shouldn't send messages directly.
+
+---
+
+## Decision
+
+- **Audit entries are the domain events.** `AuditService` publishes every recorded action on `DomainEventsService`, a small in-process bus. It already knows the actor, organization, record and project for every write (ADR-024), so no business service had to change.
+- **Rules map events to people.** `NotificationRulesService` holds one rule per action: who must act (approvers, found by permission through `rolesWithPermission`, preferring the project team) and who should hear an outcome (the requester). The actor is never notified about their own action. Adding a notification means adding a rule.
+- **Delivery respects preferences.** Each member chooses in-app and email delivery per category: waiting for you, your requests, team, general. Without a saved choice the category default applies, and only "waiting for you" is emailed by default. In-app notifications are stored, pushed live over Socket.IO to an organization- and member-specific room, and sent to registered push devices.
+- **Live updates** use the access cookie for the socket handshake and the API's CORS origins. The frontend falls back to polling every 60 seconds if the socket is down.
+
+---
+
+## Alternatives
+
+- Calling `NotificationsService` from each service: rejected. It couples every module to notifications and duplicates the audit work.
+- `@nestjs/event-emitter`: not needed for one publisher and one subscriber. The bus is a seam that a queue (T14) can replace when handlers need retries or a separate worker.
+
+---
+
+## Consequences
+
+- Handlers run in the API process after the response. A crash at that moment can drop a notification; the queue in T14 is the fix.
+- Rules read the current state of the record, so a notification reflects the record as it is when the rule runs.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.
