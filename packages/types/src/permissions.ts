@@ -34,11 +34,15 @@ export type Permission =
   | 'report.manage'
   | 'members.manage'
   | 'organization.manage'
-  | 'audit.view';
+  | 'audit.view'
+  | 'ai.use'
+  | 'ai.manage';
 
 export interface CurrentAccess {
   userId: string;
   organizationId: string;
   role: string;
   permissions: Permission[];
+  /** SitePilot operator who can open the cross-tenant platform console. */
+  isPlatformAdmin: boolean;
 }

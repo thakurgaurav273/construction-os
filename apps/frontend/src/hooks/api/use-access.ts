@@ -9,6 +9,7 @@ interface MeResponse {
   organizationId: string;
   role: string;
   permissions: Permission[];
+  isPlatformAdmin?: boolean;
 }
 
 /**
@@ -22,7 +23,13 @@ export function useCurrentAccess() {
     queryFn: async () => {
       const res = await apiClient.get('/auth/me');
       const me: MeResponse = res.data.data ?? res.data;
-      return { userId: me.id, organizationId: me.organizationId, role: me.role, permissions: me.permissions };
+      return {
+        userId: me.id,
+        organizationId: me.organizationId,
+        role: me.role,
+        permissions: me.permissions,
+        isPlatformAdmin: me.isPlatformAdmin ?? false,
+      };
     },
     enabled: !!userId,
     staleTime: 60_000,

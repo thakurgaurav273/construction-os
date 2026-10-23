@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
 
+import { AiModule } from './modules/ai/ai.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProjectsModule } from './modules/projects/projects.module';
@@ -32,6 +33,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     DatabaseModule,
     AuthModule,
     AuditModule,
+    AiModule,
     ProjectsModule,
     DashboardModule,
     WorkforceModule,

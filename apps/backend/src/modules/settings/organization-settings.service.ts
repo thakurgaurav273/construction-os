@@ -3,7 +3,8 @@ import { Organization } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
-import { UpdateOrganizationSettingsDto } from './dto/organization.dto';
+import { UpdateBrandingDto, UpdateOrganizationSettingsDto } from './dto/organization.dto';
+import { MIN_BRAND_CONTRAST, contrastRatio } from '../../common/branding/brand-color';
 
 export const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 
@@ -18,6 +19,7 @@ export interface OrganizationSettingsView {
   name: string;
   slug: string;
   logoUrl: string | null;
+  brandColor: string | null;
   address: string | null;
   gstNumber: string | null;
   currency: string;
@@ -47,6 +49,20 @@ export class OrganizationSettingsService {
         timezone: dto.timezone,
       },
     });
+    return this.toView(organization);
+  }
+
+  /**
+   * The brand colour must be readable as text and icons on white; the app derives button text colour and a
+   * dark-mode variant from it, so only one colour is stored.
+   */
+  async updateBranding(organizationId: string, dto: UpdateBrandingDto): Promise<OrganizationSettingsView> {
+    await this.find(organizationId);
+    const brandColor = dto.brandColor ? dto.brandColor.toUpperCase() : null;
+    if (brandColor && contrastRatio(brandColor, '#FFFFFF') < MIN_BRAND_CONTRAST) {
+      throw new BadRequestException(`${brandColor} is too light to read on white. Pick a darker shade (contrast at least ${MIN_BRAND_CONTRAST}:1).`);
+    }
+    const organization = await this.prisma.organization.update({ where: { id: organizationId }, data: { brandColor } });
     return this.toView(organization);
   }
 
@@ -83,6 +99,7 @@ export class OrganizationSettingsService {
       name: organization.name,
       slug: organization.slug,
       logoUrl: await this.logoUrl(organization.logo),
+      brandColor: organization.brandColor,
       address: organization.address,
       gstNumber: organization.gstNumber,
       currency: organization.currency,

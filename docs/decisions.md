@@ -1043,6 +1043,52 @@ A notification service, WebSocket gateway and push stub existed, but nothing eve
 
 ---
 
+# ADR-027 - AI Providers, Tenant Keys and Platform Trials
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-23
+
+---
+
+## Context
+
+The AI screens were demos: templated replies on a timer, rendered with `dangerouslySetInnerHTML`. The product needs Gemini, Groq and Hugging Face now and OpenAI later. Tenants should be able to bring their own key, or try AI on SitePilot's key once a platform operator approves. There was no cross-tenant operator console.
+
+---
+
+## Decision
+
+- **One path for every call:** feature → `AiService` → provider adapter → model. Features never see keys or provider SDKs. Adapters use plain `fetch`: Gemini has its own; Groq and Hugging Face share an OpenAI-compatible base class, so OpenAI is one more subclass. Base URLs and default models can be overridden by environment variable.
+- **Key resolution:** a tenant's own active key always wins. Otherwise the platform's default key is used while an approved trial or top-up has requests left and hasn't expired. The allowance is the sum of live grants, minus successful platform-funded calls since the earliest grant began.
+- **Key safety:** keys are tested with a tiny live call before saving and encrypted with AES-256-GCM using `AI_KEYS_ENCRYPTION_KEY`, with no fallback; without it, keys can't be saved. They are never returned (only the last four characters are shown), Gemini receives them in a header rather than the URL, and the audit redaction also covers API keys.
+- **Trials:** one free trial per tenant (default 14 days and 100 requests), then top-ups. The platform admin can adjust the requests and days when approving, and a top-up extends any live allowance. The decision is written to the tenant's audit log, which also notifies the requester.
+- **Platform super admins** are an environment allow-list (`PLATFORM_ADMIN_EMAILS`). The role can't be granted from inside the app. `/platform` and `/api/platform/*` check that list, never organization roles.
+- **Grounding:** prompts carry a capped data block, wrapped in `<data>` and marked as untrusted. Models are told to answer only from it and to say when it doesn't cover a question. Output is rendered by a small Markdown renderer that only creates React elements.
+- **Cost controls:** 20 AI calls per minute per client, a 10-minute cooldown on insight refreshes, cached insights and saved report summaries, and every call recorded in `ai_usage`.
+
+---
+
+## Alternatives
+
+- Provider SDKs: rejected for now. Three SDKs for three similar REST APIs would add weight and hide the request shape; `fetch` adapters are a few dozen lines each.
+- Storing keys unencrypted, or in environment variables per tenant: rejected. Tenant keys are customer secrets and need per-row encryption.
+- A database flag for super admins: rejected. An allow-list in the environment can't be granted from inside the app.
+
+---
+
+## Consequences
+
+- Two concurrent calls on a tenant's last trial request can both succeed, a slight overrun that is accepted.
+- Model ids change often. They are editable per key, and saving re-tests the key against the chosen model.
+- Rotating `AI_KEYS_ENCRYPTION_KEY` makes stored keys unreadable, so they must be saved again. Versioned ciphertexts (`v1:`) leave room for a re-encryption migration.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

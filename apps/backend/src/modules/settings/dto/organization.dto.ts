@@ -2,6 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, Validate, ValidatorConstraint, ValidatorConstraintInterface } from 'class-validator';
 import { GSTIN_PATTERN } from '../../../common/validation/patterns';
+import { HEX_COLOR } from '../../../common/branding/brand-color';
 
 export const SUPPORTED_CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'QAR', 'SGD', 'AUD'] as const;
 
@@ -54,4 +55,12 @@ export class UpdateOrganizationSettingsDto {
   @IsOptional()
   @Validate(IsTimezone)
   timezone?: string;
+}
+
+export class UpdateBrandingDto {
+  @ApiPropertyOptional({ nullable: true, example: '#1D4ED8', description: 'null restores the default SitePilot theme' })
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() || null : value))
+  @IsOptional()
+  @Matches(HEX_COLOR, { message: 'Use a hex colour like #1D4ED8' })
+  brandColor?: string | null;
 }

@@ -17,6 +17,16 @@ const UNAUDITED_WRITES = new Set([
   'NotificationsController.markRead',
   'NotificationsController.remove',
   'NotificationsController.updatePreferences',
+  // AI calls are logged per call in ai_usage instead.
+  'AiController.organizationChat',
+  'AiController.projectChat',
+  'AiController.refreshInsights',
+  // Platform console: decisions are recorded in the tenant's audit log by the service; platform keys belong to no tenant.
+  'PlatformController.approve',
+  'PlatformController.reject',
+  'PlatformController.saveKey',
+  'PlatformController.makeDefault',
+  'PlatformController.removeKey',
 ]);
 
 describe('audit coverage', () => {

@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import {
   ArrowLeft, Calendar, CloudRain, User, Users, Hammer,
-  Truck, AlertTriangle, CheckCircle2, FileText, Sparkles, Paperclip,
+  Truck, AlertTriangle, CheckCircle2, FileText, Paperclip,
 } from 'lucide-react';
 import {
   Card, CardContent, CardHeader, CardTitle,
@@ -18,6 +18,7 @@ import { DailyReportStatusBadge } from '@/features/daily-reports/components/Dail
 import { ReportAttachmentList } from '@/features/daily-reports/components/ReportAttachmentList';
 import { ReportReviewActions } from '@/features/daily-reports/components/ReportReviewActions';
 import { ReportReviewBanner } from '@/features/daily-reports/components/ReportReviewBanner';
+import { DailyReportAiSummary } from '@/features/ai/components/DailyReportAiSummary';
 
 export default function DailyReportDetailPage({
   params,
@@ -294,19 +295,7 @@ export default function DailyReportDetailPage({
         </Card>
       )}
 
-      {/* AI Summary */}
-      {report.aiSummary && (
-        <Card className="border-indigo-200 dark:border-indigo-800/60">
-          <CardHeader className="border-b bg-indigo-50/50 dark:bg-indigo-950/20">
-            <CardTitle className="text-base flex items-center gap-2 text-indigo-700 dark:text-indigo-400">
-              <Sparkles className="h-4 w-4" /> AI Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <p className="text-sm leading-relaxed">{report.aiSummary}</p>
-          </CardContent>
-        </Card>
-      )}
+      <DailyReportAiSummary projectId={params.id} reportId={report.id} summary={report.aiSummary} />
     </motion.div>
   );
 }

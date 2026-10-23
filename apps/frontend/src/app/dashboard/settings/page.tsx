@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Bell, Building2, Users, Shield, Palette, Plug, Key, History, Trash2, CheckCircle2, Settings2, Mail } from 'lucide-react';
+import { Bell, Building2, Users, Shield, Palette, Plug, Sparkles, History, Trash2, CheckCircle2, Settings2, Mail } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@sitepilot/ui';
 import { Button } from '@sitepilot/ui';
 import { Input } from '@sitepilot/ui';
@@ -32,6 +32,8 @@ import { useAuthStore } from '@/store/auth.store';
 import { Can } from '@/components/shared/Can';
 import { AuditLogsTab } from '@/features/audit/components/AuditLogsTab';
 import { NotificationPreferencesTab } from '@/features/notifications/components/NotificationPreferencesTab';
+import { AiSettingsTab } from '@/features/ai/components/AiSettingsTab';
+import { BrandingTab } from '@/features/branding/components/BrandingTab';
 import { OrganizationSettingsTab } from '@/features/settings/components/OrganizationSettingsTab';
 
 /** Must match OrgRole on the backend. */
@@ -44,7 +46,7 @@ const tabs = [
   { id: 'security', name: 'Security & Auth', icon: Shield },
   { id: 'branding', name: 'Branding', icon: Palette },
   { id: 'integrations', name: 'Integrations', icon: Plug },
-  { id: 'api', name: 'API Keys', icon: Key },
+  { id: 'ai', name: 'AI', icon: Sparkles },
   { id: 'audit', name: 'Audit Logs', icon: History },
 ];
 
@@ -287,7 +289,11 @@ export default function SettingsPage() {
 
           {activeTab === 'notifications' && <NotificationPreferencesTab />}
 
-          {activeTab !== 'organization' && activeTab !== 'members' && activeTab !== 'audit' && activeTab !== 'notifications' && (
+          {activeTab === 'ai' && <AiSettingsTab />}
+
+          {activeTab === 'branding' && <BrandingTab />}
+
+          {activeTab !== 'organization' && activeTab !== 'members' && activeTab !== 'audit' && activeTab !== 'notifications' && activeTab !== 'ai' && activeTab !== 'branding' && (
             <Card className="border-dashed border-border/60 bg-gradient-to-b from-muted/10 to-muted/30 shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)]">
               <div className="flex flex-col items-center justify-center p-20 text-center text-muted-foreground">
                 <div className="h-16 w-16 rounded-2xl bg-background border shadow-sm flex items-center justify-center mb-6">

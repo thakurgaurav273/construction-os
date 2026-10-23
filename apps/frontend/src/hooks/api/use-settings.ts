@@ -112,6 +112,7 @@ export interface OrganizationSettings {
   name: string;
   slug: string;
   logoUrl: string | null;
+  brandColor: string | null;
   address: string | null;
   gstNumber: string | null;
   currency: string;
@@ -166,6 +167,13 @@ export function useUploadOrganizationLogo() {
 export function useRemoveOrganizationLogo() {
   return useOrganizationMutation<void>(async () => {
     const res = await apiClient.delete('/settings/organization/logo');
+    return res.data.data ?? res.data;
+  });
+}
+
+export function useUpdateBranding() {
+  return useOrganizationMutation(async (brandColor: string | null) => {
+    const res = await apiClient.patch('/settings/branding', { brandColor });
     return res.data.data ?? res.data;
   });
 }

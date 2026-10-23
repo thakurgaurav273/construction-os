@@ -154,6 +154,16 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 
 ## Phase 4 — Platform
 
+### T20. Branding  `[x]`
+- [x] Settings → Branding: logo (moved here from Organization), brand colour from presets or any hex, live light/dark preview, restore default
+- [x] Brand colour applied app-wide for every member (buttons, links, focus rings, active navigation) via theme tokens; button text colour and a dark-mode shade derived automatically
+- [x] Contrast rule (≥ 3:1 on white) enforced in the API and shown live in the UI; `organization.branding_updated` audited; owners/admins only
+- [x] Sidebar shows the organization logo and current name
+- [x] Personal appearance (light / dark / match device) for every member
+- [ ] Use logo and colour on generated PDFs and emails once report/PO PDFs exist (T16)
+
+> Verified 2026-10-24: 45 backend unit tests (incl. contrast), 6 API checks (hex/contrast validation, permissions, audit, members read it) and a headless-browser run (preset → save re-themes the app instantly, other member in dark mode gets the lighter shade, read-only for non-admins, too-light colour blocked, default restored).
+
 ### T14. Background jobs
 - [ ] BullMQ + Redis queue module
 
@@ -173,11 +183,18 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 - [ ] Per-type report data (safety, workforce, procurement…)
 - [ ] Scheduled reports executed by the queue, emailed to recipients
 
-### T17. AI
-- [ ] `AiService` + provider adapter abstraction (Anthropic first)
-- [ ] Daily report summary generation
-- [ ] Project assistant backed by the AI service
-- [ ] Fix XSS: remove `dangerouslySetInnerHTML` in project AI page
+### T17. AI  `[x]`
+- [x] `AiService` + provider adapters: Google Gemini, Groq and Hugging Face (Groq/HF share an OpenAI-compatible adapter, so OpenAI is one more class); base URLs and default models overridable by env
+- [x] Bring-your-own-key: Settings → AI, keys tested live before saving, AES-256-GCM encrypted with `AI_KEYS_ENCRYPTION_KEY`, never returned (last 4 only), never written to the audit log
+- [x] Free trial (14 days / 100 requests) and top-ups requested by tenant admins, approved/declined by platform super admins on the platform key; allowance counted from successful platform-funded calls; requester notified
+- [x] Platform console at `/platform` (allow-list `PLATFORM_ADMIN_EMAILS`): AI requests, tenants, platform keys (default key funds trials), usage
+- [x] Project assistant chat, organization-wide AI Assistant, daily report summary (saved on the report), AI Command Center insights (cached, 10-minute refresh cooldown); all grounded in live data with prompt-injection guarding
+- [x] Fix XSS: removed `dangerouslySetInnerHTML`; model output rendered by a safe Markdown renderer
+- [x] New permissions `ai.use` (all roles except Viewer) and `ai.manage` (owners/admins); AI calls rate-limited (20/min) and logged in `ai_usage`
+- [ ] Verify against real Gemini/Groq/Hugging Face keys (tested with a protocol-accurate mock; model ids change often and are editable in Settings)
+- [ ] Streaming responses; per-tenant monthly caps for own-key usage
+
+> Verified 2026-10-23: 44 backend unit tests (encryption, adapters, error mapping, insight parsing, redaction), 45 end-to-end HTTP checks against a mock Groq/Gemini server (key validation and encryption, grounding, trial → used up → top-up → decline, platform-admin gating, tenant isolation, notifications, audit) and a headless-browser run (connect a key in Settings, chat, report summary, insights, approve a trial in /platform, tenant owner blocked from /platform).
 
 ### T18. Dashboard & demo cleanup
 - [ ] Real budget trend, pending approvals, workforce today

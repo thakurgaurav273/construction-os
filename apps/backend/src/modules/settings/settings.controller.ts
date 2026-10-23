@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SettingsService } from './settings.service';
 import { MAX_LOGO_BYTES, OrganizationSettingsService, OrganizationSettingsView } from './organization-settings.service';
-import { UpdateOrganizationSettingsDto } from './dto/organization.dto';
+import { UpdateBrandingDto, UpdateOrganizationSettingsDto } from './dto/organization.dto';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 import { ChangeMemberRoleDto, InviteMemberDto } from './dto/member.dto';
 import { Audit } from '../../common/audit';
@@ -31,6 +31,13 @@ export class SettingsController {
   @Patch('organization')
   updateOrganization(@CurrentUser() user: AuthUser, @Body() dto: UpdateOrganizationSettingsDto): Promise<OrganizationSettingsView> {
     return this.organization.update(user.organizationId, dto);
+  }
+
+  @RequirePermission('organization.manage')
+  @Audit('organization.branding_updated')
+  @Patch('branding')
+  updateBranding(@CurrentUser() user: AuthUser, @Body() dto: UpdateBrandingDto): Promise<OrganizationSettingsView> {
+    return this.organization.updateBranding(user.organizationId, dto);
   }
 
   @RequirePermission('organization.manage')

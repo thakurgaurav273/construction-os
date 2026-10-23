@@ -117,6 +117,7 @@ model User {
   transfersCompleted   StockTransfer[]    @relation("TransferCompletedBy")
   stockAdjustments     StockAdjustment[]
   notificationPreferences NotificationPreference[]
+  aiAccessRequests        AiAccessRequest[]   @relation("AiAccessRequester")
 
   @@map("users")
 }
@@ -126,6 +127,8 @@ model Organization {
   name      String
   slug      String   @unique
   logo      String?
+  /// Brand colour as #RRGGBB, applied to buttons, links and highlights. Null means the default SitePilot theme.
+  brandColor String?
   address   String?
   gstNumber String?
   currency  String   @default("INR")
@@ -170,6 +173,11 @@ model Organization {
   materialIssues        MaterialIssue[]
   auditLogs             AuditLog[]
   notificationPreferences NotificationPreference[]
+  aiCredentials           AiCredential[]
+  aiSetting               AiOrgSetting?
+  aiAccessRequests        AiAccessRequest[]
+  aiUsage                 AiUsage[]
+  aiInsightSnapshots      AiInsightSnapshot[]
 
   @@map("organizations")
 }
@@ -1518,4 +1526,137 @@ model ReportSchedule {
   @@index([organizationId])
   @@index([nextRunAt])
   @@map("report_schedules")
+}
+// ─── AI ──────────────────────────────────────────────────────────────────────
+
+enum AiProvider {
+  GEMINI
+  GROQ
+  HUGGINGFACE
+}
+
+/// Where the key for a call came from: the tenant's own key, or the platform's key under an approved trial/top-up.
+enum AiKeySource {
+  ORGANIZATION
+  PLATFORM
+}
+
+enum AiAccessRequestKind {
+  TRIAL
+  TOP_UP
+}
+
+enum AiAccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// A tenant's own provider key, encrypted with AI_KEYS_ENCRYPTION_KEY. Only the last four characters are ever shown.
+model AiCredential {
+  id             String     @id @default(uuid())
+  organizationId String
+  provider       AiProvider
+  encryptedKey   String
+  keyHint        String
+  model          String
+  lastVerifiedAt DateTime?
+  createdById    String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider])
+  @@map("ai_credentials")
+}
+
+/// Which of its own keys a tenant uses. Without one, the tenant can only use AI under an approved platform allowance.
+model AiOrgSetting {
+  organizationId String      @id
+  activeProvider AiProvider?
+  updatedAt      DateTime    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("ai_org_settings")
+}
+
+/// The platform's own keys, managed by platform super admins and used for approved trials and top-ups.
+model PlatformAiCredential {
+  provider       AiProvider @id
+  encryptedKey   String
+  keyHint        String
+  model          String
+  isDefault      Boolean    @default(false)
+  lastVerifiedAt DateTime?
+  updatedByEmail String
+  updatedAt      DateTime   @updatedAt
+
+  @@map("platform_ai_credentials")
+}
+
+/// A tenant asking to use the platform's AI: a first free trial, or more requests afterwards.
+model AiAccessRequest {
+  id                String                @id @default(uuid())
+  organizationId    String
+  kind              AiAccessRequestKind
+  status            AiAccessRequestStatus @default(PENDING)
+  requestedRequests Int
+  reason            String?
+  requestedById     String
+  createdAt         DateTime              @default(now())
+  decidedByEmail    String?
+  decidedAt         DateTime?
+  decisionNote      String?
+  grantedRequests   Int?
+  startsAt          DateTime?
+  expiresAt         DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requestedBy  User         @relation("AiAccessRequester", fields: [requestedById], references: [id])
+
+  @@index([status, createdAt])
+  @@index([organizationId, status])
+  @@map("ai_access_requests")
+}
+
+/// One row per AI call, successful or not. Platform-funded calls count against the tenant's allowance.
+model AiUsage {
+  id               String      @id @default(uuid())
+  organizationId   String
+  userId           String
+  feature          String
+  provider         AiProvider
+  model            String
+  source           AiKeySource
+  success          Boolean
+  errorCode        String?
+  promptTokens     Int?
+  completionTokens Int?
+  latencyMs        Int?
+  createdAt        DateTime    @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, source, success, createdAt])
+  @@map("ai_usage")
+}
+
+/// Cached AI Command Center insights, so the page doesn't spend tokens on every visit.
+model AiInsightSnapshot {
+  id             String     @id @default(uuid())
+  organizationId String
+  content        Json
+  provider       AiProvider
+  model          String
+  generatedById  String
+  createdAt      DateTime   @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("ai_insight_snapshots")
 }

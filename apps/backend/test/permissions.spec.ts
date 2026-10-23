@@ -3,6 +3,8 @@ import { before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { relative } from 'node:path';
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { PlatformAdminGuard } from '../src/modules/ai/platform-admin.guard';
 import { Reflector } from '@nestjs/core';
 import type { Permission } from '@sitepilot/types';
 import {
@@ -49,7 +51,12 @@ describe('route permissions', () => {
 
   it('protects every write endpoint with its own permission', () => {
     // A class baseline such as finance.view only grants reading; each write must name its own permission.
+    // The platform console is guarded by the platform-admin allow-list instead of organization permissions.
+    const platformGuarded = new Set(controllers
+      .filter((controller) => (Reflect.getMetadata(GUARDS_METADATA, controller) ?? []).includes(PlatformAdminGuard))
+      .map((controller) => controller.name));
     const unprotected = writeRoutes(controllers)
+      .filter(({ key }) => !platformGuarded.has(key.split('.')[0]))
       .filter(({ key, handler }) => !OPEN_WRITES.has(key) && (Reflect.getMetadata(PERMISSIONS_KEY, handler) ?? []).length === 0)
       .map(({ key }) => key);
     assert.deepEqual(unprotected, [], `Add @RequirePermission to: ${unprotected.join(', ')}`);

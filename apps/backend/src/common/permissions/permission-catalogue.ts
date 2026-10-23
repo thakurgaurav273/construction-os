@@ -39,11 +39,13 @@ export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
   'members.manage': { group: 'Administration', label: 'Invite members and change roles' },
   'organization.manage': { group: 'Administration', label: 'Edit organization settings' },
   'audit.view': { group: 'Administration', label: 'View the audit log' },
+  'ai.use': { group: 'AI', label: 'Use AI assistants and summaries' },
+  'ai.manage': { group: 'AI', label: 'Manage AI provider keys and request AI access' },
 };
 
 export const ALL_PERMISSIONS = Object.keys(PERMISSION_CATALOGUE) as Permission[];
 
-const SITE_BASICS: Permission[] = ['dailyReport.write', 'document.upload', 'attendance.mark', 'delivery.receive'];
+const SITE_BASICS: Permission[] = ['dailyReport.write', 'document.upload', 'attendance.mark', 'delivery.receive', 'ai.use'];
 
 /**
  * Default grants per role. Reading operational data needs no permission; every write and all financial
@@ -63,12 +65,12 @@ export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
   ],
   SITE_ENGINEER: [...SITE_BASICS, 'po.create'],
   STORE_MANAGER: [
-    'document.upload', 'delivery.receive', 'material.manage', 'material.issue', 'inventory.adjust', 'inventory.transfer',
+    'ai.use', 'document.upload', 'delivery.receive', 'material.manage', 'material.issue', 'inventory.adjust', 'inventory.transfer',
     'warehouse.manage',
   ],
-  PROCUREMENT: ['document.upload', 'delivery.receive', 'vendor.manage', 'rfq.manage', 'rfq.award', 'po.create'],
+  PROCUREMENT: ['ai.use', 'document.upload', 'delivery.receive', 'vendor.manage', 'rfq.manage', 'rfq.award', 'po.create'],
   FINANCE: [
-    'document.upload', 'finance.view', 'invoice.create', 'invoice.approve',
+    'ai.use', 'document.upload', 'finance.view', 'invoice.create', 'invoice.approve',
     'payment.request', 'payment.approve', 'payment.release', 'report.manage',
   ],
   VIEWER: [],

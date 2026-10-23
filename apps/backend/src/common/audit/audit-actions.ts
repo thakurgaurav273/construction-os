@@ -15,6 +15,7 @@ export const AUDIT_ACTIONS = {
   'auth.signed_in': action('signed in', 'user'),
   'auth.password_reset': action('reset their password', 'user'),
   'organization.updated': action('updated organization settings', 'organization'),
+  'organization.branding_updated': action('changed the brand colour', 'organization'),
   'organization.logo_updated': action('uploaded a new organization logo', 'organization'),
   'organization.logo_removed': action('removed the organization logo', 'organization'),
   'invitation.accepted': action('joined the organization', 'user'),
@@ -115,6 +116,16 @@ export const AUDIT_ACTIONS = {
   'report_schedule.updated': action('updated a report schedule', 'report_schedule'),
   'report_schedule.toggled': action('paused or resumed a report schedule', 'report_schedule'),
   'report_schedule.deleted': action('deleted a report schedule', 'report_schedule'),
+
+  'ai.key_saved': action('saved an AI provider key', 'ai_settings'),
+  'ai.key_removed': action('removed an AI provider key', 'ai_settings'),
+  'ai.model_changed': action('changed the AI model', 'ai_settings'),
+  'ai.provider_selected': action('changed the active AI provider', 'ai_settings'),
+  'ai.access_requested': action('requested AI access', 'ai_access_request'),
+  'ai.access_cancelled': action('cancelled an AI access request', 'ai_access_request'),
+  'ai.access_approved': action('approved AI access', 'ai_access_request'),
+  'ai.access_rejected': action('rejected an AI access request', 'ai_access_request'),
+  'daily_report.ai_summary_generated': action('generated an AI summary of a daily report', 'daily_report'),
 } as const satisfies Record<string, AuditActionInfo>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

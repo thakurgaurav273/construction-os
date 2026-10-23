@@ -2,6 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
+import { ConfigService } from '@nestjs/config';
+import { isPlatformAdmin } from '../../../common/platform/platform-admins';
 import { OrgRole, UserStatus } from '@prisma/client';
 import type { Permission } from '@sitepilot/types';
 import { PrismaService } from '../../../database/prisma.service';
@@ -22,6 +24,8 @@ export interface AuthenticatedUser {
   organizationId: string;
   role: OrgRole;
   permissions: Permission[];
+  /** Platform operator (PLATFORM_ADMIN_EMAILS): can open the cross-tenant console. */
+  isPlatformAdmin: boolean;
 }
 
 /** Browsers send the HttpOnly cookie; API clients and Swagger can still use a Bearer header. */
@@ -34,6 +38,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     tokens: TokenService,
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
   ) {
     super({
       jwtFromRequest: extractAccessToken,
@@ -69,6 +74,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       organizationId: payload.organizationId,
       role: membership.role,
       permissions: permissionsForRole(membership.role),
+      isPlatformAdmin: isPlatformAdmin(this.config, membership.user.email),
     };
   }
 }

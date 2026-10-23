@@ -61,6 +61,8 @@ export class NotificationRulesService implements OnModuleInit {
     'transfer.received': (event) => this.transferDecided(event, NotificationType.SUCCESS, 'received'),
     'member.role_changed': (event) => this.roleChanged(event),
     'project.member_added': (event) => this.addedToProject(event),
+    'ai.access_approved': (event) => this.aiAccessDecided(event, true),
+    'ai.access_rejected': (event) => this.aiAccessDecided(event, false),
   };
 
   constructor(
@@ -284,6 +286,26 @@ export class NotificationRulesService implements OnModuleInit {
       title: `You were added to ${project.name}`,
       body: `${event.actorName} added you to the project team.`,
       link: `/dashboard/projects/${project.id}`,
+    }];
+  }
+
+  private async aiAccessDecided(event: DomainEvent, approved: boolean): Promise<NotificationPlan[]> {
+    const request = await this.prisma.aiAccessRequest.findUnique({
+      where: { id: event.entityId ?? '' },
+      select: { kind: true, requestedById: true, grantedRequests: true, expiresAt: true, decisionNote: true },
+    });
+    if (!request) return [];
+    const what = request.kind === 'TRIAL' ? 'free AI trial' : 'request for more AI usage';
+    const body = approved
+      ? `You have ${request.grantedRequests ?? 0} AI requests until ${request.expiresAt ? formatDay(request.expiresAt) : 'further notice'}.`
+      : `Reason: ${request.decisionNote ?? 'not given'}. You can still add your own API key.`;
+    return [{
+      recipients: [request.requestedById],
+      category: 'decisions',
+      type: approved ? NotificationType.SUCCESS : NotificationType.WARNING,
+      title: `Your ${what} was ${approved ? 'approved' : 'declined'}`,
+      body,
+      link: '/dashboard/settings#ai',
     }];
   }
 }
