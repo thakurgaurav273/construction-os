@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Progress } from '@sitepilot/ui';
-import { ListChecks, Pencil } from 'lucide-react';
+import { FileSpreadsheet, ListChecks, Pencil } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import type { ContractDetail } from '../types';
 import { formatAmount, formatQuantity } from '../utils/format';
@@ -27,9 +28,14 @@ export function ContractBoqCard({ contract, canEdit }: ContractBoqCardProps): Re
           </CardDescription>
         </div>
         {canEdit && !editing && (
-          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-            <Pencil className="mr-1 h-3.5 w-3.5" /> {contract.items.length === 0 ? 'Add BOQ' : 'Edit BOQ'}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/dashboard/billing/contracts/${contract.id}/import-boq`}><FileSpreadsheet className="mr-1 h-3.5 w-3.5" /> Import</Link>
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Pencil className="mr-1 h-3.5 w-3.5" /> {contract.items.length === 0 ? 'Add BOQ' : 'Edit BOQ'}
+            </Button>
+          </div>
         )}
       </CardHeader>
       <CardContent>
@@ -39,8 +45,13 @@ export function ContractBoqCard({ contract, canEdit }: ContractBoqCardProps): Re
           <EmptyState
             icon={ListChecks}
             title="No BOQ yet"
-            description="Add the contract's items with their units, quantities and rates. Bills are measured against them."
-            action={canEdit ? <Button onClick={() => setEditing(true)}>Add BOQ</Button> : undefined}
+            description="Add the contract's items with their units, quantities and rates, or import them from your own spreadsheet. Bills are measured against them."
+            action={canEdit ? (
+              <div className="flex gap-2">
+                <Button variant="outline" asChild><Link href={`/dashboard/billing/contracts/${contract.id}/import-boq`}>Import from Sheet</Link></Button>
+                <Button onClick={() => setEditing(true)}>Add BOQ</Button>
+              </div>
+            ) : undefined}
           />
         ) : (
           <ul className="divide-y rounded-xl border">

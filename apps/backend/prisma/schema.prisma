@@ -1738,6 +1738,10 @@ enum ImportEntity {
   VENDOR
   OPENING_STOCK
   PURCHASE_ORDER
+  /// A contract's bill of quantities, imported from the contract page.
+  BOQ
+  /// An RA bill's measurement book, imported from the bill page.
+  MEASUREMENT_BOOK
 }
 
 /// How one organization's spreadsheet layout maps onto SitePilot fields. Learned once (AI-assisted), then
@@ -1931,6 +1935,9 @@ model RaBill {
   periodFrom      DateTime
   periodTo        DateTime
   status          RaBillStatus @default(DRAFT)
+  /// Quantities certified before the contract came into SitePilot, imported with the BOQ. Carries "previous"
+  /// quantities forward; it moves no money and has no measurements.
+  isOpeningBalance Boolean     @default(false)
   notes           String       @default("")
   /// Totals as of the last change; fixed once the bill is certified.
   grossAmount     Decimal      @default(0) @db.Decimal(15, 2)

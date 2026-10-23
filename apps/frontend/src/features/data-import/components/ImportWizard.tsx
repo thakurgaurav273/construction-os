@@ -104,7 +104,7 @@ export function ImportWizard({ initialEntity }: { initialEntity: ImportEntity | 
 
       {step === 'upload' && (
         <SheetUploadStep
-          entities={entities}
+          entities={entities.filter((candidate) => !candidate.context)}
           entity={entity}
           onEntityChange={setEntity}
           onUpload={(selected) => { void readSheet(selected); }}

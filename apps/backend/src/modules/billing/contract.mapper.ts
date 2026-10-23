@@ -12,7 +12,7 @@ export const CONTRACT_INCLUDE = {
   items: { orderBy: [{ sortOrder: 'asc' }, { itemNo: 'asc' }] },
   adjustments: { orderBy: { sortOrder: 'asc' } },
   bills: {
-    select: { id: true, sequence: true, status: true, grossAmount: true, netAmount: true, periodFrom: true, periodTo: true },
+    select: { id: true, sequence: true, status: true, isOpeningBalance: true, grossAmount: true, netAmount: true, periodFrom: true, periodTo: true },
     orderBy: { sequence: 'asc' },
   },
 } satisfies Prisma.ContractInclude;
@@ -39,6 +39,7 @@ export interface ContractBillSummary {
   code: string;
   sequence: number;
   status: RaBillStatus;
+  isOpeningBalance: boolean;
   grossAmount: number;
   netAmount: number;
   periodFrom: Date;
@@ -121,6 +122,7 @@ function toBillSummary(bill: LoadedContract['bills'][number]): ContractBillSumma
     code: billCode(bill.sequence),
     sequence: bill.sequence,
     status: bill.status,
+    isOpeningBalance: bill.isOpeningBalance,
     grossAmount: bill.grossAmount.toNumber(),
     netAmount: bill.netAmount.toNumber(),
     periodFrom: bill.periodFrom,

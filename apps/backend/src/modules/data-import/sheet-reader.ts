@@ -17,7 +17,11 @@ export async function readSpreadsheet(buffer: Buffer, fileName: string, sheetNam
     return { sheetNames: ['Sheet1'], sheetName: 'Sheet1', rows: parseCsv(buffer.toString('utf8')) };
   }
   if (extension !== 'xlsx') {
-    throw new BadRequestException('Upload an Excel (.xlsx) or CSV file. Older .xls files can be saved as .xlsx from Excel.');
+    throw new BadRequestException(
+      extension === 'numbers'
+        ? 'Numbers files can’t be read directly. In Numbers, choose File → Export To → Excel, then upload the .xlsx.'
+        : 'Upload an Excel (.xlsx) or CSV file. Older .xls files can be saved as .xlsx from Excel.',
+    );
   }
 
   const workbook = new Workbook();

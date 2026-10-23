@@ -44,7 +44,7 @@ export function ContractBillsCard({ contract, blockedReason, canPrepare, onNewBi
                   className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{bill.code}</p>
+                    <p className="text-sm font-medium">{bill.code}{bill.isOpeningBalance && <span className="ml-2 text-xs font-normal text-muted-foreground">Opening balance</span>}</p>
                     <p className="text-xs text-muted-foreground">{formatPeriod(bill.periodFrom, bill.periodTo)}</p>
                   </div>
                   <div className="text-right">

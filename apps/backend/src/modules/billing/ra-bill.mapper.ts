@@ -43,6 +43,8 @@ export interface RaBillSummaryView {
   code: string;
   sequence: number;
   status: RaBillStatus;
+  /** Brought in with the BOQ: everything certified before SitePilot. */
+  isOpeningBalance: boolean;
   reference: string | null;
   periodFrom: Date;
   periodTo: Date;
@@ -122,6 +124,7 @@ export function toRaBillSummary(bill: SummaryBill): RaBillSummaryView {
     code: billCode(bill.sequence),
     sequence: bill.sequence,
     status: bill.status,
+    isOpeningBalance: bill.isOpeningBalance,
     reference: bill.reference,
     periodFrom: bill.periodFrom,
     periodTo: bill.periodTo,

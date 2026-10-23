@@ -4,7 +4,7 @@ import { apiClient } from '@/lib/api/client';
 import { downloadCsv } from '@/lib/download-csv';
 
 /** Must match ImportEntity on the backend. */
-export type ImportEntity = 'MATERIAL' | 'VENDOR' | 'OPENING_STOCK' | 'PURCHASE_ORDER';
+export type ImportEntity = 'MATERIAL' | 'VENDOR' | 'OPENING_STOCK' | 'PURCHASE_ORDER' | 'BOQ' | 'MEASUREMENT_BOOK';
 export type RowAction = 'create' | 'update' | 'skip' | 'error';
 export type ExistingRecordPolicy = 'skip' | 'update';
 
@@ -23,6 +23,8 @@ export interface ImportEntityDefinition {
   permission: Permission;
   canUpdateExisting: boolean;
   keepsExtraColumns: boolean;
+  /** Imported into one record from its own page (a contract's BOQ, a bill's measurement book). */
+  context?: 'contract' | 'ra_bill';
   fields: ImportField[];
   allowed: boolean;
 }
@@ -99,7 +101,8 @@ const IMPORT_KEY = ['imports'] as const;
 
 const unwrap = <T,>(res: { data: { data?: T } & T }): T => (res.data.data ?? res.data) as T;
 
-function sheetForm(file: File, fields: Record<string, string | number | undefined>): FormData {
+/** The upload plus its form fields, as the import endpoints expect them. Shared with Billing's imports. */
+export function sheetForm(file: File, fields: Record<string, string | number | undefined>): FormData {
   const form = new FormData();
   form.append('file', file);
   for (const [key, value] of Object.entries(fields)) {
@@ -108,7 +111,7 @@ function sheetForm(file: File, fields: Record<string, string | number | undefine
   return form;
 }
 
-const multipart = { headers: { 'Content-Type': 'multipart/form-data' } };
+export const multipart = { headers: { 'Content-Type': 'multipart/form-data' } };
 
 export function useImportEntities() {
   return useQuery<ImportEntityDefinition[]>({

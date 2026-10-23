@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, cn } from '@sitepilot/ui';
-import { AlertTriangle, Ruler } from 'lucide-react';
+import { AlertTriangle, FileSpreadsheet, Ruler } from 'lucide-react';
 import type { RaBillDetail, RaBillLine } from '../types';
 import { formatAmount, formatQuantity } from '../utils/format';
 
@@ -42,9 +43,16 @@ export function RaBillAbstract({ bill, onOpenLine, editable }: RaBillAbstractPro
             {editable ? 'Open an item to enter its measurements. Totals update as you save.' : `${active.length} of ${bill.lines.length} BOQ lines billed so far.`}
           </CardDescription>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => setShowAll((value) => !value)}>
-          {showAll ? 'Only billed lines' : 'All BOQ lines'}
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          {editable && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/dashboard/billing/ra-bills/${bill.id}/import-measurements`}><FileSpreadsheet className="mr-1 h-3.5 w-3.5" /> Import MB</Link>
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => setShowAll((value) => !value)}>
+            {showAll ? 'Only billed lines' : 'All BOQ lines'}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {lines.length === 0 ? (

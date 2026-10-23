@@ -1,14 +1,10 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, cn } from '@sitepilot/ui';
-import { FileSpreadsheet, Upload } from 'lucide-react';
+import React from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, cn } from '@sitepilot/ui';
 import type { ImportEntity, ImportEntityDefinition } from '@/hooks/api/use-data-import';
 import { ENTITY_PRESENTATION } from '../import-entities';
-
-const MAX_FILE_BYTES = 5 * 1024 * 1024;
-const ACCEPTED = ['.xlsx', '.csv'];
+import { SheetDropZone } from './SheetDropZone';
 
 interface SheetUploadStepProps {
   entities: ImportEntityDefinition[];
@@ -19,26 +15,6 @@ interface SheetUploadStepProps {
 }
 
 export function SheetUploadStep({ entities, entity, onEntityChange, onUpload, reading }: SheetUploadStepProps): React.ReactElement {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
-
-  function accept(file: File | undefined): void {
-    if (!file) return;
-    if (!ACCEPTED.some((extension) => file.name.toLowerCase().endsWith(extension))) {
-      toast.error('Upload an Excel (.xlsx) or CSV file. Older .xls files can be saved as .xlsx from Excel.');
-      return;
-    }
-    if (file.size > MAX_FILE_BYTES) {
-      toast.error('The file must be 5 MB or smaller. Split larger sheets into parts.');
-      return;
-    }
-    if (!entity) {
-      toast.error('First choose what the sheet contains.');
-      return;
-    }
-    onUpload(file);
-  }
-
   return (
     <div className="space-y-6">
       <Card>
@@ -85,37 +61,7 @@ export function SheetUploadStep({ entities, entity, onEntityChange, onUpload, re
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div
-            onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(event) => {
-              event.preventDefault();
-              setDragging(false);
-              accept(event.dataTransfer.files[0]);
-            }}
-            className={cn(
-              'flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-12 text-center transition-colors',
-              dragging ? 'border-primary bg-primary/5' : 'bg-muted/20',
-            )}
-          >
-            <FileSpreadsheet className="h-10 w-10 text-primary/40" />
-            <p className="text-sm text-muted-foreground">Drag an Excel or CSV file here, or</p>
-            <input
-              ref={inputRef}
-              type="file"
-              accept={ACCEPTED.join(',')}
-              className="hidden"
-              aria-label="Choose spreadsheet"
-              onChange={(event) => {
-                accept(event.target.files?.[0]);
-                event.target.value = '';
-              }}
-            />
-            <Button type="button" disabled={!entity || reading} loading={reading} onClick={() => inputRef.current?.click()}>
-              <Upload className="mr-1.5 h-4 w-4" /> {reading ? 'Reading sheet…' : 'Choose file'}
-            </Button>
-            <p className="text-xs text-muted-foreground">.xlsx or .csv, up to 5 MB and 2,000 rows</p>
-          </div>
+          <SheetDropZone onFile={onUpload} reading={reading} disabled={!entity} disabledReason="First choose what the sheet contains." />
         </CardContent>
       </Card>
     </div>

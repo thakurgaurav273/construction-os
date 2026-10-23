@@ -22,9 +22,11 @@ export function toRaBillFormValues(bill?: RaBillDetail, previousPeriodTo?: strin
   const nextStart = previousPeriodTo
     ? new Date(new Date(previousPeriodTo).getTime() + 86_400_000).toISOString().slice(0, 10)
     : contractStart?.slice(0, 10) ?? firstOfThisMonth();
+  const today = new Date().toISOString().slice(0, 10);
   return {
     periodFrom: bill?.periodFrom.slice(0, 10) ?? nextStart,
-    periodTo: bill?.periodTo.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+    // When the last bill ended today, a new one can't end before it starts.
+    periodTo: bill?.periodTo.slice(0, 10) ?? (nextStart > today ? nextStart : today),
     reference: bill?.reference ?? '',
     notes: bill?.notes ?? '',
   };

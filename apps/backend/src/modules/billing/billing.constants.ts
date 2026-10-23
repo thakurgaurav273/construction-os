@@ -1,4 +1,4 @@
-import type { RaBillStatus } from '@prisma/client';
+import type { ContractDirection, RaBillStatus } from '@prisma/client';
 
 export const MAX_CONTRACT_ITEMS = 500;
 export const MAX_ADJUSTMENT_RULES = 20;
@@ -15,4 +15,8 @@ export const BILL_EVENTS = {
   changesRequested: 'Sent back for changes',
   certified: 'Certified',
   cancelled: 'Cancelled',
+  openingBalance: 'Opening balance imported',
+  measurementsImported: 'Measurements imported',
 } as const;
+
+export const DIRECTION_PARTY: Record<ContractDirection, string> = { CLIENT: 'Client', SUBCONTRACT: 'Subcontractor' };

@@ -1305,6 +1305,50 @@ Phase 1 (ADR-031) stopped at certification: a certified RA bill moved no money. 
 
 ---
 
+# ADR-033 - Importing BOQs and Measurement Books in Each Organization's Layout
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Organizations keep BOQs and measurement books in their own spreadsheets (see MIPL's RA Bill 04: an Abstract tab, and an MB tab where an item row is followed by "RA Bill 1st/2nd" sections, measurement rows, deduction rows, notes and total / hold / paid rows). ADR-029 already learns flat sheet layouts once and reuses them. Measurement books aren't flat, and contracts brought in mid-way (at RA-04) need their earlier certified quantities.
+
+---
+
+## Decision
+
+- **Reuse ADR-029's layouts.** `BOQ` and `MEASUREMENT_BOOK` are two more import entities with field lists; column mapping (AI-proposed once, name-matched without AI, confirmed by a person) and saved templates work unchanged. They are marked with a `context` and imported from the contract or bill page, not the generic Imports page, through Billing routes that check billing permissions.
+- **Measurement books are parsed by fixed rules, never AI.** A row with an item number starts an item; text-only rows are section markers ("RA Bill …"), totals ("Total … / hold / paid") or notes; rows with a quantity are measurements; deduction wording (Deduction, Desuction, Less, Minus, (-)) or a negative quantity marks deductions. The words are built in for now.
+- **The sheet's quantity is the truth.** A row keeps its Nos × L × B × H only when the stored (4-decimal) dimensions reproduce the sheet's quantity within its 2-decimal display rounding; otherwise the row keeps the sheet's quantity, with the full dimensions in its description. The preview shows exactly what will be claimed.
+- **Cross-checks, not corrections.** Each item's rows are compared with the sheet's own total; differences (e.g. a sheet that adds its deductions) and held quantities are shown as warnings for a person to judge. Nothing is written until the preview is accepted; each item's rows replace that item's measurements through the same path as the measurement screen.
+- **Opening balance.** A BOQ column of quantities certified before SitePilot becomes one certified bill (`isOpeningBalance`) numbered as the organization's last bill, so the next bill continues their numbering with correct previous quantities. It raises no vendor bill, receivable or retention.
+- **Output.** A print view (landscape A4) and an Excel workbook (Abstract + Measurement Book); the MB sheet uses the organization's own saved MB columns when there is one.
+
+---
+
+## Alternatives
+
+- **AI parses every measurement book**: copes with odd layouts, but money quantities must be reproducible and auditable, and it costs time and money on every upload.
+- **Per-organization parser code**: precise for one customer, unmaintainable across many.
+- **Import previous bills one by one**: more history, but most organizations only have the latest cumulative sheet.
+
+---
+
+## Consequences
+
+- Layouts that break the item-row convention (e.g. item numbers only in a merged heading) need mapping to a column that carries them, or editable row rules later.
+- .numbers files must be exported to Excel first; there is no maintained reader.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

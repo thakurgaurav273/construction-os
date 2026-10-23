@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button, Card, CardContent, Skeleton } from '@sitepilot/ui';
-import { AlertTriangle, ArrowLeft, MessageSquareWarning } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, History, MessageSquareWarning, Printer } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useCan } from '@/hooks/api/use-access';
 import { useRaBill } from '@/hooks/api/use-billing';
@@ -74,9 +74,26 @@ export default function RaBillPage(): React.ReactElement {
               {bill.certifiedBy && ` · Certified by ${bill.certifiedBy.name}`}
             </p>
           </div>
-          <BillActions bill={bill} />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link href={`/dashboard/billing/ra-bills/${bill.id}/print`}><Printer className="mr-2 h-4 w-4" /> Print / Excel</Link>
+            </Button>
+            <BillActions bill={bill} />
+          </div>
         </div>
       </div>
+
+      {bill.isOpeningBalance && (
+        <Card>
+          <CardContent className="flex gap-3 p-4 text-sm">
+            <History className="h-5 w-5 shrink-0 text-primary" />
+            <div>
+              <p className="font-medium">Opening balance</p>
+              <p className="text-muted-foreground">Quantities certified before this contract was in SitePilot, imported with the BOQ. They count as “previous” on the next bill; this bill moves no money.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {bill.status === 'CHANGES_REQUESTED' && bill.reviewNote && (
         <Card className="border-amber-300/60 bg-amber-50/60 dark:bg-amber-950/20">

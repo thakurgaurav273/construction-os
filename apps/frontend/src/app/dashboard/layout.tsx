@@ -13,18 +13,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <>
       <BrandThemeStyle />
-      <div className="flex h-screen overflow-hidden bg-background">
-        <Sidebar />
+      {/* Printing shows only the page content, flowing over as many sheets as it needs. */}
+      <div className="flex h-screen overflow-hidden bg-background print:block print:h-auto print:overflow-visible print:bg-white">
+        <div className="contents print:hidden">
+          <Sidebar />
+        </div>
         
         {/* Mobile sidebar overlay would go here if we implemented the full mobile drawer */}
 
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <Header 
-            onMenuClick={() => setSidebarOpen(true)} 
-            onSearchClick={() => setCommandPaletteOpen(true)} 
-          />
+        <div className="flex flex-1 flex-col overflow-hidden print:block print:overflow-visible">
+          <div className="contents print:hidden">
+            <Header 
+              onMenuClick={() => setSidebarOpen(true)} 
+              onSearchClick={() => setCommandPaletteOpen(true)} 
+            />
+          </div>
           
-          <main className="flex-1 overflow-y-auto bg-muted/20">
+          <main className="flex-1 overflow-y-auto bg-muted/20 print:overflow-visible print:bg-white">
             {children}
           </main>
         </div>

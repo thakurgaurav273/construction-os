@@ -11,7 +11,7 @@ import {
 import { Info, Sparkles } from 'lucide-react';
 import { FormField } from '@/components/shared/FormField';
 import {
-  useSaveImportTemplate, type ImportEntityDefinition, type ImportMapping, type ImportTemplate, type SheetAnalysis,
+  useSaveImportTemplate, type ImportEntityDefinition, type ImportMapping, type ImportTemplate, type SheetAnalysis, type TemplateInput,
 } from '@/hooks/api/use-data-import';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import {
@@ -32,10 +32,12 @@ interface ColumnMappingStepProps {
   onReread: (options: { sheetName?: string; headerRow?: number }) => void;
   onSaved: (template: ImportTemplate) => void;
   onBack: () => void;
+  /** Saves through another endpoint, e.g. Billing's BOQ or measurement book layouts. */
+  onSaveTemplate?: (input: TemplateInput, id?: string) => Promise<ImportTemplate>;
 }
 
 export function ColumnMappingStep({
-  definition, analysis, fileName, template, rereading, onReread, onSaved, onBack,
+  definition, analysis, fileName, template, rereading, onReread, onSaved, onBack, onSaveTemplate,
 }: ColumnMappingStepProps): React.ReactElement {
   const saveTemplate = useSaveImportTemplate();
   const startingMapping = template?.mapping ?? analysis.suggestion?.mapping ?? EMPTY_MAPPING;
@@ -75,7 +77,7 @@ export function ColumnMappingStep({
       mapping: toImportMapping(values, translations),
     };
     try {
-      const saved = await saveTemplate.mutateAsync({ id: template?.id, input });
+      const saved = onSaveTemplate ? await onSaveTemplate(input, template?.id) : await saveTemplate.mutateAsync({ id: template?.id, input });
       toast.success(`Saved the “${saved.name}” layout`);
       onSaved(saved);
     } catch (error) {

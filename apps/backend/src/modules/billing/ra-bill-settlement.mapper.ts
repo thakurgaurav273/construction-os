@@ -42,7 +42,8 @@ export type SettlementView =
 
 /** Null until the bill is certified: before that nothing is owed either way. */
 export function toSettlementView(bill: SettlementRecord, today: Date): SettlementView | null {
-  if (bill.status !== 'CERTIFIED') return null;
+  // An opening balance was settled before SitePilot.
+  if (bill.status !== 'CERTIFIED' || bill.isOpeningBalance) return null;
 
   if (bill.contract.direction === 'SUBCONTRACT') {
     const invoice = bill.invoice;

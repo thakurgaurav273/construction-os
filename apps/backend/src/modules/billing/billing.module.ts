@@ -1,7 +1,12 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../database/database.module';
 import { AuthModule } from '../auth/auth.module';
+import { DataImportModule } from '../data-import/data-import.module';
 import { FinanceModule } from '../finance/finance.module';
+import { BillingImportController } from './import/billing-import.controller';
+import { BoqImportService } from './import/boq-import.service';
+import { MeasurementImportService } from './import/measurement-import.service';
+import { RaBillExportService } from './import/ra-bill-export.service';
 import { ProcurementModule } from '../procurement/procurement.module';
 import { ClientsController } from './clients.controller';
 import { ClientsService } from './clients.service';
@@ -21,8 +26,8 @@ import { RetentionService } from './retention.service';
 
 /** Contracts with a BOQ, billed in running account bills, in either direction (to clients or from subcontractors). */
 @Module({
-  imports: [DatabaseModule, AuthModule, ProcurementModule, FinanceModule],
-  controllers: [ClientsController, ContractsController, RaBillsController, ReceivablesController],
+  imports: [DatabaseModule, AuthModule, ProcurementModule, FinanceModule, DataImportModule],
+  controllers: [ClientsController, ContractsController, RaBillsController, ReceivablesController, BillingImportController],
   providers: [
     ClientsService,
     ContractsService,
@@ -35,6 +40,9 @@ import { RetentionService } from './retention.service';
     RaBillReceiptsService,
     ReceivablesService,
     RetentionService,
+    BoqImportService,
+    MeasurementImportService,
+    RaBillExportService,
   ],
 })
 export class BillingModule {}

@@ -40,7 +40,7 @@ export class ReceivablesService {
 
   async findAll(organizationId: string, projectId?: string): Promise<ReceivablesView> {
     const bills = await this.prisma.raBill.findMany({
-      where: { organizationId, projectId, status: 'CERTIFIED', contract: { direction: 'CLIENT' } },
+      where: { organizationId, projectId, status: 'CERTIFIED', isOpeningBalance: false, contract: { direction: 'CLIENT' } },
       include: { ...RA_BILL_SUMMARY_INCLUDE, receipts: { where: { voidedAt: null }, select: { amount: true } } },
       orderBy: { dueDate: 'asc' },
     });

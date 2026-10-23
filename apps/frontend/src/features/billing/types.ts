@@ -42,6 +42,7 @@ export interface ContractBillSummary {
   code: string;
   sequence: number;
   status: RaBillStatus;
+  isOpeningBalance: boolean;
   grossAmount: number;
   netAmount: number;
   periodFrom: string;
@@ -139,6 +140,8 @@ export interface RaBillSummary {
   code: string;
   sequence: number;
   status: RaBillStatus;
+  /** Quantities certified before SitePilot, imported with the BOQ. */
+  isOpeningBalance: boolean;
   reference: string | null;
   periodFrom: string;
   periodTo: string;

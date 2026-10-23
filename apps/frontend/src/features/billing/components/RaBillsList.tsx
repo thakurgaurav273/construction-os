@@ -52,7 +52,7 @@ export function RaBillsList({ onBrowseContracts }: { onBrowseContracts: () => vo
                 className="grid gap-2 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center sm:gap-4"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{bill.code} · {bill.contract.title}</p>
+                  <p className="truncate text-sm font-medium">{bill.code}{bill.isOpeningBalance ? ' (opening balance)' : ''} · {bill.contract.title}</p>
                   <p className="truncate text-xs text-muted-foreground">
                     {bill.contract.code} · {bill.partyName ?? '—'} · {bill.project.name} · {formatPeriod(bill.periodFrom, bill.periodTo)}
                   </p>
