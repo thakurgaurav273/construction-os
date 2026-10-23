@@ -17,7 +17,8 @@ import {
 } from '@/hooks/api/use-materials';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { formatNumber } from '@/lib/utils';
-import { siteStockSchema, toSiteStockInput, type SiteStockFormValues } from '../validation/site-stock.schema';
+import { NO_SUBCONTRACT, siteStockSchema, toSiteStockInput, type SiteStockFormValues } from '../validation/site-stock.schema';
+import { SubcontractRecoveryFields } from './SubcontractRecoveryFields';
 
 interface SiteStockDialogProps {
   open: boolean;
@@ -52,7 +53,9 @@ const COPY: Record<SiteStockMovementType, { title: string; description: string; 
 };
 
 function emptyValues(projectId = '', materialId = ''): SiteStockFormValues {
-  return { projectId, materialId, warehouseId: '', quantity: 0, issuedOn: format(new Date(), 'yyyy-MM-dd'), note: '' };
+  return {
+    projectId, materialId, warehouseId: '', quantity: 0, issuedOn: format(new Date(), 'yyyy-MM-dd'), note: '', contractId: NO_SUBCONTRACT, recoveryRate: '',
+  };
 }
 
 export function SiteStockDialog({ open, onOpenChange, type, projectId, materialId }: SiteStockDialogProps): React.ReactElement {
@@ -65,6 +68,7 @@ export function SiteStockDialog({ open, onOpenChange, type, projectId, materialI
   const selectedProjectId = useWatch({ control, name: 'projectId' });
   const selectedMaterialId = useWatch({ control, name: 'materialId' });
   const selectedWarehouseId = useWatch({ control, name: 'warehouseId' });
+  const selectedContractId = useWatch({ control, name: 'contractId' });
 
   const { data: projects = [] } = useProjects();
   const { data: materials } = useMaterials({ limit: 100, sort: 'name', order: 'asc' });
@@ -203,6 +207,16 @@ export function SiteStockDialog({ open, onOpenChange, type, projectId, materialI
               <Input id="site-stock-date" type="date" max={format(new Date(), 'yyyy-MM-dd')} {...register('issuedOn')} />
             </FormField>
           </div>
+
+          <SubcontractRecoveryFields
+            type={type}
+            projectId={selectedProjectId}
+            selectedContractId={selectedContractId}
+            defaultRate={material?.unitCost ?? null}
+            control={control}
+            register={register}
+            errors={errors}
+          />
 
           <FormField label="Note (optional)" htmlFor="site-stock-note" error={errors.note?.message}>
             <Textarea

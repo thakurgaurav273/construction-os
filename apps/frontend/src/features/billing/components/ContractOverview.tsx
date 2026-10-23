@@ -26,6 +26,13 @@ export function ContractOverview({ contract }: { contract: ContractDetail }): Re
           <Stat label="Certified to date (gross)" value={formatAmount(contract.certifiedToDate)} hint={`${certifiedPercent}% of contract value`} />
           <Stat label="Bills" value={String(contract.billCount)} hint={`${contract.openBill ? `${contract.openBill.code} open` : 'None open'} · due in ${contract.paymentTermDays} days`} />
         </div>
+        {contract.materials && contract.materials.issuedValue > 0 && (
+          <div className="grid grid-cols-3 gap-4 rounded-lg bg-muted/40 px-4 py-3">
+            <Stat label="Material issued to them" value={formatAmount(contract.materials.issuedValue)} />
+            <Stat label="Recovered on certified bills" value={formatAmount(contract.materials.recoveredValue)} />
+            <Stat label="Still to recover" value={formatAmount(contract.materials.pendingValue)} hint={contract.materials.pendingValue > 0 ? 'Recover it on the next bill' : undefined} />
+          </div>
+        )}
         <div>
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Taxes & deductions on each bill</p>
           {contract.adjustments.length === 0 ? (

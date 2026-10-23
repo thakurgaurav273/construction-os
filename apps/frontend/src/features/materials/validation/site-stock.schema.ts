@@ -11,7 +11,13 @@ export const siteStockSchema = z.object({
     .max(1_000_000_000),
   issuedOn: z.string().min(1, 'Choose a date'),
   note: z.string().trim().max(500),
+  /** NO_SUBCONTRACT when the material is the project's own use. */
+  contractId: z.string(),
+  recoveryRate: z.union([z.literal(''), z.coerce.number({ invalid_type_error: 'Enter a rate' }).min(0, "Can't be negative")]),
 });
+
+/** Radix Select can't hold an empty value, so "not to a subcontractor" uses a sentinel. */
+export const NO_SUBCONTRACT = 'none';
 
 export type SiteStockFormValues = z.infer<typeof siteStockSchema>;
 
@@ -22,6 +28,8 @@ export function toSiteStockInput(values: SiteStockFormValues): SiteStockMovement
     quantity: values.quantity,
     issuedOn: values.issuedOn,
     note: values.note || undefined,
+    contractId: values.contractId === NO_SUBCONTRACT ? undefined : values.contractId,
+    recoveryRate: values.contractId === NO_SUBCONTRACT || values.recoveryRate === '' ? undefined : values.recoveryRate,
   };
 }
 

@@ -113,6 +113,13 @@ export class ProjectMaterialsService {
     });
     if (!warehouse) throw new NotFoundException('Store not found.');
 
+    const subcontract = dto.contractId ? await this.findSubcontract(dto.contractId, projectId, organizationId) : null;
+    // A return is credited at the rate the material was charged at, unless another is given.
+    const issuedRate = subcontract && type === MaterialIssueType.RETURN
+      ? await this.assertReturnable(subcontract.id, material.id, dto.quantity, material.unit)
+      : null;
+    if (!subcontract && dto.recoveryRate !== undefined) throw new BadRequestException('A recovery rate needs the subcontract it is recovered from.');
+
     const issuedOn = dto.issuedOn ? new Date(dto.issuedOn) : new Date();
     if (isFutureDay(issuedOn)) throw new BadRequestException("The date can't be in the future.");
 
@@ -145,6 +152,8 @@ export class ProjectMaterialsService {
           materialId: material.id,
           warehouseId: warehouse.id,
           projectId,
+          contractId: subcontract?.id ?? null,
+          recoveryRate: subcontract ? dto.recoveryRate ?? issuedRate ?? material.unitCost : null,
           issuedById: userId,
           organizationId,
         },
@@ -154,7 +163,7 @@ export class ProjectMaterialsService {
         data: {
           type: 'update',
           title: document.title,
-          description: `${code}: ${dto.quantity} ${material.unit} of ${material.name} ${document.verb} ${warehouse.name}.`,
+          description: `${code}: ${dto.quantity} ${material.unit} of ${material.name} ${document.verb} ${warehouse.name}${subcontract ? ` (${type === MaterialIssueType.ISSUE ? 'to' : 'from'} ${subcontract.vendorName}, ${subcontract.code})` : ''}.`,
           entityType: 'material_issue',
           entityId: issue.id,
           metadata: { code, materialId: material.id, quantity: dto.quantity },
@@ -174,6 +183,36 @@ export class ProjectMaterialsService {
       select: { code: true },
     });
     return nextDocumentNumber(prefix, existing.map((issue) => issue.code));
+  }
+
+  /** Only an active subcontract on the same project can receive material to be recovered. */
+  private async findSubcontract(contractId: string, projectId: string, organizationId: string): Promise<{ id: string; code: string; vendorName: string }> {
+    const contract = await this.prisma.contract.findFirst({
+      where: { id: contractId, organizationId },
+      select: { id: true, code: true, direction: true, status: true, projectId: true, vendor: { select: { name: true } } },
+    });
+    if (!contract || contract.direction !== 'SUBCONTRACT') throw new NotFoundException('Subcontract not found.');
+    if (contract.projectId !== projectId) throw new BadRequestException(`${contract.code} belongs to a different project.`);
+    if (contract.status !== 'ACTIVE') throw new BadRequestException(`${contract.code} is closed.`);
+    return { id: contract.id, code: contract.code, vendorName: contract.vendor?.name ?? 'the subcontractor' };
+  }
+
+  /** A subcontractor can't return more of a material than they were issued. Returns the latest issue's rate. */
+  private async assertReturnable(contractId: string, materialId: string, quantity: number, unit: string): Promise<Prisma.Decimal | null> {
+    const moved = await this.prisma.materialIssue.groupBy({
+      by: ['type'],
+      where: { contractId, materialId },
+      _sum: { quantity: true },
+    });
+    const total = (type: MaterialIssueType): number => num(moved.find((entry) => entry.type === type)?._sum.quantity ?? null);
+    const held = total(MaterialIssueType.ISSUE) - total(MaterialIssueType.RETURN);
+    if (quantity > held + 0.0005) throw new BadRequestException(`Only ${Math.max(0, held)} ${unit} of this material was issued to that subcontractor.`);
+    const lastIssue = await this.prisma.materialIssue.findFirst({
+      where: { contractId, materialId, type: MaterialIssueType.ISSUE },
+      orderBy: { issuedOn: 'desc' },
+      select: { recoveryRate: true },
+    });
+    return lastIssue?.recoveryRate ?? null;
   }
 
   private async assertProject(projectId: string, organizationId: string): Promise<{ id: string; name: string }> {

@@ -3,6 +3,7 @@ import {
 } from '@prisma/client';
 import { roundMoney } from './billing-math';
 import { OPEN_BILL_STATUSES } from './billing.constants';
+import type { ContractMaterialsSummary } from './recovery/material-recovery.service';
 import type { RetentionView } from './retention.service';
 
 export const CONTRACT_INCLUDE = {
@@ -79,6 +80,8 @@ export interface ContractItemView {
   isExtra: boolean;
   /** Certified across all certified bills. */
   certifiedQuantity: number;
+  /** On a subcontract: the client BOQ line this delivers. */
+  clientItemId: string | null;
   /** On any bill, so it can't be removed from the BOQ. */
   inUse: boolean;
 }
@@ -90,6 +93,8 @@ export interface ContractDetailView extends ContractSummaryView {
   adjustments: AdjustmentRuleView[];
   bills: ContractBillSummary[];
   retention: RetentionView;
+  /** Material issued to the subcontractor and how much has been recovered (subcontracts only). */
+  materials: ContractMaterialsSummary | null;
 }
 
 export function billCode(sequence: number): string {
@@ -158,6 +163,7 @@ export function toContractDetail(
   certifiedByItem: Map<string, number>,
   itemsInUse: Set<string>,
   retention: RetentionView,
+  materials: ContractMaterialsSummary | null,
 ): ContractDetailView {
   return {
     ...toContractSummary(contract),
@@ -174,10 +180,12 @@ export function toContractDetail(
       amount: roundMoney(item.quantity.toNumber() * item.rate.toNumber()),
       isExtra: item.isExtra,
       certifiedQuantity: certifiedByItem.get(item.id) ?? 0,
+      clientItemId: item.clientItemId,
       inUse: itemsInUse.has(item.id),
     })),
     adjustments: contract.adjustments.map(toAdjustmentView),
     bills: contract.bills.map(toBillSummary),
     retention,
+    materials,
   };
 }

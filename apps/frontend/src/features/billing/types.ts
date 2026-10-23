@@ -80,6 +80,8 @@ export interface ContractItem {
   isExtra: boolean;
   certifiedQuantity: number;
   inUse: boolean;
+  /** On a subcontract: the client BOQ line this delivers. */
+  clientItemId: string | null;
 }
 
 export interface RetentionRelease {
@@ -108,6 +110,8 @@ export interface ContractDetail extends ContractSummary {
   adjustments: (AdjustmentRule & { id: string })[];
   bills: ContractBillSummary[];
   retention: Retention;
+  /** Material issued to the subcontractor (subcontracts only). */
+  materials: { issuedValue: number; recoveredValue: number; pendingValue: number } | null;
 }
 
 export interface ContractInput {
@@ -201,7 +205,7 @@ export interface RaBillDetail extends RaBillSummary {
   reviewNote: string | null;
   contractStatus: ContractStatus;
   lines: RaBillLine[];
-  adjustments: (AdjustmentRule & { id: string; amount: number })[];
+  adjustments: (AdjustmentRule & { id: string; amount: number; kind: 'MANUAL' | 'MATERIAL_RECOVERY' })[];
   totals: { previousGross: number; claimedGross: number; grossAmount: number; upToDateGross: number; netAmount: number };
   events: { id: string; stage: string; actorName: string; note: string; createdAt: string }[];
   settlement: Settlement | null;

@@ -5,6 +5,7 @@ export const MATERIAL_ISSUE_INCLUDE = {
   material: { select: { id: true, name: true, unit: true } },
   warehouse: { select: { id: true, name: true } },
   issuedBy: { select: { id: true, name: true } },
+  contract: { select: { id: true, code: true, vendor: { select: { name: true } } } },
 } satisfies Prisma.MaterialIssueInclude;
 
 type MaterialIssueWithRelations = Prisma.MaterialIssueGetPayload<{ include: typeof MATERIAL_ISSUE_INCLUDE }>;
@@ -21,6 +22,8 @@ export interface MaterialIssueView {
   material: { id: string; name: string; unit: string };
   warehouse: { id: string; name: string };
   issuedBy: { id: string; name: string };
+  /** The subcontractor it is recovered from, if any. */
+  subcontract: { id: string; code: string; vendorName: string | null; recoveryRate: number } | null;
 }
 
 export interface ProjectMaterialLine {
@@ -64,5 +67,8 @@ export function toMaterialIssueView(issue: MaterialIssueWithRelations): Material
     material: issue.material,
     warehouse: issue.warehouse,
     issuedBy: issue.issuedBy,
+    subcontract: issue.contract
+      ? { id: issue.contract.id, code: issue.contract.code, vendorName: issue.contract.vendor?.name ?? null, recoveryRate: num(issue.recoveryRate ?? issue.unitCost) }
+      : null,
   };
 }

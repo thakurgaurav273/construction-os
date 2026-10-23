@@ -1,4 +1,4 @@
-import { ContractDirection, MeasurementType, Prisma, RaBillStatus } from '@prisma/client';
+import { BillAdjustmentKind, ContractDirection, MeasurementType, Prisma, RaBillStatus } from '@prisma/client';
 import { adjustmentAmount, roundMoney, roundQuantity } from './billing-math';
 import { AdjustmentRuleView, billCode, toAdjustmentView } from './contract.mapper';
 import { SETTLEMENT_INCLUDE, SettlementView, toSettlementView } from './ra-bill-settlement.mapper';
@@ -101,6 +101,7 @@ export interface RaBillLineView {
 
 export interface BillAdjustmentView extends AdjustmentRuleView {
   amount: number;
+  kind: BillAdjustmentKind;
 }
 
 export interface RaBillDetailView extends RaBillSummaryView {
@@ -202,7 +203,7 @@ export function toRaBillDetail(bill: DetailBill, previousLines: PreviousLine[]):
   const grossAmount = sum((line) => line.thisAmount);
   const adjustments = bill.adjustments.map((adjustment) => {
     const view = toAdjustmentView(adjustment);
-    return { ...view, amount: adjustmentAmount(view, grossAmount) };
+    return { ...view, kind: adjustment.kind, amount: adjustmentAmount(view, grossAmount) };
   });
 
   return {

@@ -242,6 +242,8 @@ export interface MaterialIssue {
   material: { id: string; name: string; unit: string };
   warehouse: { id: string; name: string };
   issuedBy: { id: string; name: string };
+  /** The subcontractor it is recovered from, if any. */
+  subcontract: { id: string; code: string; vendorName: string | null; recoveryRate: number } | null;
 }
 
 export interface ProjectMaterialLine {
@@ -273,6 +275,9 @@ export interface SiteStockMovementInput {
   quantity: number;
   issuedOn?: string;
   note?: string;
+  /** Subcontract the material goes to (or comes back from), to recover it from their bills. */
+  contractId?: string;
+  recoveryRate?: number;
 }
 
 /** Stock changes ripple into material totals, store inventory, the project tab and its timeline. */

@@ -17,7 +17,9 @@ const billAdjustmentsSchema = z.object({ adjustments: z.array(adjustmentSchema).
 type BillAdjustmentsValues = z.infer<typeof billAdjustmentsSchema>;
 
 const toValues = (bill: RaBillDetail): BillAdjustmentsValues => ({
-  adjustments: bill.adjustments.map(({ label, effect, calculation, value, isRetention }) => ({ label, effect, calculation, value, isRetention })),
+  // Material recovery lines are managed from the recovery card, not typed here.
+  adjustments: bill.adjustments.filter((adjustment) => adjustment.kind === 'MANUAL')
+    .map(({ label, effect, calculation, value, isRetention }) => ({ label, effect, calculation, value, isRetention })),
 });
 
 /** Changes taxes and deductions on this bill only, e.g. this month's advance recovery. */

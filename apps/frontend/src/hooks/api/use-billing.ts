@@ -5,6 +5,7 @@ import type {
   ContractItemInput, ContractStatus, ContractSummary, MeasurementInput, RaBillDetail, RaBillInput, RaBillStatus,
   RaBillSummary, ReceiptInput, Receivables, RetentionReleaseInput,
 } from '@/features/billing/types';
+import type { ItemLinkOptions, Margin, MaterialRecovery } from '@/features/billing/margin-types';
 
 function unwrap<T>(res: { data: { data?: T } & T }): T {
   return res.data.data ?? res.data;
@@ -41,11 +42,12 @@ export interface ContractFilters {
   status?: ContractStatus;
 }
 
-export function useContracts(filters: ContractFilters = {}) {
+export function useContracts(filters: ContractFilters = {}, enabled = true) {
   return useQuery<ContractSummary[]>({
     queryKey: ['billing', 'contracts', filters],
     queryFn: async () => unwrap(await apiClient.get('/contracts', { params: filters })),
     staleTime: 30_000,
+    enabled,
   });
 }
 
@@ -160,3 +162,45 @@ export function useReleaseRetention() {
   return useBillingMutation(async ({ contractId, input }: { contractId: string; input: RetentionReleaseInput }): Promise<ContractDetail> =>
     unwrap(await apiClient.post(`/contracts/${contractId}/retention-releases`, input)));
 }
+
+/* ---------- Margin and material recovery ---------- */
+
+export function useMaterialRecovery(billId: string, enabled = true) {
+  return useQuery<MaterialRecovery>({
+    queryKey: ['billing', 'material-recovery', billId],
+    queryFn: async () => unwrap(await apiClient.get(`/ra-bills/${billId}/material-recovery`)),
+    enabled,
+  });
+}
+
+export function useRecoverMaterials() {
+  return useBillingMutation(async ({ billId, materialIds }: { billId: string; materialIds: string[] }): Promise<RaBillDetail> =>
+    unwrap(await apiClient.post(`/ra-bills/${billId}/material-recovery`, { materialIds })));
+}
+
+export function useRemoveRecovery() {
+  return useBillingMutation(async ({ billId, adjustmentId }: { billId: string; adjustmentId: string }): Promise<RaBillDetail> =>
+    unwrap(await apiClient.delete(`/ra-bills/${billId}/material-recovery/${adjustmentId}`)));
+}
+
+export function useItemLinkOptions(contractId: string) {
+  return useQuery<ItemLinkOptions>({
+    queryKey: ['billing', 'item-links', contractId],
+    queryFn: async () => unwrap(await apiClient.get(`/contracts/${contractId}/item-links`)),
+  });
+}
+
+export function useSaveItemLinks() {
+  return useBillingMutation(async ({ contractId, links }: { contractId: string; links: { itemId: string; clientItemId: string | null }[] }): Promise<ContractDetail> =>
+    unwrap(await apiClient.put(`/contracts/${contractId}/item-links`, { links })));
+}
+
+export function useMargin(projectId: string | null) {
+  return useQuery<Margin>({
+    queryKey: ['billing', 'margin', projectId],
+    queryFn: async () => unwrap(await apiClient.get('/billing/margin', { params: { projectId } })),
+    enabled: !!projectId,
+    staleTime: 30_000,
+  });
+}
+

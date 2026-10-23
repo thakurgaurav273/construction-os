@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Progress } from '@sitepilot/ui';
-import { FileSpreadsheet, ListChecks, Pencil } from 'lucide-react';
+import { FileSpreadsheet, Link2, ListChecks, Pencil } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import type { ContractDetail } from '../types';
 import { formatAmount, formatQuantity } from '../utils/format';
@@ -28,7 +28,12 @@ export function ContractBoqCard({ contract, canEdit }: ContractBoqCardProps): Re
           </CardDescription>
         </div>
         {canEdit && !editing && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            {contract.direction === 'SUBCONTRACT' && contract.items.length > 0 && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/dashboard/billing/contracts/${contract.id}/links`}><Link2 className="mr-1 h-3.5 w-3.5" /> Link to client BOQ</Link>
+              </Button>
+            )}
             <Button variant="outline" size="sm" asChild>
               <Link href={`/dashboard/billing/contracts/${contract.id}/import-boq`}><FileSpreadsheet className="mr-1 h-3.5 w-3.5" /> Import</Link>
             </Button>
@@ -65,7 +70,10 @@ export function ContractBoqCard({ contract, canEdit }: ContractBoqCardProps): Re
                   </div>
                   <div className="min-w-0">
                     <p className="line-clamp-2 text-sm">{item.description}</p>
-                    {item.isExtra && <Badge variant="outline" className="mt-1">Extra item</Badge>}
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {item.isExtra && <Badge variant="outline">Extra item</Badge>}
+                      {contract.direction === 'SUBCONTRACT' && (item.clientItemId ? <Badge variant="info">Linked to client BOQ</Badge> : <Badge variant="secondary">Not linked</Badge>)}
+                    </div>
                   </div>
                   <div className="text-sm md:text-right">
                     <p>{formatQuantity(item.quantity)} {item.unit} × {formatAmount(item.rate)}</p>

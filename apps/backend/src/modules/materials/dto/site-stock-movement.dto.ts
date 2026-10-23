@@ -31,6 +31,18 @@ export class SiteStockMovementDto {
   @IsString()
   @MaxLength(500)
   note?: string;
+
+  @ApiPropertyOptional({ description: 'Subcontract the material goes to (or comes back from), to recover it from their bills' })
+  @IsOptional()
+  @IsUUID()
+  contractId?: string;
+
+  @ApiPropertyOptional({ description: 'Rupees per unit to recover; defaults to the carrying cost' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  recoveryRate?: number;
 }
 
 export class MaterialPlanDto {

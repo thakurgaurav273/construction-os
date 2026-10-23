@@ -4,6 +4,10 @@ import { AuthModule } from '../auth/auth.module';
 import { DataImportModule } from '../data-import/data-import.module';
 import { FinanceModule } from '../finance/finance.module';
 import { BillingImportController } from './import/billing-import.controller';
+import { ItemLinksService } from './margin/item-links.service';
+import { MarginController } from './margin/margin.controller';
+import { MarginService } from './margin/margin.service';
+import { MaterialRecoveryService } from './recovery/material-recovery.service';
 import { BoqImportService } from './import/boq-import.service';
 import { MeasurementImportService } from './import/measurement-import.service';
 import { RaBillExportService } from './import/ra-bill-export.service';
@@ -27,7 +31,7 @@ import { RetentionService } from './retention.service';
 /** Contracts with a BOQ, billed in running account bills, in either direction (to clients or from subcontractors). */
 @Module({
   imports: [DatabaseModule, AuthModule, ProcurementModule, FinanceModule, DataImportModule],
-  controllers: [ClientsController, ContractsController, RaBillsController, ReceivablesController, BillingImportController],
+  controllers: [ClientsController, ContractsController, RaBillsController, ReceivablesController, BillingImportController, MarginController],
   providers: [
     ClientsService,
     ContractsService,
@@ -43,6 +47,9 @@ import { RetentionService } from './retention.service';
     BoqImportService,
     MeasurementImportService,
     RaBillExportService,
+    MaterialRecoveryService,
+    ItemLinksService,
+    MarginService,
   ],
 })
 export class BillingModule {}

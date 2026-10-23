@@ -15,6 +15,7 @@ import { BillTotalsCard } from '@/features/billing/components/BillTotalsCard';
 import { MeasurementSheet } from '@/features/billing/components/MeasurementSheet';
 import { RaBillAbstract } from '@/features/billing/components/RaBillAbstract';
 import { SettlementCard } from '@/features/billing/components/SettlementCard';
+import { MaterialRecoveryCard } from '@/features/billing/components/margin/MaterialRecoveryCard';
 import { DIRECTION_LABELS } from '@/features/billing/constants';
 import { formatPeriod } from '@/features/billing/utils/format';
 
@@ -111,6 +112,7 @@ export default function RaBillPage(): React.ReactElement {
         <div className="space-y-6">
           <SettlementCard bill={bill} />
           <BillTotalsCard bill={bill} editable={editable} />
+          <MaterialRecoveryCard bill={bill} editable={editable} />
           <BillTimeline events={bill.events} />
         </div>
       </div>

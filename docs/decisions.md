@@ -1349,6 +1349,48 @@ Organizations keep BOQs and measurement books in their own spreadsheets (see MIP
 
 ---
 
+# ADR-034 - Material Recovery and Margin per Item
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Contractors routinely supply material (cement, steel, blocks) to subcontractors and recover its cost from their RA bills, and want to know, item by item, how much they bill the client against what they pay subcontractors for the same work.
+
+---
+
+## Decision
+
+- **Issues name the subcontract.** `MaterialIssue.contractId` records the subcontract a material issue (or return) was for, with a `recoveryRate` that defaults to the carrying cost; returns default to the rate it was issued at. Returns can't exceed what that subcontractor was issued. The stock ledger is unchanged: it is still an issue to the project.
+- **Recovery is an ordinary bill deduction.** Recovering adds a FIXED DEDUCT `RaBillAdjustment` of kind `MATERIAL_RECOVERY` per material, and the issue notes it covers point at it (`recoveryAdjustmentId`). Totals, the vendor bill raised at certification (ADR-032), print and Excel need no special handling. An issue is pending while it is unlinked or linked to a cancelled bill, so cancelling a bill frees its material without rewriting history; removing the line unlinks it. Manual edits of a bill's taxes and deductions replace only `MANUAL` lines.
+- **Margin is measured on links, not guesses.** A subcontract BOQ line points at the client BOQ line it delivers (`ContractItem.clientItemId`, same project). Suggestions are deterministic (rate code, then description, then item number with the same unit) and only offered when exactly one client line matches; a person confirms.
+- **Margin figures are certified work value** at the rates frozen on each certified bill, before taxes and deductions: client billed minus linked subcontract cost per client line, with unlinked subcontract work shown as cost not set against any line. Material recovered is reported separately, because the material's own cost sits in procurement. The report needs `finance.view` on top of `billing.view`.
+
+---
+
+## Alternatives
+
+- **A separate "recoveries" ledger on the bill**: cleaner separation, but every total, the vendor bill, print and export would need to learn about it.
+- **Recover automatically on the next bill**: convenient, but subcontract terms differ (some recover monthly, some at completion), so recovery stays a deliberate step.
+- **Margin from matching item numbers at report time**: no setup, but silently wrong whenever numbering differs between the client and subcontract BOQs.
+
+---
+
+## Consequences
+
+- Material issued before this change has no subcontract and isn't recoverable through Billing.
+- Margin ignores material and overheads; it answers "what do we keep on the work we subcontract", not project profit.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

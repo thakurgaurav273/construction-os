@@ -29,6 +29,7 @@ export function RecentIssuesList({ issues }: { issues: MaterialIssue[] }): React
                   <p className="text-sm font-medium truncate">{issue.material.name}</p>
                   <p className="text-xs text-muted-foreground truncate">
                     {issue.code} · {isReturn ? 'to' : 'from'} {issue.warehouse.name} · {issue.issuedBy.name}
+                    {issue.subcontract && ` · ${isReturn ? 'by' : 'for'} ${issue.subcontract.vendorName ?? issue.subcontract.code} (recovered at ₹${issue.subcontract.recoveryRate})`}
                   </p>
                 </div>
                 <div className="text-right shrink-0">

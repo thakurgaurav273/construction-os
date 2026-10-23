@@ -115,9 +115,14 @@ export class RaBillsService {
           notes: dto.notes?.trim(),
         },
       });
+      // Only manual lines are replaced; material recovery lines are managed from the issues they recover.
       if (dto.adjustments) {
-        await tx.raBillAdjustment.deleteMany({ where: { billId: id } });
+        await tx.raBillAdjustment.deleteMany({ where: { billId: id, kind: 'MANUAL' } });
         await tx.raBillAdjustment.createMany({ data: adjustmentRows(dto.adjustments).map((row) => ({ ...row, billId: id })) });
+        const recoveries = await tx.raBillAdjustment.findMany({ where: { billId: id, kind: 'MATERIAL_RECOVERY' }, orderBy: { sortOrder: 'asc' } });
+        for (const [index, line] of recoveries.entries()) {
+          await tx.raBillAdjustment.update({ where: { id: line.id }, data: { sortOrder: dto.adjustments.length + index } });
+        }
       }
       await this.totals.refresh(tx, id);
     });

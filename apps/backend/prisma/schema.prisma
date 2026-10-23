@@ -713,10 +713,18 @@ model MaterialIssue {
   materialId     String
   warehouseId    String
   projectId      String
+  /// The subcontract the material was issued to (or returned from), when it is to be recovered from their bills.
+  contractId     String?
+  /// Rupees per unit recovered from the subcontractor; defaults to the carrying cost.
+  recoveryRate   Decimal?          @db.Decimal(15, 2)
+  /// The bill deduction that recovered it; cleared again if that bill is cancelled.
+  recoveryAdjustmentId String?
   issuedById     String
   organizationId String
   createdAt      DateTime          @default(now())
 
+  contract           Contract?         @relation(fields: [contractId], references: [id])
+  recoveryAdjustment RaBillAdjustment? @relation(fields: [recoveryAdjustmentId], references: [id], onDelete: SetNull)
   material     Material     @relation(fields: [materialId], references: [id])
   warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
   project      Project      @relation(fields: [projectId], references: [id])
@@ -727,6 +735,7 @@ model MaterialIssue {
   @@index([organizationId])
   @@index([projectId, issuedOn])
   @@index([materialId])
+  @@index([contractId])
   @@map("material_issues")
 }
 
@@ -1790,6 +1799,13 @@ enum BillAdjustmentEffect {
   DEDUCT
 }
 
+/// Manual lines come from the contract's rules or are typed on the bill; material recovery lines are managed
+/// by Billing from material issued to the subcontractor.
+enum BillAdjustmentKind {
+  MANUAL
+  MATERIAL_RECOVERY
+}
+
 enum BillAdjustmentCalculation {
   /// Percentage of the bill's gross amount, e.g. CGST 9% or security deposit 10%.
   PERCENT
@@ -1868,6 +1884,7 @@ model Contract {
   adjustments  ContractAdjustmentRule[]
   bills        RaBill[]
   retentionReleases RetentionRelease[]
+  materialIssues    MaterialIssue[]
 
   @@unique([organizationId, code])
   @@index([organizationId, direction])
@@ -1889,10 +1906,14 @@ model ContractItem {
   rate        Decimal  @db.Decimal(15, 2)
   /// Extra / non-scheduled item added after award.
   isExtra     Boolean  @default(false)
+  /// On a subcontract: the client BOQ line this work delivers, for margin per item.
+  clientItemId String?
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  clientItem      ContractItem?  @relation("SubcontractItemLinks", fields: [clientItemId], references: [id], onDelete: SetNull)
+  subcontractItems ContractItem[] @relation("SubcontractItemLinks")
   contract     Contract            @relation(fields: [contractId], references: [id], onDelete: Cascade)
   lines        RaBillLine[]
   measurements RaBillMeasurement[]
@@ -2026,9 +2047,11 @@ model RaBillAdjustment {
   calculation BillAdjustmentCalculation
   value       Decimal                   @db.Decimal(15, 2)
   isRetention Boolean                   @default(false)
+  kind        BillAdjustmentKind        @default(MANUAL)
   sortOrder   Int                       @default(0)
 
-  bill RaBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  bill            RaBill          @relation(fields: [billId], references: [id], onDelete: Cascade)
+  recoveredIssues MaterialIssue[]
 
   @@index([billId])
   @@map("ra_bill_adjustments")
