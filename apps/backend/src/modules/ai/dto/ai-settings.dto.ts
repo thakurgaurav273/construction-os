@@ -2,9 +2,13 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AiAccessRequestKind, AiProvider } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
-  ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max,
-  MaxLength, Min, MinLength, ValidateNested,
+  IsBoolean, IsEnum, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max,
+  IsUUID, MaxLength, Min, MinLength,
 } from 'class-validator';
+import { PaginationDto } from '../../../common/dto/pagination.dto';
+
+export const CONVERSATION_SCOPES = ['mine', 'organization'] as const;
+export type ConversationScope = (typeof CONVERSATION_SCOPES)[number];
 
 /** Model ids look like "gemini-2.5-flash" or "meta-llama/Llama-3.1-8B-Instruct". */
 const MODEL_PATTERN = /^[A-Za-z0-9._:/-]+$/;
@@ -78,19 +82,26 @@ export class RejectAiAccessRequestDto {
   @ApiProperty() @IsString() @IsNotEmpty({ message: 'Add a note explaining the decision' }) @MaxLength(1000) note!: string;
 }
 
-export class ChatMessageDto {
-  @ApiProperty({ enum: ['user', 'assistant'] }) @IsIn(['user', 'assistant']) role!: 'user' | 'assistant';
-  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(4000) content!: string;
+export class AiChatDto {
+  @ApiProperty({ description: 'The new question; earlier turns are loaded from the saved conversation' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(4000)
+  question!: string;
+
+  @ApiPropertyOptional({ description: 'Continue this conversation; omit to start a new one' })
+  @IsOptional()
+  @IsUUID()
+  conversationId?: string;
 }
 
-export class AiChatDto {
-  @ApiProperty({ type: [ChatMessageDto], description: 'The conversation so far, oldest first; the last one is the question' })
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayMaxSize(20)
-  @ValidateNested({ each: true })
-  @Type(() => ChatMessageDto)
-  messages!: ChatMessageDto[];
+export class AiConversationQueryDto extends PaginationDto {
+  @ApiPropertyOptional({ enum: CONVERSATION_SCOPES, default: 'mine', description: '"organization" needs the ai.history.view permission' })
+  @IsOptional()
+  @IsIn(CONVERSATION_SCOPES)
+  scope?: ConversationScope;
+
+  @ApiPropertyOptional({ description: 'Only chats about this project' }) @IsOptional() @IsUUID() projectId?: string;
 }
 
 export class SetDefaultPlatformProviderDto {

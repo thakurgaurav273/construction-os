@@ -40,6 +40,7 @@ export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
   'organization.manage': { group: 'Administration', label: 'Edit organization settings' },
   'audit.view': { group: 'Administration', label: 'View the audit log' },
   'ai.use': { group: 'AI', label: 'Use AI assistants and summaries' },
+  'ai.history.view': { group: 'AI', label: 'See everyone’s AI chat history' },
   'ai.manage': { group: 'AI', label: 'Manage AI provider keys and request AI access' },
 };
 

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 
 export type AiProviderId = 'GEMINI' | 'GROQ' | 'HUGGINGFACE';
@@ -64,6 +64,42 @@ export interface ChatAnswer {
   answer: string;
   provider: string;
   model: string;
+}
+
+export interface ChatReply extends ChatAnswer {
+  conversationId: string;
+}
+
+export type ConversationScope = 'mine' | 'organization';
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  project: { id: string; name: string } | null;
+  user: { id: string; name: string };
+  isOwn: boolean;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: (ChatTurn & { id: string; model: string | null; createdAt: string })[];
+}
+
+export interface ConversationPage {
+  items: ConversationSummary[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface ConversationFilters {
+  scope: ConversationScope;
+  projectId?: string;
+  search?: string;
+  page: number;
 }
 
 export interface AiInsight {
@@ -141,9 +177,32 @@ export function useCancelAiAccessRequest() {
 export function useAiChat(projectId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (messages: ChatTurn[]): Promise<ChatAnswer> =>
-      unwrap<ChatAnswer>(await apiClient.post(projectId ? `/ai/projects/${projectId}/chat` : '/ai/chat', { messages })),
+    mutationFn: async (input: { question: string; conversationId?: string }): Promise<ChatReply> =>
+      unwrap<ChatReply>(await apiClient.post(projectId ? `/ai/projects/${projectId}/chat` : '/ai/chat', input)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...AI_KEY, 'conversations'] }),
     onSettled: () => queryClient.invalidateQueries({ queryKey: [...AI_KEY, 'status'] }),
+  });
+}
+
+/** Saved chats, newest first: the member's own, or the whole organization's for `ai.history.view` holders. */
+export function useAiConversations(filters: ConversationFilters, enabled = true) {
+  return useQuery<ConversationPage>({
+    queryKey: [...AI_KEY, 'conversations', 'list', filters],
+    queryFn: async () => {
+      const params = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== undefined && value !== ''));
+      return unwrap<ConversationPage>(await apiClient.get('/ai/conversations', { params }));
+    },
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
+    enabled,
+  });
+}
+
+export function useAiConversation(id: string | null) {
+  return useQuery<ConversationDetail>({
+    queryKey: [...AI_KEY, 'conversations', 'detail', id],
+    queryFn: async () => unwrap<ConversationDetail>(await apiClient.get(`/ai/conversations/${id}`)),
+    enabled: !!id,
   });
 }
 

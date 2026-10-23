@@ -1089,6 +1089,41 @@ The AI screens were demos: templated replies on a timer, rendered with `dangerou
 
 ---
 
+# ADR-028 - Saved AI Chat History
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-23
+
+---
+
+## Context
+
+Assistant chats lived only in the browser and were lost on refresh. Members want to return to earlier answers, and owners want to see who asked the assistant what across the organization.
+
+---
+
+## Decision
+
+- Every chat is saved as an `AiConversation` (organization, author, optional project, title from the first question) with `AiChatMessage` rows for each question and answer, including the model that answered.
+- The server is the source of truth for the conversation. The client sends only the new question and a `conversationId`; earlier turns (the last 12) are loaded from the database, so a client can't change what the model is told was said.
+- A turn is saved only after the model answers, so failed calls leave nothing half-finished and a retry simply sends the question again.
+- Visibility: members see their own chats. The `ai.history.view` permission (owners and admins by default) shows the whole organization's. Only the author can continue a chat, and only in the scope it started in, so a project chat can't be continued with organization-wide data.
+- Chats can't be deleted from the app, so the record of who asked what stays intact.
+
+---
+
+## Consequences
+
+- Chat history grows with use. It is indexed by organization, author and last update; retention can be added later without changing the API.
+- Viewing someone else's chat is read-only. Asking a follow-up starts a new chat of your own.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

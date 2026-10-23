@@ -2,13 +2,17 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
-import { Button, Skeleton, Textarea, cn } from '@sitepilot/ui';
-import { AlertTriangle, ArrowUp, RotateCcw, Sparkles, SquarePen, User } from 'lucide-react';
-import { useAiChat, useAiStatus, type ChatTurn } from '@/hooks/api/use-ai';
+import { format } from 'date-fns';
+import { Button, Skeleton, cn } from '@sitepilot/ui';
+import { AlertTriangle, Eye, History, MessageSquare, RotateCcw, SquarePen } from 'lucide-react';
+import { useAiChat, useAiConversation, useAiStatus, type ChatTurn } from '@/hooks/api/use-ai';
 import { getApiErrorMessage } from '@/lib/api/errors';
-import { SafeMarkdown } from './SafeMarkdown';
 import { AiUnavailableNotice } from './AiUnavailableNotice';
 import { AiChatEmptyState } from './AiChatEmptyState';
+import { AiChatHistory } from './AiChatHistory';
+import { AiChatTurn } from './AiChatTurn';
+import { AiChatComposer } from './AiChatComposer';
+import { AiThinkingIndicator } from './AiThinkingIndicator';
 
 interface AiChatProps {
   /** Scope to one project; omit for questions across the whole organization. */
@@ -18,6 +22,13 @@ interface AiChatProps {
   /** Sizing classes; defaults to a fixed-height panel. */
   className?: string;
 }
+
+type ChatView = 'chat' | 'history';
+
+const VIEWS: { value: ChatView; label: string; icon: typeof MessageSquare }[] = [
+  { value: 'chat', label: 'Chat', icon: MessageSquare },
+  { value: 'history', label: 'History', icon: History },
+];
 
 /** Access problems ("not set up", "allowance used") get the set-up notice instead of a generic error. */
 function accessProblem(error: unknown): string | null {
@@ -31,33 +42,49 @@ function accessProblem(error: unknown): string | null {
 export function AiChat({ projectId, placeholder, suggestions, className }: AiChatProps): React.ReactElement {
   const { data: status, isLoading: statusLoading } = useAiStatus();
   const chat = useAiChat(projectId);
+  const [view, setView] = useState<ChatView>('chat');
   const [turns, setTurns] = useState<ChatTurn[]>([]);
-  const [draft, setDraft] = useState('');
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  /** Set when reading someone else's saved chat: it can be read but not continued. */
+  const [viewingOther, setViewingOther] = useState<{ name: string; at: string } | null>(null);
   const [failure, setFailure] = useState<{ message: string; access: boolean } | null>(null);
   const [caption, setCaption] = useState<string | null>(null);
+  const opened = useAiConversation(openingId);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [turns, chat.isPending]);
+  }, [turns, chat.isPending, view]);
+
+  useEffect(() => {
+    const conversation = opened.data;
+    if (!conversation || conversation.id !== openingId) return;
+    setTurns(conversation.messages.map(({ role, content }) => ({ role, content })));
+    setConversationId(conversation.id);
+    setViewingOther(conversation.isOwn ? null : { name: conversation.user.name, at: conversation.createdAt });
+    setFailure(null);
+    setCaption(null);
+    setOpeningId(null);
+  }, [opened.data, openingId]);
 
   async function send(question: string, history: ChatTurn[] = turns): Promise<void> {
     const text = question.trim();
     if (!text || chat.isPending) return;
-    const conversation: ChatTurn[] = [...history, { role: 'user', content: text }];
-    setTurns(conversation);
-    setDraft('');
+    setTurns([...history, { role: 'user', content: text }]);
     setFailure(null);
     try {
-      const answer = await chat.mutateAsync(conversation);
-      setTurns([...conversation, { role: 'assistant', content: answer.answer }]);
-      setCaption(`${answer.model} · ${answer.provider.toLowerCase()}`);
+      const reply = await chat.mutateAsync({ question: text, conversationId: conversationId ?? undefined });
+      setTurns([...history, { role: 'user', content: text }, { role: 'assistant', content: reply.answer }]);
+      setConversationId(reply.conversationId);
+      setCaption(`${reply.model} · ${reply.provider.toLowerCase()}`);
     } catch (error) {
       const access = accessProblem(error);
       setFailure({ message: access ?? getApiErrorMessage(error, 'The assistant couldn’t answer. Try again.'), access: !!access });
     }
   }
 
+  /** The failed question was never saved, so it is sent again on top of the turns before it. */
   function retry(): void {
     const lastQuestion = [...turns].reverse().find((turn) => turn.role === 'user');
     if (!lastQuestion) return;
@@ -66,77 +93,103 @@ export function AiChat({ projectId, placeholder, suggestions, className }: AiCha
 
   function startNewChat(): void {
     setTurns([]);
+    setConversationId(null);
+    setViewingOther(null);
     setFailure(null);
     setCaption(null);
+    setView('chat');
+  }
+
+  function openConversation(id: string): void {
+    setView('chat');
+    if (id !== conversationId) setOpeningId(id);
   }
 
   if (statusLoading) return <Skeleton className={cn('w-full rounded-xl', className ?? 'h-[480px]')} />;
-  if (status && status.mode === 'NONE' && turns.length === 0) return <AiUnavailableNotice reason={status.blockedReason ?? 'AI isn’t available.'} />;
+  if (status && status.mode === 'NONE' && turns.length === 0 && view === 'chat') return <AiUnavailableNotice reason={status.blockedReason ?? 'AI isn’t available.'} />;
+
+  const pendingQuestion = chat.isPending ? turns[turns.length - 1]?.content ?? '' : null;
+  const isOpening = !!openingId && opened.isLoading;
 
   return (
     <div className={cn('flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm', className ?? 'h-[min(70vh,640px)]')}>
-      <div className="flex items-center justify-between gap-3 border-b px-4 py-2.5">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Sparkles className="h-4 w-4 text-violet-500" />
-          {projectId ? 'Project assistant' : 'Organization-wide'}
-        </div>
-        <Button variant="ghost" size="sm" className="h-8" disabled={turns.length === 0 || chat.isPending} onClick={startNewChat}>
-          <SquarePen className="mr-1.5 h-3.5 w-3.5" /> New chat
-        </Button>
-      </div>
-      <div className="flex-1 overflow-y-auto" aria-live="polite">
-        <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col space-y-5 px-4 py-6">
-          {turns.length === 0 && <AiChatEmptyState suggestions={suggestions} onSelect={(suggestion) => { void send(suggestion); }} />}
-          {turns.map((turn, index) => (
-            <div key={index} className={cn('flex gap-3', turn.role === 'user' && 'flex-row-reverse')}>
-              <div className={cn('mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full', turn.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-violet-500/10 text-violet-600')}>
-                {turn.role === 'user' ? <User className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-              </div>
-              <div className={cn('max-w-[85%] rounded-2xl px-4 py-2.5', turn.role === 'user' ? 'rounded-tr-sm bg-primary text-primary-foreground' : 'rounded-tl-sm bg-muted/60')}>
-                {turn.role === 'user' ? <p className="whitespace-pre-wrap text-sm">{turn.content}</p> : <SafeMarkdown content={turn.content} />}
-              </div>
-            </div>
+      <div className="flex items-center justify-between gap-3 border-b px-3 py-2">
+        <div className="inline-flex rounded-lg bg-muted/60 p-0.5" role="tablist" aria-label="Assistant views">
+          {VIEWS.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={view === value}
+              onClick={() => setView(value)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                view === value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" /> {label}
+            </button>
           ))}
-          {chat.isPending && (
-            <div className="flex gap-3">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-500/10 text-violet-600"><Sparkles className="h-3.5 w-3.5 animate-pulse" /></div>
-              <div className="w-2/3 space-y-2 rounded-2xl rounded-tl-sm bg-muted/60 p-3"><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-4/5" /></div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="hidden text-xs text-muted-foreground sm:inline">{projectId ? 'This project' : 'All projects'}</span>
+          <Button variant="ghost" size="sm" className="h-8" disabled={(turns.length === 0 && view === 'chat') || chat.isPending} onClick={startNewChat}>
+            <SquarePen className="mr-1.5 h-3.5 w-3.5" /> New chat
+          </Button>
+        </div>
+      </div>
+
+      {view === 'history' ? (
+        <div className="min-h-0 flex-1">
+          <AiChatHistory projectId={projectId} activeId={conversationId} onOpen={openConversation} />
+        </div>
+      ) : (
+        <>
+          {viewingOther && (
+            <div className="flex items-center gap-2 border-b bg-amber-50/70 px-4 py-2 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+              <Eye className="h-3.5 w-3.5 shrink-0" />
+              <span>Viewing {viewingOther.name}&apos;s chat from {format(new Date(viewingOther.at), 'd MMM yyyy, h:mm a')}. Start a new chat to ask your own questions.</span>
             </div>
           )}
-          {failure && (failure.access ? <AiUnavailableNotice reason={failure.message} compact /> : (
-            <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200" role="alert">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span className="flex-1">{failure.message}</span>
-              <Button size="sm" variant="outline" onClick={retry}><RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Retry</Button>
+          <div className="flex-1 overflow-y-auto" aria-live="polite">
+            <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col space-y-5 px-4 py-6">
+              {isOpening ? (
+                <div className="space-y-5">
+                  <Skeleton className="ml-auto h-10 w-1/2 rounded-2xl" />
+                  <Skeleton className="h-24 w-3/4 rounded-2xl" />
+                </div>
+              ) : opened.isError && openingId ? (
+                <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200" role="alert">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span className="flex-1">Unable to open that chat. It may have been removed, or you may no longer have access.</span>
+                  <Button size="sm" variant="outline" onClick={() => { void opened.refetch(); }}><RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Retry</Button>
+                </div>
+              ) : (
+                <>
+                  {turns.length === 0 && <AiChatEmptyState suggestions={suggestions} onSelect={(suggestion) => { void send(suggestion); }} />}
+                  {turns.map((turn, index) => <AiChatTurn key={index} turn={turn} />)}
+                  {pendingQuestion !== null && <AiThinkingIndicator question={pendingQuestion} />}
+                  {failure && (failure.access ? <AiUnavailableNotice reason={failure.message} compact /> : (
+                    <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200" role="alert">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <span className="flex-1">{failure.message}</span>
+                      <Button size="sm" variant="outline" onClick={retry}><RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Retry</Button>
+                    </div>
+                  ))}
+                </>
+              )}
+              <div ref={endRef} />
             </div>
-          ))}
-          <div ref={endRef} />
-        </div>
-      </div>
-      <div className="border-t bg-muted/20 px-4 pb-2.5 pt-3">
-        <form
-          className="mx-auto flex w-full max-w-3xl items-end gap-2 rounded-2xl border bg-background p-2 shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-ring"
-          onSubmit={(event) => { event.preventDefault(); void send(draft); }}
-        >
-          <Textarea
-            rows={1}
-            value={draft}
-            maxLength={4000}
-            aria-label="Ask a question"
-            placeholder={placeholder}
-            className="max-h-32 min-h-[40px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(draft); }
-            }}
-          />
-          <Button type="submit" size="icon" className="h-9 w-9 shrink-0 rounded-xl" aria-label="Send" disabled={!draft.trim() || chat.isPending}><ArrowUp className="h-4 w-4" /></Button>
-        </form>
-        <p className="mx-auto mt-2 flex w-full max-w-3xl flex-wrap justify-between gap-x-4 gap-y-1 px-1 text-[11px] text-muted-foreground">
-          <span>AI can be wrong; check important figures in SitePilot.{caption ? ` Answered by ${caption}.` : ''}</span>
-          <span className="hidden sm:inline">Enter to send · Shift + Enter for a new line</span>
-        </p>
-      </div>
+          </div>
+          {viewingOther ? (
+            <div className="flex justify-center border-t bg-muted/20 px-4 py-3">
+              <Button variant="outline" onClick={startNewChat}><SquarePen className="mr-1.5 h-4 w-4" /> Start a new chat</Button>
+            </div>
+          ) : (
+            <AiChatComposer placeholder={placeholder} busy={chat.isPending} caption={caption} onSend={(question) => { void send(question); }} />
+          )}
+        </>
+      )}
     </div>
   );
 }

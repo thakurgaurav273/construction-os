@@ -7,6 +7,7 @@ import { AiAccessService } from './ai-access.service';
 import { AiService } from './ai.service';
 import { AiContextService } from './ai-context.service';
 import { AiFeaturesService } from './ai-features.service';
+import { AiConversationsService } from './ai-conversations.service';
 import { AiCredentialsService } from './ai-credentials.service';
 import { AiAccessRequestsService } from './ai-access-requests.service';
 import { PlatformAiService } from './platform-ai.service';
@@ -25,6 +26,7 @@ import { PlatformController } from './platform.controller';
     AiService,
     AiContextService,
     AiFeaturesService,
+    AiConversationsService,
     AiCredentialsService,
     AiAccessRequestsService,
     PlatformAiService,

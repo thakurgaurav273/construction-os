@@ -36,6 +36,7 @@ export type Permission =
   | 'organization.manage'
   | 'audit.view'
   | 'ai.use'
+  | 'ai.history.view'
   | 'ai.manage';
 
 export interface CurrentAccess {

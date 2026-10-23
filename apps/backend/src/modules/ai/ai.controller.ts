@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseEnumPipe, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseEnumPipe, ParseUUIDPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import type { Permission } from '@sitepilot/types';
 import { AiProvider } from '@prisma/client';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -8,12 +9,18 @@ import { Audit } from '../../common/audit';
 import { AiAccessService, AiAccessStatus } from './ai-access.service';
 import { AiCredentialsService, AiSettingsView } from './ai-credentials.service';
 import { AccessRequestView, AiAccessRequestsService, TRIAL_DEFAULTS } from './ai-access-requests.service';
-import { AiFeaturesService, ChatAnswerView, InsightSnapshotView } from './ai-features.service';
+import { AiFeaturesService, ChatReplyView, InsightSnapshotView } from './ai-features.service';
+import { AiConversationsService, ConversationDetail, ConversationSummary, ConversationViewer } from './ai-conversations.service';
+import type { Paginated } from '../projects/projects.service';
 import {
-  AiChatDto, CreateAiAccessRequestDto, SaveAiCredentialDto, SelectAiProviderDto, UpdateAiModelDto,
+  AiChatDto, AiConversationQueryDto, CreateAiAccessRequestDto, SaveAiCredentialDto, SelectAiProviderDto, UpdateAiModelDto,
 } from './dto/ai-settings.dto';
 
-interface AuthUser { id: string; organizationId: string }
+interface AuthUser { id: string; organizationId: string; permissions: Permission[] }
+
+function viewerOf(user: AuthUser): ConversationViewer {
+  return { organizationId: user.organizationId, userId: user.id, canViewAll: user.permissions.includes('ai.history.view') };
+}
 
 /** Model calls cost money, so they get their own per-client limit on top of the allowance. */
 const AI_CALL_LIMIT = { default: { limit: 20, ttl: 60_000 } };
@@ -28,6 +35,7 @@ export class AiController {
     private readonly credentials: AiCredentialsService,
     private readonly requests: AiAccessRequestsService,
     private readonly features: AiFeaturesService,
+    private readonly conversations: AiConversationsService,
   ) {}
 
   /** Whether AI can be used right now, for every member (so screens can explain why it's off). */
@@ -103,8 +111,8 @@ export class AiController {
   @Throttle(AI_CALL_LIMIT)
   @HttpCode(HttpStatus.OK)
   @Post('chat')
-  organizationChat(@Body() dto: AiChatDto, @CurrentUser() user: AuthUser): Promise<ChatAnswerView> {
-    return this.features.organizationChat(user.organizationId, user.id, dto.messages);
+  organizationChat(@Body() dto: AiChatDto, @CurrentUser() user: AuthUser): Promise<ChatReplyView> {
+    return this.features.organizationChat(user.organizationId, user.id, dto);
   }
 
   @RequirePermission('ai.use')
@@ -112,8 +120,21 @@ export class AiController {
   @Throttle(AI_CALL_LIMIT)
   @HttpCode(HttpStatus.OK)
   @Post('projects/:projectId/chat')
-  projectChat(@Param('projectId') projectId: string, @Body() dto: AiChatDto, @CurrentUser() user: AuthUser): Promise<ChatAnswerView> {
-    return this.features.projectChat(user.organizationId, user.id, projectId, dto.messages);
+  projectChat(@Param('projectId') projectId: string, @Body() dto: AiChatDto, @CurrentUser() user: AuthUser): Promise<ChatReplyView> {
+    return this.features.projectChat(user.organizationId, user.id, projectId, dto);
+  }
+
+  /** The member's own chats; holders of ai.history.view may ask for the whole organization's. */
+  @RequirePermission('ai.use')
+  @Get('conversations')
+  listConversations(@Query() query: AiConversationQueryDto, @CurrentUser() user: AuthUser): Promise<Paginated<ConversationSummary>> {
+    return this.conversations.list(viewerOf(user), query);
+  }
+
+  @RequirePermission('ai.use')
+  @Get('conversations/:id')
+  getConversation(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<ConversationDetail> {
+    return this.conversations.get(viewerOf(user), id);
   }
 
   @RequirePermission('ai.use')

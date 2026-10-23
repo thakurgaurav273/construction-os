@@ -118,6 +118,7 @@ model User {
   stockAdjustments     StockAdjustment[]
   notificationPreferences NotificationPreference[]
   aiAccessRequests        AiAccessRequest[]   @relation("AiAccessRequester")
+  aiConversations         AiConversation[]
 
   @@map("users")
 }
@@ -178,6 +179,7 @@ model Organization {
   aiAccessRequests        AiAccessRequest[]
   aiUsage                 AiUsage[]
   aiInsightSnapshots      AiInsightSnapshot[]
+  aiConversations         AiConversation[]
 
   @@map("organizations")
 }
@@ -320,6 +322,7 @@ model Project {
   cashFlowEntries       CashFlowEntry[]
   generatedReports      GeneratedReport[]
   materialIssues        MaterialIssue[]
+  aiConversations       AiConversation[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -1659,4 +1662,47 @@ model AiInsightSnapshot {
 
   @@index([organizationId, createdAt])
   @@map("ai_insight_snapshots")
+}
+
+enum AiChatRole {
+  USER
+  ASSISTANT
+}
+
+/// One assistant conversation, kept so members can return to it and admins can see who asked what.
+model AiConversation {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  /// Null for organization-wide chats.
+  projectId      String?
+  title          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project      Project?        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages     AiChatMessage[]
+
+  @@index([organizationId, updatedAt])
+  @@index([organizationId, userId, updatedAt])
+  @@map("ai_conversations")
+}
+
+model AiChatMessage {
+  id             String      @id @default(uuid())
+  conversationId String
+  organizationId String
+  role           AiChatRole
+  content        String
+  /// Which model answered; null on the member's own questions.
+  provider       AiProvider?
+  model          String?
+  createdAt      DateTime    @default(now())
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_chat_messages")
 }

@@ -3,7 +3,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AiContextService } from './ai-context.service';
 import { AiAnswer, AiService } from './ai.service';
-import { ChatMessageDto } from './dto/ai-settings.dto';
+import { AiConversationsService, ChatTurn } from './ai-conversations.service';
+import { AiChatDto } from './dto/ai-settings.dto';
 
 /** Insights are regenerated at most this often per organization, to keep token spend sane. */
 const INSIGHTS_COOLDOWN_MS = 10 * 60_000;
@@ -39,15 +40,18 @@ export interface ChatAnswerView {
   model: string;
 }
 
+export interface ChatReplyView extends ChatAnswerView {
+  conversationId: string;
+}
+
 function dataBlock(context: string): string {
   return `<data>\n${context}\n</data>`;
 }
 
-/** Chat history from the client: only the last turns, and the latest question gets the data attached. */
-function withData(messages: ChatMessageDto[], context: string): { role: 'user' | 'assistant'; content: string }[] {
-  const recent = messages.slice(-12);
-  return recent.map((message, index) => (
-    index === recent.length - 1 && message.role === 'user'
+/** Only the latest question gets the data attached; earlier turns are sent as they were. */
+function withData(messages: ChatTurn[], context: string): ChatTurn[] {
+  return messages.map((message, index) => (
+    index === messages.length - 1 && message.role === 'user'
       ? { role: 'user', content: `${dataBlock(context)}\n\nQuestion: ${message.content}` }
       : { role: message.role, content: message.content }
   ));
@@ -94,24 +98,39 @@ export class AiFeaturesService {
     private readonly prisma: PrismaService,
     private readonly ai: AiService,
     private readonly context: AiContextService,
+    private readonly conversations: AiConversationsService,
   ) {}
 
-  async projectChat(organizationId: string, userId: string, projectId: string, messages: ChatMessageDto[]): Promise<ChatAnswerView> {
+  async projectChat(organizationId: string, userId: string, projectId: string, dto: AiChatDto): Promise<ChatReplyView> {
     const project = await this.context.project(projectId, organizationId);
-    const answer = await this.ai.complete(
-      { organizationId, userId, feature: 'project_chat' },
-      { system: `${GROUNDING}\nYou are answering about the project "${project.name}".`, messages: withData(messages, project.context), maxTokens: 900 },
-    );
-    return toView(answer);
+    return this.converse({ organizationId, userId, projectId, feature: 'project_chat' }, dto, `You are answering about the project "${project.name}".`, project.context);
   }
 
-  async organizationChat(organizationId: string, userId: string, messages: ChatMessageDto[]): Promise<ChatAnswerView> {
+  async organizationChat(organizationId: string, userId: string, dto: AiChatDto): Promise<ChatReplyView> {
     const context = await this.context.organization(organizationId);
+    return this.converse({ organizationId, userId, projectId: null, feature: 'org_chat' }, dto, 'You are answering about the whole organization across all projects.', context);
+  }
+
+  /** One chat turn: earlier turns come from the saved conversation, and the new turn is saved once answered. */
+  private async converse(
+    scope: { organizationId: string; userId: string; projectId: string | null; feature: 'project_chat' | 'org_chat' },
+    dto: AiChatDto,
+    focus: string,
+    context: string,
+  ): Promise<ChatReplyView> {
+    const { organizationId, userId, projectId, feature } = scope;
+    const askedAt = new Date();
+    const earlier = dto.conversationId
+      ? await this.conversations.previousTurns(organizationId, userId, dto.conversationId, projectId)
+      : [];
     const answer = await this.ai.complete(
-      { organizationId, userId, feature: 'org_chat' },
-      { system: `${GROUNDING}\nYou are answering about the whole organization across all projects.`, messages: withData(messages, context), maxTokens: 900 },
+      { organizationId, userId, feature },
+      { system: `${GROUNDING}\n${focus}`, messages: withData([...earlier, { role: 'user', content: dto.question }], context), maxTokens: 900 },
     );
-    return toView(answer);
+    const conversationId = await this.conversations.saveTurn({
+      organizationId, userId, projectId, conversationId: dto.conversationId, question: dto.question, askedAt, answer,
+    });
+    return { ...toView(answer), conversationId };
   }
 
   /** Writes the summary onto the report so everyone sees the same one without paying for it again. */

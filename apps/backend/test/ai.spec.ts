@@ -7,6 +7,7 @@ import { GeminiProvider } from '../src/modules/ai/providers/gemini.provider';
 import { GroqProvider } from '../src/modules/ai/providers/openai-compatible.provider';
 import { AiProviderError } from '../src/modules/ai/providers/ai-provider';
 import { parseInsights } from '../src/modules/ai/ai-features.service';
+import { conversationTitle } from '../src/modules/ai/ai-conversations.service';
 import { sanitizeForAudit } from '../src/modules/audit/audit-metadata';
 
 const configWith = (values: Record<string, string>): ConfigService => ({ get: (key: string) => values[key] }) as unknown as ConfigService;
@@ -120,5 +121,17 @@ describe('brand colour contrast', () => {
     assert.ok(contrastRatio('#1D4ED8', '#FFFFFF') >= MIN_BRAND_CONTRAST);
     assert.ok(contrastRatio('#FACC15', '#FFFFFF') < MIN_BRAND_CONTRAST, 'yellow is too light');
     assert.equal(Math.round(contrastRatio('#000000', '#FFFFFF')), 21);
+  });
+});
+
+describe('conversation titles', () => {
+  it('uses the first question on one line', () => {
+    assert.equal(conversationTitle('  Which POs\n are   overdue? '), 'Which POs are overdue?');
+  });
+
+  it('shortens long questions to 80 characters', () => {
+    const title = conversationTitle('a'.repeat(200));
+    assert.equal(title.length, 80);
+    assert.ok(title.endsWith('…'));
   });
 });
