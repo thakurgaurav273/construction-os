@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowUpRight, Package, Undo2 } from 'lucide-react';
 import { Button, Skeleton } from '@sitepilot/ui';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useCan } from '@/hooks/api/use-access';
+import { useProjectOpenForWork } from '@/hooks/api/use-projects';
 import {
   useProjectMaterials, type ProjectMaterialLine, type SiteStockMovementType,
 } from '@/hooks/api/use-materials';
@@ -26,8 +27,11 @@ function SummaryStat({ label, value, tone }: { label: string; value: string; ton
 export default function ProjectMaterialsPage({ params }: { params: { id: string } }): React.ReactElement {
   const { data, isLoading, isError, refetch } = useProjectMaterials(params.id);
   const can = useCan();
-  const canIssue = can('material.issue');
-  const canPlan = can('project.update');
+  const isOpen = useProjectOpenForWork(params.id);
+  const canMove = can('material.issue');
+  // Returns stay possible on an archived site so leftover stock can go back to the store.
+  const canIssue = canMove && isOpen;
+  const canPlan = can('project.update') && isOpen;
   const [movementType, setMovementType] = useState<SiteStockMovementType | null>(null);
   const [planLine, setPlanLine] = useState<ProjectMaterialLine | null>(null);
 
@@ -64,16 +68,18 @@ export default function ProjectMaterialsPage({ params }: { params: { id: string 
           <h2 className="text-2xl font-bold tracking-tight">Materials</h2>
           <p className="text-muted-foreground">Material issued to this site from stores, tracked against plan.</p>
         </div>
-        {canIssue && (
+        {canMove && (
           <div className="flex gap-2">
             {hasReturnable && (
               <Button variant="outline" onClick={() => setMovementType('RETURN')}>
                 <Undo2 className="mr-1.5 h-4 w-4" /> Record Return
               </Button>
             )}
-            <Button onClick={() => setMovementType('ISSUE')}>
-              <ArrowUpRight className="mr-1.5 h-4 w-4" /> Issue Material
-            </Button>
+            {canIssue && (
+              <Button onClick={() => setMovementType('ISSUE')}>
+                <ArrowUpRight className="mr-1.5 h-4 w-4" /> Issue Material
+              </Button>
+            )}
           </div>
         )}
       </div>

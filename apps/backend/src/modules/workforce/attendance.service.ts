@@ -2,6 +2,7 @@ import {
   BadRequestException, ConflictException, Injectable, NotFoundException,
 } from '@nestjs/common';
 import { AttendanceStatus, Prisma } from '@prisma/client';
+import { findOpenProject, findProjectInOrganization } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
 import { dateKeyToDbDate, toLocalMinutes } from './attendance-dates';
 import {
@@ -49,7 +50,7 @@ export class AttendanceService {
 
   /** Workers currently assigned to the site, plus anyone already recorded there that day. */
   async getRoster(organizationId: string, projectId: string, dateKey?: string): Promise<AttendanceRoster> {
-    await this.assertProjectInOrganization(projectId, organizationId);
+    await findProjectInOrganization(this.prisma, projectId, organizationId);
     const { today } = await this.insights.getOrganizationToday(organizationId);
     const date = dateKey ?? today;
     this.assertNotFuture(date, today);
@@ -92,7 +93,7 @@ export class AttendanceService {
     userId: string,
     dto: MarkAttendanceDto,
   ): Promise<AttendanceRoster> {
-    await this.assertProjectInOrganization(projectId, organizationId);
+    await findOpenProject(this.prisma, projectId, organizationId, 'mark attendance on it');
     const { today } = await this.insights.getOrganizationToday(organizationId);
     this.assertNotFuture(dto.date, today);
 
@@ -135,7 +136,7 @@ export class AttendanceService {
    * Night-shift arrivals after midnight are recorded on the following calendar day.
    */
   async checkIn(organizationId: string, projectId: string, userId: string, workerId: string): Promise<AttendanceRecordView> {
-    await this.assertProjectInOrganization(projectId, organizationId);
+    await findOpenProject(this.prisma, projectId, organizationId, 'mark attendance on it');
     const worker = await this.findActiveWorker(workerId, organizationId);
     const { timeZone, today } = await this.insights.getOrganizationToday(organizationId);
     const now = new Date();
@@ -160,7 +161,7 @@ export class AttendanceService {
   }
 
   async checkOut(organizationId: string, projectId: string, userId: string, workerId: string): Promise<AttendanceRecordView> {
-    await this.assertProjectInOrganization(projectId, organizationId);
+    await findOpenProject(this.prisma, projectId, organizationId, 'mark attendance on it');
     const worker = await this.findActiveWorker(workerId, organizationId);
     const { today } = await this.insights.getOrganizationToday(organizationId);
     const date = dateKeyToDbDate(today);
@@ -220,13 +221,6 @@ export class AttendanceService {
     if (dateKey > today) throw new BadRequestException("Attendance can't be recorded for a future date.");
   }
 
-  private async assertProjectInOrganization(projectId: string, organizationId: string): Promise<void> {
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, organizationId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!project) throw new NotFoundException('Project not found.');
-  }
 }
 
 function toEntryData(entry: AttendanceEntryDto): Pick<Prisma.AttendanceUncheckedCreateInput, 'status' | 'notes'> & {

@@ -195,3 +195,29 @@ export interface MarkPaidInput {
   reference: string;
   method: PaymentMethod;
 }
+
+export interface BudgetHead {
+  id: string;
+  projectId: string;
+  category: string;
+  allocated: number;
+  committed: number;
+  spent: number;
+  remaining: number;
+  /** Committed plus spent, as a share of the allocation. */
+  utilizationPercent: number;
+}
+
+export interface ProjectBudget {
+  projectId: string;
+  projectBudget: number | null;
+  heads: BudgetHead[];
+  /** Orders and bills in categories that match no head. */
+  unbudgeted: { committed: number; spent: number };
+  totals: { allocated: number; committed: number; spent: number; remaining: number };
+}
+
+export interface BudgetHeadInput {
+  category: string;
+  allocated: number;
+}

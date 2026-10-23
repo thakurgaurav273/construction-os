@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Worker, WorkerShift, WorkerType } from '@prisma/client';
+import { findOpenProject } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
 import { normalizeOptionalText } from '../../common/utils/normalize-text';
 import { shiftDateKey } from './attendance-dates';
@@ -74,7 +75,7 @@ export class WorkforceService {
   }
 
   async create(organizationId: string, userId: string, dto: CreateWorkerDto): Promise<WorkerDetailView> {
-    if (dto.projectId) await this.assertProjectInOrganization(dto.projectId, organizationId);
+    if (dto.projectId) await findOpenProject(this.prisma, dto.projectId, organizationId, 'assign workers to it');
 
     const worker = await this.prisma.worker.create({
       data: {
@@ -92,7 +93,10 @@ export class WorkforceService {
 
   async update(id: string, organizationId: string, userId: string, dto: UpdateWorkerDto): Promise<WorkerDetailView> {
     const existing = await this.findWorkerOrThrow(id, organizationId);
-    if (dto.projectId) await this.assertProjectInOrganization(dto.projectId, organizationId);
+    // Workers already on an archived site can still be edited; only new assignments are blocked.
+    if (dto.projectId && dto.projectId !== existing.projectId) {
+      await findOpenProject(this.prisma, dto.projectId, organizationId, 'assign workers to it');
+    }
 
     const worker = await this.prisma.worker.update({
       where: { id },
@@ -171,13 +175,6 @@ export class WorkforceService {
     return worker;
   }
 
-  private async assertProjectInOrganization(projectId: string, organizationId: string): Promise<void> {
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, organizationId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!project) throw new NotFoundException('Project not found.');
-  }
 }
 
 function toWorkerData(dto: UpdateWorkerDto): WorkerData {
@@ -201,7 +198,7 @@ function toWorkerData(dto: UpdateWorkerDto): WorkerData {
   };
 }
 
-function hasExpiringCertification(certifications: Prisma.JsonValue): boolean {
+export function hasExpiringCertification(certifications: Prisma.JsonValue): boolean {
   return Array.isArray(certifications) && certifications.some(
     (certification) => typeof certification === 'object'
       && certification !== null

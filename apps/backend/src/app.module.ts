@@ -14,6 +14,7 @@ import { MaterialsModule } from './modules/materials/materials.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { ProcurementModule } from './modules/procurement/procurement.module';
 import { StorageModule } from './common/storage/storage.module';
+import { JobsModule } from './common/jobs';
 import { DailyReportsModule } from './modules/daily-reports/daily-reports.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { FinanceModule } from './modules/finance/finance.module';
@@ -43,6 +44,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     InventoryModule,
     ProcurementModule,
     StorageModule,
+    JobsModule,
     DailyReportsModule,
     DocumentsModule,
     FinanceModule,

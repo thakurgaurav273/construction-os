@@ -5,6 +5,7 @@ import { Search, Plus, ClipboardList, AlertTriangle } from 'lucide-react';
 import { Button, Input, Skeleton } from '@sitepilot/ui';
 import { usePurchaseOrders } from '@/hooks/api/use-procurement';
 import { useCan } from '@/hooks/api/use-access';
+import { useProjectOpenForWork } from '@/hooks/api/use-projects';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { PurchaseOrderFormDialog } from '@/features/procurement/components/PurchaseOrderFormDialog';
 import { PurchaseOrderTable } from '@/app/dashboard/procurement/components/PurchaseOrderTable';
@@ -16,7 +17,8 @@ export default function ProjectPurchaseOrdersPage({ params }: { params: { id: st
   const [search, setSearch] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const canCreate = useCan()('po.create');
+  const isOpen = useProjectOpenForWork(params.id);
+  const canCreate = useCan()('po.create') && isOpen;
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();

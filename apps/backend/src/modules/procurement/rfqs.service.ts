@@ -1,12 +1,13 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Rfq, RfqStatus } from '@prisma/client';
+import { findOpenProject } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
 import { normalizeOptionalText } from '../../common/utils/normalize-text';
 import { nextDocumentNumber, withDocumentNumberRetry } from './document-numbers';
 import { CreateRfqDto, InviteVendorsDto } from './dto/rfq.dto';
 import { DOCUMENT_PREFIX, MAX_RFQ_VENDORS, OPEN_RFQ_STATUSES } from './procurement.constants';
 import { formatDay } from './procurement-math';
-import { PurchaseOrdersService, parseFutureDate } from './purchase-orders.service';
+import { parseFutureDate } from './purchase-orders.service';
 import { RFQ_DETAIL_INCLUDE, RFQ_LIST_INCLUDE, RfqDetailView, RfqView, toRfqDetailView, toRfqView } from './rfq.mapper';
 import { VendorsService } from './vendors.service';
 
@@ -19,7 +20,6 @@ export class RfqsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly vendors: VendorsService,
-    private readonly orders: PurchaseOrdersService,
   ) {}
 
   async findAll(organizationId: string): Promise<RfqView[]> {
@@ -39,7 +39,7 @@ export class RfqsService {
   }
 
   async create(organizationId: string, userId: string, dto: CreateRfqDto): Promise<RfqDetailView> {
-    await this.orders.assertProjectInOrganization(dto.projectId, organizationId);
+    await findOpenProject(this.prisma, dto.projectId, organizationId, 'request quotes for it');
     await this.vendors.findActiveVendors(dto.vendorIds, organizationId);
     const closingDate = parseFutureDate(dto.closingDate, 'Closing date');
     const title = dto.title.trim();

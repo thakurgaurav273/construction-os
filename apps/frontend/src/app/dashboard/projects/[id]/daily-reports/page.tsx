@@ -1,5 +1,6 @@
 'use client';
 
+import { useProjectOpenForWork } from '@/hooks/api/use-projects';
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -22,6 +23,7 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const { data: reports = [], isLoading, isError, refetch } = useDailyReports(params.id);
+  const isOpen = useProjectOpenForWork(params.id);
 
   const filtered = reports.filter((report) => {
     const query = search.trim().toLowerCase();
@@ -45,13 +47,15 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
           <h2 className="text-2xl font-bold tracking-tight">Daily Reports</h2>
           <p className="text-muted-foreground mt-1">Track daily site progress, weather, and safety logs.</p>
         </div>
-        <Can permission="dailyReport.write">
-          <Link href={`/dashboard/projects/${params.id}/daily-reports/new`}>
-            <Button className="shadow-lg shadow-primary/20">
-              <Plus className="mr-2 h-4 w-4" /> New Report
-            </Button>
-          </Link>
-        </Can>
+        {isOpen && (
+          <Can permission="dailyReport.write">
+            <Link href={`/dashboard/projects/${params.id}/daily-reports/new`}>
+              <Button className="shadow-lg shadow-primary/20">
+                <Plus className="mr-2 h-4 w-4" /> New Report
+              </Button>
+            </Link>
+          </Can>
+        )}
       </div>
 
       <Card>
@@ -98,7 +102,7 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
               icon={FileText}
               title="No daily reports yet"
               description="Record today's progress, labour and site issues so the team has a daily record of this project."
-              action={
+              action={isOpen ? (
                 <Can permission="dailyReport.write">
                   <Button asChild>
                     <Link href={`/dashboard/projects/${params.id}/daily-reports/new`}>
@@ -106,7 +110,7 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
                     </Link>
                   </Button>
                 </Can>
-              }
+              ) : undefined}
             />
           ) : (
             <div className="overflow-x-auto">

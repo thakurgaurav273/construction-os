@@ -33,6 +33,6 @@ import { PlatformController } from './platform.controller';
     PlatformAdminGuard,
     MailService,
   ],
-  exports: [AiService],
+  exports: [AiService, AiFeaturesService],
 })
 export class AiModule {}

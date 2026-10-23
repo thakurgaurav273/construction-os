@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import type {
-  BillableLine, BudgetLine, CashFlowEntry, FinanceSummary, Invoice, InvoiceDetail, InvoiceInput, InvoiceStatus,
-  MarkPaidInput, Payment, PaymentInput, PaymentStatus,
+  BillableLine, BudgetHeadInput, BudgetLine, CashFlowEntry, FinanceSummary, Invoice, InvoiceDetail, InvoiceInput, InvoiceStatus,
+  MarkPaidInput, Payment, PaymentInput, PaymentStatus, ProjectBudget,
 } from '@/features/finance/types';
 
 function unwrap<T>(res: { data: { data?: T } & T }): T {
@@ -80,6 +80,40 @@ export function useBudget() {
     queryFn: async () => unwrap(await apiClient.get('/finance/budget')),
     staleTime: 60_000,
   });
+}
+
+export function useProjectBudget(projectId: string, enabled = true) {
+  return useQuery<ProjectBudget>({
+    queryKey: ['finance', 'project-budget', projectId],
+    queryFn: async () => unwrap(await apiClient.get(`/projects/${projectId}/budget`)),
+    enabled: enabled && !!projectId,
+    staleTime: 30_000,
+  });
+}
+
+/** Head names only; anyone raising an order or bill can see them to file it correctly. */
+export function useBudgetCategories(projectId: string | undefined) {
+  return useQuery<string[]>({
+    queryKey: ['finance', 'budget-categories', projectId],
+    queryFn: async () => unwrap(await apiClient.get(`/projects/${projectId}/budget/categories`)),
+    enabled: !!projectId,
+    staleTime: 60_000,
+  });
+}
+
+export function useCreateBudgetHead(projectId: string) {
+  return useFinanceMutation(async (input: BudgetHeadInput): Promise<ProjectBudget> =>
+    unwrap(await apiClient.post(`/projects/${projectId}/budget/heads`, input)));
+}
+
+export function useUpdateBudgetHead(projectId: string) {
+  return useFinanceMutation(async ({ id, input }: { id: string; input: BudgetHeadInput }): Promise<ProjectBudget> =>
+    unwrap(await apiClient.patch(`/projects/${projectId}/budget/heads/${id}`, input)));
+}
+
+export function useDeleteBudgetHead(projectId: string) {
+  return useFinanceMutation(async (id: string): Promise<ProjectBudget> =>
+    unwrap(await apiClient.delete(`/projects/${projectId}/budget/heads/${id}`)));
 }
 
 export function useCashFlow() {

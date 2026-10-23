@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { ContractDirection, ContractStatus, Prisma } from '@prisma/client';
+import { findOpenProject } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
 import { nextDocumentNumber, withDocumentNumberRetry } from '../procurement/document-numbers';
 import { VendorsService } from '../procurement/vendors.service';
@@ -132,9 +133,7 @@ export class ContractsService {
   }
 
   async assertOpenProject(projectId: string, organizationId: string): Promise<void> {
-    const project = await this.prisma.project.findFirst({ where: { id: projectId, organizationId, deletedAt: null }, select: { status: true } });
-    if (!project) throw new NotFoundException('Project not found.');
-    if (project.status === 'ARCHIVED') throw new ConflictException('This project is archived. Restore it before billing against it.');
+    await findOpenProject(this.prisma, projectId, organizationId, 'bill against it');
   }
 
   /** A client contract bills a client; a subcontract is billed by an active vendor. Never both. */

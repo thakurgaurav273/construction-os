@@ -1,5 +1,7 @@
 'use client';
 
+import { useProjectOpenForWork } from '@/hooks/api/use-projects';
+import { Can } from '@/components/shared/Can';
 import React, { useMemo, useState } from 'react';
 import { Users, Search, CheckCircle2, AlertCircle, ShieldCheck, ClipboardCheck } from 'lucide-react';
 import {
@@ -15,6 +17,7 @@ import { MarkAttendanceSheet } from '@/features/workforce/components/MarkAttenda
 export default function WorkforcePage({ params }: { params: { id: string } }) {
   const { data: workers = [], isLoading, isError, refetch } = useProjectWorkforce(params.id);
   const { data: stats } = useProjectWorkforceStats(params.id);
+  const isOpen = useProjectOpenForWork(params.id);
   const [search, setSearch] = useState('');
   const [attendanceOpen, setAttendanceOpen] = useState(false);
 
@@ -84,9 +87,13 @@ export default function WorkforcePage({ params }: { params: { id: string } }) {
           <h2 className="text-2xl font-bold tracking-tight">Workforce</h2>
           <p className="text-muted-foreground">Personnel assigned to this project and today&apos;s attendance.</p>
         </div>
-        <Button onClick={() => setAttendanceOpen(true)}>
-          <ClipboardCheck className="mr-2 h-4 w-4" /> Mark Attendance
-        </Button>
+        {isOpen && (
+          <Can permission="attendance.mark">
+            <Button onClick={() => setAttendanceOpen(true)}>
+              <ClipboardCheck className="mr-2 h-4 w-4" /> Mark Attendance
+            </Button>
+          </Can>
+        )}
       </div>
       <MarkAttendanceSheet projectId={params.id} open={attendanceOpen} onOpenChange={setAttendanceOpen} />
 

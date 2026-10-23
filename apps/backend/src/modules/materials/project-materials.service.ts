@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { MaterialIssueType, Prisma } from '@prisma/client';
 import { subDays } from 'date-fns';
+import { assertProjectOpen, findOpenProject, findProjectInOrganization } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
 import { SiteStockMovement, StockLedgerService } from '../inventory/stock-ledger.service';
 import { nextDocumentNumber, withDocumentNumberRetry } from '../procurement/document-numbers';
@@ -32,7 +33,7 @@ export class ProjectMaterialsService {
   ) {}
 
   async findForProject(projectId: string, organizationId: string): Promise<ProjectMaterialsView> {
-    await this.assertProject(projectId, organizationId);
+    await findProjectInOrganization(this.prisma, projectId, organizationId);
 
     const [usages, recentIssues, issuesThisWeek] = await Promise.all([
       this.prisma.materialProjectUsage.findMany({
@@ -88,7 +89,7 @@ export class ProjectMaterialsService {
   }
 
   async setPlan(projectId: string, materialId: string, organizationId: string, dto: MaterialPlanDto): Promise<{ planned: number }> {
-    await this.assertProject(projectId, organizationId);
+    await findOpenProject(this.prisma, projectId, organizationId, 'plan materials for it');
     await this.findMaterial(materialId, organizationId);
     const usage = await this.prisma.materialProjectUsage.upsert({
       where: { materialId_projectId: { materialId, projectId } },
@@ -105,7 +106,9 @@ export class ProjectMaterialsService {
     userId: string,
     dto: SiteStockMovementDto,
   ): Promise<MaterialIssueView> {
-    const project = await this.assertProject(projectId, organizationId);
+    const project = await findProjectInOrganization(this.prisma, projectId, organizationId);
+    // Leftover stock can still come back to the store after a site closes; nothing new goes out to it.
+    if (type === MaterialIssueType.ISSUE) assertProjectOpen(project, 'issue material to it');
     const material = await this.findMaterial(dto.materialId, organizationId);
     const warehouse = await this.prisma.warehouse.findFirst({
       where: { id: dto.warehouseId, organizationId, deletedAt: null },
@@ -215,14 +218,6 @@ export class ProjectMaterialsService {
     return lastIssue?.recoveryRate ?? null;
   }
 
-  private async assertProject(projectId: string, organizationId: string): Promise<{ id: string; name: string }> {
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, organizationId, deletedAt: null },
-      select: { id: true, name: true },
-    });
-    if (!project) throw new NotFoundException('Project not found.');
-    return project;
-  }
 
   private async findMaterial(materialId: string, organizationId: string): Promise<{ id: string; name: string; unit: string; unitCost: Prisma.Decimal }> {
     const material = await this.prisma.material.findFirst({

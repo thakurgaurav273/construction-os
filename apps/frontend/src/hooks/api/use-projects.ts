@@ -118,6 +118,12 @@ export function useProjectList(filters: ProjectListFilters) {
   });
 }
 
+/** False once the project is archived: it stays readable, but the API refuses new site work on it. */
+export function useProjectOpenForWork(id: string): boolean {
+  const { data: project } = useProject(id);
+  return project?.status !== 'ARCHIVED';
+}
+
 export function useProject(id: string) {
   return useQuery<ProjectDetail>({
     queryKey: ['project', id],

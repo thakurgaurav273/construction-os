@@ -41,3 +41,6 @@ coverage
 
 # TypeScript
 *.tsbuildinfo
+
+# Local-disk file storage (STORAGE_DRIVER=local)
+.storage/

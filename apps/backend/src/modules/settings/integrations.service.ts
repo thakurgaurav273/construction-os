@@ -17,6 +17,7 @@ const STORAGE_PROVIDERS: Record<StorageBackend, string> = {
   r2: 'Cloudflare R2',
   's3-compatible': 'S3-compatible storage',
   'local-default': 'Local MinIO',
+  'local-disk': 'Local disk',
 };
 
 /**
@@ -60,8 +61,8 @@ export class IntegrationsService {
       id: 'storage',
       name: 'File storage',
       provider: STORAGE_PROVIDERS[backend],
-      state: backend === 'local-default' ? 'development' : 'connected',
-      detail: backend === 'local-default'
+      state: backend === 'local-default' || backend === 'local-disk' ? 'development' : 'connected',
+      detail: backend === 'local-default' || backend === 'local-disk'
         ? 'Documents, photos and logos are stored on the default local server, which is meant for development only.'
         : 'Documents, photos and logos are stored in object storage and shared through expiring links.',
     };

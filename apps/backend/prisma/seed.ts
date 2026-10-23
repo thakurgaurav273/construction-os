@@ -1284,17 +1284,18 @@ async function seedFinance(orgId: string) {
   // Bills are entered by the finance team so the owner can approve them (maker-checker).
   const clerk = await prisma.user.findUnique({ where: { email: 'suresh.b@grovyn.com' }, select: { id: true } });
 
-  const CATS = ['Steel & Rebar', 'Cement & Concrete', 'Electrical', 'Mechanical', 'Labour', 'Equipment Hire', 'Overheads'];
-  const BD: Record<string, number[][]> = {
-    'GRV-001': [[28e6,14.2e6,4.8e6],[18e6,9.4e6,2.2e6],[12e6,5.8e6,1.9e6],[10e6,4.2e6,2.1e6],[14e6,8.64e6,1.2e6],[6e6,3.4e6,.8e6],[4e6,2.2e6,.4e6]],
-    'GRV-002': [[6e6,2.1e6,.9e6],[5e6,1.8e6,.6e6],[4e6,1.2e6,.5e6],[3e6,.8e6,.4e6],[5e6,2.02e6,.3e6],[3e6,1e6,.2e6],[2e6,.6e6,.1e6]],
-    'GRV-003': [[96e6,74.88e6,8e6],[64e6,49.92e6,5.2e6],[42e6,32.76e6,3.8e6],[38e6,29.64e6,2.6e6],[48e6,37.44e6,4e6],[18e6,14.04e6,1.5e6],[14e6,10.92e6,.9e6]],
-    'GRV-004': [[16e6,3.52e6,.5e6],[10e6,2.2e6,.3e6],[8e6,1.76e6,.2e6],[6e6,1.32e6,.1e6],[8e6,1.76e6,.2e6],[4e6,.88e6,.1e6],[3e6,.66e6,.05e6]],
+  // Budget heads use the same names as purchase order and bill categories; committed and spent are derived from those.
+  const CATS = ['Steel', 'Concrete', 'Electrical', 'Mechanical', 'Labour', 'Equipment', 'Finishes'];
+  const BD: Record<string, number[]> = {
+    'GRV-001': [28e6, 18e6, 12e6, 10e6, 14e6, 6e6, 4e6],
+    'GRV-002': [6e6, 5e6, 4e6, 3e6, 5e6, 3e6, 2e6],
+    'GRV-003': [96e6, 64e6, 42e6, 38e6, 48e6, 18e6, 14e6],
+    'GRV-004': [16e6, 10e6, 8e6, 6e6, 8e6, 4e6, 3e6],
   };
   for (const [code, items] of Object.entries(BD)) {
     const pid = projIdByCode[code]; if (!pid) continue;
     for (let i = 0; i < items.length; i++) {
-      await prisma.budgetItem.create({ data: { projectId: pid, organizationId: orgId, category: CATS[i], allocated: items[i][0], spent: items[i][1], committed: items[i][2] } });
+      await prisma.budgetItem.create({ data: { projectId: pid, organizationId: orgId, category: CATS[i], allocated: items[i] } });
     }
   }
 
@@ -1429,62 +1430,35 @@ main()
 // ─── Reports Seed Data ────────────────────────────────────────────────────────
 
 async function seedReports(orgId: string) {
-  const count = await prisma.generatedReport.count({ where: { organizationId: orgId } });
+  const count = await prisma.reportSchedule.count({ where: { organizationId: orgId } });
   if (count > 0) { console.log('  → Reports already seeded, skipping'); return; }
 
-  const templates = [
-    { type: 'EXECUTIVE', name: 'Executive Summary - Q3', desc: 'High-level overview' },
-    { type: 'COST', name: 'Cost Analysis - September', desc: 'Budget tracking' },
-    { type: 'WORKFORCE', name: 'Workforce Report - Week 38', desc: 'Attendance trends' },
-    { type: 'FINANCIAL', name: 'Financial Report - September', desc: 'Invoices and payments' },
-  ];
+  // Generated reports aren't seeded: they need real files, so generate one from the Reports page instead.
+  const owner = await prisma.userOrganization.findFirstOrThrow({ where: { organizationId: orgId, role: 'OWNER' }, select: { userId: true } });
+  const definition = await prisma.report.create({
+    data: { name: 'Executive Summary', type: 'EXECUTIVE', description: '', projects: [], organizationId: orgId, createdBy: owner.userId },
+  });
+  const nextMonday = new Date();
+  nextMonday.setUTCDate(nextMonday.getUTCDate() + ((8 - nextMonday.getUTCDay()) % 7 || 7));
+  nextMonday.setUTCHours(3, 30, 0, 0); // 09:00 in Asia/Kolkata
 
-  const reports = await Promise.all(
-    templates.map((t, i) =>
-      prisma.report.create({
-        data: { name: t.name, type: t.type, description: t.desc, projects: [], organizationId: orgId, createdBy: 'system' },
-      })
-    )
-  );
-
-  const history = [
-    { name: 'Executive Summary - Q3', type: 'EXECUTIVE', format: 'PDF', size: 4200000, daysAgo: 3, by: 'Automated Schedule' },
-    { name: 'Cost Analysis - September', type: 'COST', format: 'EXCEL', size: 1800000, daysAgo: 18, by: 'Alex Manager' },
-    { name: 'Workforce Report - Week 36', type: 'WORKFORCE', format: 'PDF', size: 2400000, daysAgo: 25, by: 'Sarah HR' },
-    { name: 'Safety Audit - Marina Bay', type: 'SAFETY', format: 'PDF', size: 3100000, daysAgo: 30, by: 'Mike Safety' },
-  ];
-
-  for (const h of history) {
-    await prisma.generatedReport.create({
-      data: {
-        reportId: reports[Math.floor(Math.random() * reports.length)].id,
-        organizationId: orgId,
-        name: h.name,
-        type: h.type,
-        format: h.format,
-        status: 'COMPLETED',
-        fileSize: h.size,
-        generatedBy: h.by,
-        generatedAt: new Date(Date.now() - h.daysAgo * 24 * 60 * 60 * 1000),
-      },
-    });
-  }
-
-  // Seed one schedule
   await prisma.reportSchedule.create({
     data: {
-      reportId: reports[0].id,
-      reportType: reports[0].type,
+      reportId: definition.id,
+      reportType: 'EXECUTIVE',
       name: 'Weekly Executive Summary',
       frequency: 'WEEKLY',
+      time: '09:00',
+      timezone: 'Asia/Kolkata',
       projects: [],
-      recipients: ['manager@grovyn.com'],
+      recipients: ['OWNER', 'PROJECT_MANAGER'],
+      emails: [],
       enabled: true,
-      nextRunAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      nextRunAt: nextMonday,
       organizationId: orgId,
-      createdBy: 'system',
+      createdBy: owner.userId,
     },
   });
 
-  console.log(`  → Seeded reports: ${templates.length} templates, ${history.length} history, 1 schedule`);
+  console.log('  → Seeded reports: 1 weekly schedule');
 }

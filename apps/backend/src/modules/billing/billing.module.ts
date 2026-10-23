@@ -51,5 +51,6 @@ import { RetentionService } from './retention.service';
     ItemLinksService,
     MarginService,
   ],
+  exports: [ReceivablesService],
 })
 export class BillingModule {}

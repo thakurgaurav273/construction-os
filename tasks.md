@@ -54,13 +54,13 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 - [x] Remove raw-body passthrough in `ReportsService.updateSchedule` (DTOs for generate / schedule create + update / history)
 - [x] Verify `locationId` on inventory item update (done in T11)
 
-### T4. RBAC (permission-based)
-- [ ] Permission constants per module + role → permission map
-- [ ] `@RequirePermissions()` decorator + `PermissionsGuard`
-- [ ] Apply to every mutating endpoint (PO approve, budgets, documents delete, transfers, adjustments, settings, org update)
-- [ ] Daily report approve / reject → `dailyReports.approve` permission (today any non-author member can review)
-- [ ] Attendance marking + worker create/deactivate → `workforce.manage` permission (today any member can)
-- [ ] Fix OWNER escalation in settings (ADMIN can't invite/promote to OWNER)
+### T4. RBAC (permission-based)  `[x]`
+- [x] Permission constants per module + role → permission map (`packages/types` permissions, `permission-catalogue.ts`; Settings → Roles shows it)
+- [x] `@RequirePermission()` decorator + `PermissionsGuard`; a route-coverage test fails if a write route has no permission (or isn't listed as open)
+- [x] Applied to every mutating endpoint (PO approve, documents delete, transfers, adjustments, settings, org update…)
+- [x] Daily report approve / reject → `dailyReport.approve`
+- [x] Attendance marking → `attendance.mark`; worker create/edit/deactivate → `workforce.manage`
+- [x] OWNER escalation fixed: only owners can invite, promote to or remove owners
 - [~] Rate limiting: auth endpoints limited to 10/min per IP; a global limit waits for `TRUST_PROXY` to be set in production (behind a proxy every user shares one IP)
 
 ### T5. Auth hardening  `[x]`
@@ -85,9 +85,9 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 
 > Verified 2026-10-23: 25 HTTP checks (preview, new and existing accounts, wrong password keeps the link usable, concurrent accept, reuse, expiry, case-insensitive member check) and a headless-browser run (open link → set password → dashboard; reused link shows the expiry message).
 
-### T7. Validation everywhere
-- [ ] DTOs for settings (role change, invite), notifications (device register), reports (generate, schedule create/update), auth refresh/logout
-- [ ] Remove remaining `any` in backend
+### T7. Validation everywhere  `[x]`
+- [x] DTOs for settings (role change, invite), notifications (device register), reports (generate, schedule create/update); every `@Body()` is a validated DTO (refresh/logout take no body)
+- [x] No `any` left in backend source
 
 ### T8. Audit log  `[x]`
 - [x] `AuditLog` model (actor snapshot, action, entity, project, redacted input, IP, user agent, timestamp) + migration; a Postgres trigger rejects UPDATE / DELETE / TRUNCATE
@@ -102,14 +102,14 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 
 ## Phase 3 — Module write flows
 
-### T9. Procurement
-- [ ] New Purchase Order page/dialog wired to `POST /purchase-orders`
-- [ ] Vendor create / edit / deactivate
-- [ ] RFQ create, invite vendors, record quotes, compare, award
-- [ ] Delivery receive / GRN linked to PO (FK, not strings)
-- [ ] PO state machine guards (no approving a rejected PO), PO edit/cancel, GET by id
-- [ ] Project → Purchase Orders tab: correct field names + filter by project
-- [ ] Replace hardcoded analytics/KPI trend text with API data; error state + skeletons
+### T9. Procurement  `[x]`
+- [x] New Purchase Order dialog wired to `POST /purchase-orders` (procurement page and project tab)
+- [x] Vendor create / edit / deactivate / reactivate
+- [x] RFQ create, invite vendors, record quotes, compare, award (creates the PO)
+- [x] Delivery receive / GRN linked to the PO by foreign key, receiving into a store's stock
+- [x] PO state machine guards, edit / cancel, GET by id, maker-checker approval
+- [x] Project → Purchase Orders tab filtered by project
+- [x] Analytics/KPIs from API data with error states and skeletons
 
 ### T10. Materials  `[x]`
 - [x] Fix create with empty category/supplier (FK error → 500); category/supplier verified to belong to the org; duplicate SKU → 409
@@ -132,11 +132,13 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 
 > Verified 2026-10-23: migration backfill tested on legacy rows, fresh DB + seed, 46 HTTP checks (store/bin setup, transfer state machine + maker-checker, concurrent receive, concurrent adjustments, damaged availability, material total = Σ store stock, permissions, org isolation) and a headless-browser run (owner requests, project manager approves and receives).
 
-### T12. Finance
-- [ ] Create / approve / cancel invoice
-- [ ] Record / approve payment
-- [ ] Budget line items CRUD linked to project budget
-- [ ] Fix KPI formatting (currency, variance %), error state
+### T12. Finance  `[x]`
+- [x] Create / submit / approve / reject / cancel vendor bills (maker-checker, PO matching)
+- [x] Request / approve / release / cancel payments (maker-checker)
+- [x] Budget heads per project (ADR-037): add / rename / re-allocate / remove from the project Budget tab (`budget.manage`: owners, admins, project managers, finance). Committed (approved POs not yet billed) and spent (approved, part-paid and paid vendor bills), both incl. GST, are derived from the matching category, never typed in; anything outside the heads shows as Unbudgeted. PO and vendor-bill category pickers list the project's heads first. Finance, the finance summary and the Cost report use the same figures
+  > Verified 2026-10-24: 4 unit tests, 38 HTTP checks (figures match orders and bills in the DB, case-insensitive matching, unbudgeted moves when heads are added or removed, a new PO counts only once approved, permissions per role, validation, cross-project isolation, finance summary and Cost report agree, audit) and a headless-browser run (add/remove a head, PO category picker, phone layout, site engineer restricted state).
+- [ ] `Project.spent` (dashboard and project header) is still a stored figure; derive it from vendor bills like the budget heads
+- [x] KPI formatting (₹, utilisation %), error states
 
 ### T13. Projects & Settings  `[x]`
 - [x] Archive / restore (back to the previous status), delete only for projects with no history (new `project.delete` permission, code freed for reuse), remove member (never the last project manager), change project role
@@ -145,7 +147,8 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 - [x] Remove "Coming Soon" `[tab]` route; Timeline's dead Export button removed
 - [x] Settings → Organization tab wired to `GET/PATCH /settings/organization` (validated GSTIN, currency, IANA time zone) + logo upload/remove (PNG/JPG/WebP ≤ 2 MB, signed URLs); onboarding uses the same endpoint; `PATCH /auth/organization` removed; header shows the real organization name
 - [x] Error states on projects list, project layout (covers budget, team, timeline), team, organization settings
-- [ ] Block new work (POs, reports, issues, attendance…) on archived projects in the other modules; today they're only hidden from pickers
+- [x] Block new work on archived projects in the other modules (ADR-036): new or edited daily reports, attendance and check-ins, assigning workers, purchase orders (create, edit, submit, approve), RFQs and awards, material issues and plans, site stores, document uploads and RA bills are refused with a 409 explaining how to restore. Still allowed: reading, approving or rejecting reports already submitted, rejecting or cancelling orders, returning leftover stock, editing workers already there, and all money flows (vendor bills, payments, receipts). Project tabs hide the blocked actions and the banner says what's paused
+  > Verified 2026-10-24: 3 unit tests for the shared guard, 30 HTTP checks (every blocked action, every action that stays open, other projects unaffected, restore reopens drafts and orders) and a headless-browser run of each project tab on an archived project.
 - [ ] Verify logo upload against running MinIO/R2 (validation paths tested; storage write not exercised locally)
 - [x] Settings completed: grouped navigation (Account / Workspace) with tabs kept in the URL hash; no placeholder tabs left
 - [x] Profile: edit your name (`PATCH /auth/profile`), shown at once in the sidebar and menus; "Your profile" in the account menu
@@ -206,8 +209,23 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 
 > Verified 2026-10-24: 71 HTTP checks (permissions per role, client validation, contract party rules, BOQ duplicates and in-use protection, measurement maths incl. deductions and steel, totals with five tax/deduction lines, one open bill, locked submitted bills, certified ≤ claimed, held quantities, frozen rates after a rate revision, previous quantities on the next bill, over-BOQ flag, send back / cancel / close rules, subcontract maker-checker, list filters, notifications, audit, timeline), 5 unit tests for the billing maths, and a headless-browser run (finance creates a contract, pastes a BOQ, starts and measures a bill with a deduction, submits; the PM records certification with a hold; site engineer read-only on a phone with no horizontal scroll; procurement sees the restricted state).
 
-### T14. Background jobs
-- [ ] BullMQ + Redis queue module
+### T22. Help center & product tour
+- [ ] Help button (`?` icon) in the header next to notifications, plus "Help & guides" in the account menu and the ⌘K palette
+- [ ] Help center panel (side drawer, opens on the current page's guide): searchable list of guides per module — Projects, Daily Reports, Workforce & attendance, Materials & inventory, Procurement, Finance, Billing (contracts, RA bills, measurement book, certification, receivables, retention, imports, margin), Reports, AI, Settings
+- [ ] Guides written as short task-based steps ("Raise your first RA bill", "Import a measurement book", "Recover material from a subcontractor"), with screenshots or short clips; content kept as versioned files in the repo (MDX/JSON per module) so guides ship with the features they describe
+- [ ] Guides respect roles: only show modules and actions the member's permissions allow (e.g. no "Certify a bill" guide for site engineers)
+- [ ] Contextual "?" links on complex screens (bill abstract, measurement book, import mapping, margin) that open the matching guide section
+- [ ] Product tour after onboarding: step-by-step spotlight walkthrough (highlight an element, short tip, Next / Back / Skip) covering the sidebar, ⌘K search, notifications, creating a project, and the member's main module by role
+- [ ] Per-module mini tours the first time a member opens a module (e.g. Billing: tabs → New Contract → BOQ → RA bill → certify); can be replayed from the help center
+- [ ] Tour progress stored per user on the server (completed / skipped per tour, so it follows them across devices); "Restart tour" in the help center
+- [ ] Getting-started checklist for new organizations (invite your team, create a project, add a BOQ, record attendance…) that ticks off from real data and can be dismissed
+- [ ] Accessible: keyboard navigation and Escape to exit, focus kept inside the tour step, respects reduced motion, works on tablet and mobile layouts
+- [ ] Empty states link to the relevant guide ("Learn how contracts work")
+- [ ] Later: AI "Ask SitePilot how to…" answering from the same guide content
+
+### T14. Background jobs  `[x]`
+- [x] BullMQ + Redis queue module (`common/jobs`): `register` / `enqueue` / `every`, three attempts with exponential backoff, shared job scheduler for recurring jobs; runs in-process when `REDIS_URL` isn't set (ADR-035)
+- [ ] Move other slow work onto the queue (notification emails, AI insight refresh, imports)
 
 ### T15. Notifications  `[x]`
 - [x] Emit notifications from domain events: every audited action is published on an in-process event bus; rules turn them into notifications — PO submitted/approved/rejected/sent back, daily report submitted/approved/sent back, bill submitted/approved/rejected, payment requested/approved (+ "ready to release")/rejected/released, transfer requested/approved/rejected/received, role changed, added to a project. Approvers are found by permission (preferring the project team), and nobody is told about their own action
@@ -220,10 +238,15 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 
 > Verified 2026-10-24: migration on a fresh DB (matches the schema exactly), 34 unit tests, 21 HTTP/socket checks (live delivery, permission-based recipients, no self-notifications, preferences mute in-app, email routing, read state, isolation, transfer flow) and a headless-browser run (live toast while the app is open, bell → open link → marked read, preferences tab).
 
-### T16. Reports
-- [ ] Real PDF / Excel generation (queued), stored in object storage, download button
-- [ ] Per-type report data (safety, workforce, procurement…)
-- [ ] Scheduled reports executed by the queue, emailed to recipients
+### T16. Reports  `[x]`
+- [x] Real PDF / Excel generation (queued), stored in object storage, download button: branded PDF (logo, brand colour, ₹) and Excel workbook (one sheet per table), short-lived signed download links, in-app preview of the same content; polling while reports generate
+- [x] Per-type report data for a chosen period and projects: Executive, Cost, Workforce, Schedule, Procurement, Inventory, Financial (finance access only), Safety
+- [x] Scheduled reports executed by the queue, emailed to recipients: once-a-minute tick with claim-before-run, next run in the schedule's own time zone (DST-safe, missed runs skipped), recipients by role plus extra emails with files attached, delivery outcome on each schedule, Run now, edit, pause/resume
+- [x] Optional AI summary at the top of a report (skipped when AI isn't available)
+- [x] Local-disk storage driver with signed links for development (`STORAGE_DRIVER=local`)
+- [ ] Real email delivery needs `RESEND_API_KEY` (stubbed to the log without it)
+
+> Verified 2026-10-24: 11 new unit tests (time-zone/DST scheduling, missed runs, period rules, schedule health, issue parsing, renderers don't change stored content), 138 HTTP checks run against both Redis-queue and in-process modes (all 8 types produce valid PDF + Excel files with stored content, downloads save as attachments, project scope, period validation, finance-only visibility for reports, templates and downloads, schedule validation, run now → role-based emails with attachments, minute tick runs due schedules, one-off switches off, missed daily runs produce one report, pause/resume, edit re-times in the new zone, delete removes files, audit; no job fell back to in-process with Redis on), and a headless-browser run (generate with validation → ready without reload → download → preview and email deep link, edit and run a schedule, schedule from a template, phone layout with no horizontal scroll, site engineer read-only without financial reports).
 
 ### T17. AI  `[x]`
 - [x] `AiService` + provider adapters: Google Gemini, Groq and Hugging Face (Groq/HF share an OpenAI-compatible adapter, so OpenAI is one more class); base URLs and default models overridable by env
@@ -238,10 +261,14 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 
 > Verified 2026-10-23: 44 backend unit tests (encryption, adapters, error mapping, insight parsing, redaction), 45 end-to-end HTTP checks against a mock Groq/Gemini server (key validation and encryption, grounding, trial → used up → top-up → decline, platform-admin gating, tenant isolation, notifications, audit) and a headless-browser run (connect a key in Settings, chat, report summary, insights, approve a trial in /platform, tenant owner blocked from /platform).
 
-### T18. Dashboard & demo cleanup
-- [ ] Real budget trend, pending approvals, workforce today
-- [ ] Remove demo AI insights / weather / hardcoded org names
-- [ ] Delete unused `demo-store.ts`, `procurement-store.ts`; update `docs/DEMO_MODE.md`
+### T18. Dashboard & demo cleanup  `[x]`
+- [x] Real budget trend, pending approvals, workforce today: "Planned vs paid out" spreads each project's budget over its planned months against released payments (finance access only; others see the attendance trend); "Waiting for you" counts approvals by the member's permissions with maker-checker (own requests excluded) and links to each module; workforce today and the 7-day attendance trend come from marked attendance
+- [x] Remove demo AI insights / weather / hardcoded org names: insights card shows the latest AI Command Center snapshot (members with `ai.use`), weather removed, header shows the organization's name, "+1 from last month" replaced by real counts, fake "Download Report" replaced by a link to Reports, New Project only for `project.create`
+- [x] Delete unused `demo-store.ts` and `data/demo.ts` (`procurement-store.ts` was already gone); `docs/DEMO_MODE.md` now explains seeded demo data
+- [x] Dashboard page split into `features/dashboard` components; charts lazy-loaded; loading, error and empty states
+- [ ] `docs/PRODUCTION_INTEGRATION.md` is still out of date beyond the demo-mode step (repositories, bearer tokens)
+
+> Verified 2026-10-24: 2 new unit tests (planned monthly burn, payments bucketed by paid month), 20 HTTP checks across owner / project manager / site engineer / finance (spend trend gated by finance access and matching released payments, queues per permission, own requests excluded, unattributed requests still counted, totals), and a headless-browser run (owner with queues and spend chart, queue link opens the module, site engineer sees attendance and nothing waiting without New Project, phone layout without horizontal scroll).
 
 ### T19. Tests
 - [ ] Jest setup for backend; service tests for daily reports, attendance, transfers, PO approvals

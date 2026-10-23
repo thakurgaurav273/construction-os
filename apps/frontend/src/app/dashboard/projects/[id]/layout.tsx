@@ -157,7 +157,8 @@ export default function ProjectDetailLayout({
               <Archive className="mt-0.5 h-4 w-4 shrink-0" />
               <p>
                 This project was archived{project.archivedAt ? ` on ${format(new Date(project.archivedAt), 'dd MMM yyyy')}` : ''}.
-                Its records stay readable, but it can&apos;t be edited until it&apos;s restored.
+                Its records stay readable, but new reports, attendance, orders, material issues and documents are paused until
+                it&apos;s restored. Leftover stock can still be returned, and bills and payments carry on in Finance.
               </p>
             </div>
           )}

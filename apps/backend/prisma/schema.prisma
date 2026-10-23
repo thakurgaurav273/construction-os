@@ -1435,10 +1435,9 @@ model BudgetItem {
   id             String   @id @default(uuid())
   projectId      String
   organizationId String
+  /// The budget head, matched case-insensitively against purchase order and vendor bill categories.
   category       String
   allocated      Decimal  @default(0) @db.Decimal(15, 2)
-  spent          Decimal  @default(0) @db.Decimal(15, 2)
-  committed      Decimal  @default(0) @db.Decimal(15, 2)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -1517,11 +1516,24 @@ model GeneratedReport {
   organizationId String
   name           String
   type           String
-  format         String   // PDF, EXCEL, HTML
+  format         String   // PDF, EXCEL, BOTH
   status         String   // PENDING, GENERATING, COMPLETED, FAILED
   fileUrl        String?
   fileSize       Int?
+  /// The report content (metrics and tables), for the in-app preview and re-rendering.
   data           Json?
+  /// Object storage keys of the rendered files.
+  pdfKey         String?
+  excelKey       String?
+  /// Projects the report covers; empty means every project.
+  projectIds     String[] @default([])
+  periodFrom     DateTime?
+  periodTo       DateTime?
+  /// Set when a schedule produced it.
+  scheduleId     String?
+  /// Why generation failed, in words a member can act on.
+  error          String?
+  completedAt    DateTime?
   generatedBy    String
   generatedAt    DateTime @default(now())
   expiresAt      DateTime?
@@ -1552,6 +1564,9 @@ model ReportSchedule {
   includeAiSummary Boolean @default(true)
   enabled         Boolean  @default(true)
   lastRunAt       DateTime?
+  /// Outcome of the last run, shown on the schedule card.
+  lastStatus      String?
+  lastError       String?
   nextRunAt       DateTime
   organizationId  String
   createdBy       String

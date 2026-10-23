@@ -1391,6 +1391,134 @@ Contractors routinely supply material (cement, steel, blocks) to subcontractors 
 
 ---
 
+# ADR-035 - Background Jobs and Generated Reports
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Reports were generated inside the request and saved as a raw JSON dump. Nothing produced a file, nothing ran on a schedule, and the next run time ignored the schedule's time zone. Report generation, emails with attachments and AI summaries are too slow for a request, and they need retries.
+
+---
+
+## Decision
+
+- **One queue behind a small interface.** `JobsService` (common/jobs) offers `register`, `enqueue` and `every`. With `REDIS_URL` set, jobs go through a BullMQ queue (`sitepilot`) with three attempts and exponential backoff, and recurring jobs use a BullMQ job scheduler, so several API instances tick once between them. Without Redis (local development, tests) the same handlers run in-process with the same retry rules. Feature code never imports BullMQ. Job ids can't contain `:` (BullMQ reserves it), and `enqueue` rejects them.
+- **Reports are built once and rendered many ways.** Each report type has a builder that returns a `ReportDocument` (headline metrics, sections with typed tables or bullets). The PDF (pdfmake, Roboto, so ₹ renders), the Excel workbook (exceljs, one sheet per table, real numbers and dates) and the in-app preview all render that same document. The document is stored on `GeneratedReport.data`, and the files go to object storage (`pdfKey`, `excelKey`).
+- **Requests only queue.** `POST /reports/generate` creates a PENDING report for whole UTC days in a chosen period (30 days by default, 366 at most) and enqueues `reports.generate`. The page polls while anything is pending. Failures on the last attempt are saved as a message a member can act on.
+- **Schedules claim their run.** A once-a-minute tick finds due schedules and moves each one's `nextRunAt` forward with a conditional update before queueing, so a run is never produced twice. Next runs step in the schedule's own time zone (09:00 stays 09:00 through DST), and runs missed during downtime are skipped rather than sent in a burst. One-off schedules switch themselves off after running. Each run covers the frequency's window (last day, 7 days, 30 days).
+- **Recipients are roles, not labels.** Schedule recipients are `OrgRole` values plus extra addresses. Financial reports only go to roles with `finance.view`. Each person gets their own email with the files attached (links only above 10 MB) and 7-day signed download links. The outcome (DELIVERED, PARTIAL, FAILED, NO_RECIPIENTS) is shown on the schedule.
+- **Downloads use short-lived signed links** that save as an attachment. A local-disk storage driver (`STORAGE_DRIVER=local`) serves HMAC-signed links from `/api/files/:token` for development without S3.
+- **The AI summary is optional and never blocks a report.** It goes through `AiFeaturesService.summarizeReport` (feature `report_summary`). Without AI access the report is delivered without it.
+
+---
+
+## Alternatives
+
+- **Node cron inside the API**: no retries or persistence, and every instance would fire every schedule.
+- **Rendering PDFs with a headless browser**: pixel-perfect HTML, but a heavy Chromium dependency on every server. pdfmake is pure JavaScript and fast enough for tabular reports.
+- **Storing only the files**: the in-app preview would have to parse PDFs; storing the document also lets reports be re-rendered later.
+
+---
+
+## Consequences
+
+- Production needs Redis for durable jobs; without it, queued work is lost on restart (the API logs a warning).
+- The PDF shows at most 200 rows per table; the Excel file and preview point there for the rest. A report stores at most 5,000 rows per table.
+- Seeded demo data no longer includes generated reports without files; generate one from the Reports page.
+
+---
+
+# ADR-036 - Archived Projects Are Closed for New Site Work
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Archiving hid a project from pickers and made its details read-only, but every other module still accepted new work against it through the API: reports, attendance, orders, material issues, documents.
+
+---
+
+## Decision
+
+- One shared guard (`modules/projects/project-guards.ts`): `findProjectInOrganization` for reads and `findOpenProject` / `assertProjectOpen` for new work. It replaces five copies of the same project lookup and answers 409 with "This project is archived, so you can't …. Restore it from the project menu first."
+- **Blocked:** creating, editing or submitting daily reports; marking attendance and check-in/out; assigning workers; creating, editing, submitting or approving purchase orders; RFQs and awards; material issues and plans; linking stores; uploading documents; contracts and new RA bills.
+- **Still allowed:** reading everything; approving or rejecting reports already submitted; rejecting or cancelling orders; returning leftover stock to a store; editing workers already on the site; vendor bills, payments and client receipts, because money owed doesn't end when a site closes.
+
+---
+
+## Alternatives
+
+- **Block everything**: would strand pending approvals and unpaid bills on closed sites.
+- **Frontend-only hiding**: the API would still accept the work.
+
+---
+
+## Consequences
+
+- Draft daily reports and purchase orders on an archived project are frozen until it's restored; pending orders can be rejected or cancelled.
+
+---
+
+# ADR-037 - Budget Heads with Derived Commitments and Spend
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Budget lines held allocated, committed and spent amounts that only the seed ever wrote, so they never moved with real purchase orders or bills. Their names ("Steel & Rebar") also didn't match the categories orders and bills use ("Steel").
+
+---
+
+## Decision
+
+- A budget line is a **head**: a project, a category name and an allocation. Only those are stored.
+- **Committed** = approved purchase orders in that category not yet billed (order total minus approved bills against it, never below zero). **Spent** = approved, part-paid and paid vendor bills in that category. Both include GST, like order and bill totals.
+- Categories match case-insensitively, ignoring surrounding spaces. Orders and bills whose category has no head show as **Unbudgeted** on the project, so nothing silently disappears.
+- PO and vendor-bill forms list the project's heads first (`GET /projects/:id/budget/categories`, names only, open to every member). The money view (`GET /projects/:id/budget`) needs `finance.view`; changing heads needs the new `budget.manage`.
+- One `BudgetService` feeds the project Budget tab, Finance → Budget, the finance summary and the Cost report.
+
+---
+
+## Alternatives
+
+- **A budget-line field on every PO and bill**: more precise, but adds a choice to every order and needs existing records mapped.
+- **Typed-in figures**: drift from what procurement and finance record.
+
+---
+
+## Consequences
+
+- The `spent` and `committed` columns were dropped (migration `20261101090000`); the seed now uses heads named like its orders and bills.
+- Utilisation on heads now includes commitments, so budget risk warnings fire before money is actually spent.
+- Labour paid outside vendor bills isn't counted yet.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

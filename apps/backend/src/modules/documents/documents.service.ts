@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { findOpenProject } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -26,11 +27,7 @@ export class DocumentsService {
     options: { dailyReportId?: string } = {},
   ) {
     // The project id comes from the URL, so confirm it belongs to the caller before writing to storage.
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, organizationId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!project) throw new NotFoundException('Project not found');
+    await findOpenProject(this.prisma, projectId, organizationId, 'upload documents to it');
 
     const key = `organizations/${organizationId}/projects/${projectId}/documents/${uuidv4()}-${safeFileName(file.originalname)}`;
     const url = await this.storage.upload(key, file.buffer, file.mimetype);

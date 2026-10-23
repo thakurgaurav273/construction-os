@@ -30,6 +30,7 @@ export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
   'po.approve': { group: 'Procurement', label: 'Approve purchase orders' },
   'delivery.receive': { group: 'Procurement', label: 'Schedule and receive deliveries' },
   'finance.view': { group: 'Finance', label: 'View invoices, payments and budgets' },
+  'budget.manage': { group: 'Finance', label: 'Set project budget heads' },
   'invoice.create': { group: 'Finance', label: 'Record vendor invoices' },
   'invoice.approve': { group: 'Finance', label: 'Approve vendor invoices' },
   'payment.request': { group: 'Finance', label: 'Request payments' },
@@ -67,7 +68,7 @@ export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     'workforce.manage', 'material.manage', 'material.issue', 'inventory.transfer', 'warehouse.manage',
     'rfq.manage', 'rfq.award', 'po.create', 'po.approve',
     // Project managers certify bills for work on their sites; finance releases the money.
-    'finance.view', 'invoice.approve',
+    'finance.view', 'invoice.approve', 'budget.manage',
     'report.manage',
     'billing.view', 'contract.manage', 'billing.prepare', 'billing.certify',
   ],
@@ -79,7 +80,7 @@ export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
   ],
   PROCUREMENT: ['ai.use', 'document.upload', 'delivery.receive', 'vendor.manage', 'rfq.manage', 'rfq.award', 'po.create'],
   FINANCE: [
-    'ai.use', 'document.upload', 'finance.view', 'invoice.create', 'invoice.approve',
+    'ai.use', 'document.upload', 'finance.view', 'budget.manage', 'invoice.create', 'invoice.approve',
     'payment.request', 'payment.approve', 'payment.release', 'report.manage',
     'billing.view', 'contract.manage', 'billing.prepare', 'billing.receipts',
   ],

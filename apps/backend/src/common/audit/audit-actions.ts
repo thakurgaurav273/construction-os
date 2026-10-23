@@ -126,6 +126,9 @@ export const AUDIT_ACTIONS = {
   'delivery.cancelled': action('cancelled a delivery', 'delivery'),
 
   'invoice.created': action('recorded a vendor invoice', 'invoice'),
+  'budget_head.created': action('added a budget head', 'budget_head'),
+  'budget_head.updated': action('changed a budget head', 'budget_head'),
+  'budget_head.deleted': action('removed a budget head', 'budget_head'),
   'invoice.updated': action('edited a vendor invoice', 'invoice'),
   'invoice.submitted': action('submitted an invoice for approval', 'invoice'),
   'invoice.approved': action('approved an invoice', 'invoice'),
@@ -142,6 +145,7 @@ export const AUDIT_ACTIONS = {
   'report_schedule.created': action('scheduled a report', 'report_schedule'),
   'report_schedule.updated': action('updated a report schedule', 'report_schedule'),
   'report_schedule.toggled': action('paused or resumed a report schedule', 'report_schedule'),
+  'report_schedule.run': action('ran a report schedule now', 'report_schedule'),
   'report_schedule.deleted': action('deleted a report schedule', 'report_schedule'),
 
   'ai.key_saved': action('saved an AI provider key', 'ai_settings'),

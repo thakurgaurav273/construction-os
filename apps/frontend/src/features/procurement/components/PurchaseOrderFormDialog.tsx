@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import {
@@ -13,6 +13,7 @@ import { useProjects } from '@/hooks/api/use-projects';
 import { useCreatePurchaseOrder, useUpdatePurchaseOrder, useVendors } from '@/hooks/api/use-procurement';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { PRIORITY_OPTIONS, PROCUREMENT_CATEGORIES } from '../constants';
+import { CategorySelect } from '@/features/finance/components/CategorySelect';
 import type { PurchaseOrder, Vendor } from '../types';
 import {
   purchaseOrderSchema, toPurchaseOrderFormValues, toPurchaseOrderInput, type PurchaseOrderFormValues,
@@ -50,6 +51,7 @@ export function PurchaseOrderFormDialog({
 
   const activeVendors = vendors.filter((option) => option.status === 'ACTIVE' || option.id === order?.vendor?.id);
   const categories = [...new Set([order?.category, prefill?.category, ...PROCUREMENT_CATEGORIES].filter((value): value is string => !!value))];
+  const selectedProjectId = useWatch({ control, name: 'projectId' });
 
   // Reset only as the dialog opens; background refetches must not wipe in-progress edits.
   const wasOpen = useRef(false);
@@ -110,12 +112,7 @@ export function PurchaseOrderFormDialog({
             </FormField>
             <FormField label="Category" error={errors.category?.message}>
               <Controller control={control} name="category" render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger aria-label="Category"><SelectValue placeholder="Select a category" /></SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => <SelectItem key={category} value={category}>{category}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <CategorySelect projectId={selectedProjectId || undefined} value={field.value} onChange={field.onChange} fallbackCategories={categories} />
               )} />
             </FormField>
             <FormField label="Priority">

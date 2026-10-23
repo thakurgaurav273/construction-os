@@ -1,32 +1,79 @@
 import { Injectable } from '@nestjs/common';
+import type { Permission } from '@sitepilot/types';
 import { PrismaService } from '../../database/prisma.service';
 import { WorkforceService } from '../workforce/workforce.service';
-import { subMonths, format } from 'date-fns';
+import { PendingApprovals, PendingApprovalsService } from './pending-approvals.service';
+import { SpendTrendPoint, spendTrend } from './spend-trend';
+
+const LIVE_STATUSES = ['ACTIVE', 'PLANNING'];
+const NEW_PROJECT_WINDOW_DAYS = 30;
+
+export interface DashboardMember {
+  id: string;
+  organizationId: string;
+  permissions: Permission[];
+}
+
+export interface DashboardProject {
+  id: string;
+  name: string;
+  status: string;
+  priority: string;
+  progress: number;
+  budget: number | null;
+  spent: number;
+  location: string | null;
+  expectedCompletion: Date | null;
+  memberCount: number;
+  clientName: string | null;
+}
+
+export interface DashboardActivity {
+  id: string;
+  type: string;
+  title: string;
+  description: string | null;
+  createdAt: Date;
+  actor: { id: string; name: string; avatar: string | null };
+}
+
+export interface DashboardStats {
+  activeProjects: number;
+  totalProjects: number;
+  newProjects: number;
+  budgetUtilization: number;
+  totalBudget: number;
+  totalSpent: number;
+  approvals: PendingApprovals;
+  workforceToday: number;
+  workforceTotal: number;
+  workforceNotMarked: number;
+  projects: DashboardProject[];
+  recentActivity: DashboardActivity[];
+  /** Null for members without finance access: payments are finance data. */
+  spendTrend: SpendTrendPoint[] | null;
+}
 
 @Injectable()
 export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly workforce: WorkforceService,
+    private readonly approvals: PendingApprovalsService,
   ) {}
 
-  async getStats(organizationId: string) {
-    const [projects, recentActivities, workforceStats] = await Promise.all([
+  async getStats(member: DashboardMember): Promise<DashboardStats> {
+    const { organizationId } = member;
+    const canSeeFinance = member.permissions.includes('finance.view');
+    const today = new Date();
+    const [projects, recentActivities, workforceStats, approvals, paidPayments] = await Promise.all([
       this.prisma.project.findMany({
         where: { organizationId, deletedAt: null },
         select: {
-          id: true,
-          name: true,
-          status: true,
-          budget: true,
-          spent: true,
-          progress: true,
-          location: true,
-          expectedCompletion: true,
-          priority: true,
-          clientName: true,
-          members: { select: { id: true } },
+          id: true, name: true, status: true, budget: true, spent: true, progress: true, location: true, startDate: true,
+          expectedCompletion: true, priority: true, clientName: true, createdAt: true, members: { select: { id: true } },
         },
+        orderBy: { updatedAt: 'desc' },
       }),
       this.prisma.activity.findMany({
         where: { organizationId },
@@ -35,75 +82,50 @@ export class DashboardService {
         include: { actor: { select: { id: true, name: true, avatar: true } } },
       }),
       this.workforce.getStats(organizationId),
+      this.approvals.forMember(member),
+      canSeeFinance
+        ? this.prisma.payment.findMany({ where: { organizationId, status: 'PAID' }, select: { amount: true, paidDate: true } })
+        : Promise.resolve(null),
     ]);
 
-    const activeProjects = projects.filter((p) =>
-      ['ACTIVE', 'PLANNING'].includes(p.status),
-    );
-    const totalBudget = projects.reduce(
-      (sum, p) => sum + (p.budget ? Number(p.budget) : 0),
-      0,
-    );
-    const totalSpent = projects.reduce((sum, p) => sum + Number(p.spent), 0);
-    const budgetUtilization =
-      totalBudget > 0
-        ? Math.round((totalSpent / totalBudget) * 1000) / 10
-        : 0;
-
-    const budgetTrend = this.computeBudgetTrend(totalBudget, totalSpent);
+    const liveProjects = projects.filter((project) => LIVE_STATUSES.includes(project.status));
+    const newSince = new Date(today.getTime() - NEW_PROJECT_WINDOW_DAYS * 24 * 3600 * 1000);
+    const totalBudget = projects.reduce((sum, project) => sum + (project.budget ? Number(project.budget) : 0), 0);
+    const totalSpent = projects.reduce((sum, project) => sum + Number(project.spent), 0);
 
     return {
-      activeProjects: activeProjects.length,
+      activeProjects: liveProjects.length,
       totalProjects: projects.length,
-      budgetUtilization,
+      newProjects: projects.filter((project) => project.createdAt >= newSince).length,
+      budgetUtilization: totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 1000) / 10 : 0,
       totalBudget,
       totalSpent,
-      pendingApprovals: 0,
+      approvals,
       workforceToday: workforceStats.presentToday,
       workforceTotal: workforceStats.total,
       workforceNotMarked: workforceStats.notMarkedToday,
-      projects: projects.map((p) => ({
-        id: p.id,
-        name: p.name,
-        status: p.status,
-        priority: p.priority,
-        progress: p.progress,
-        budget: p.budget ? Number(p.budget) : null,
-        spent: Number(p.spent),
-        location: p.location,
-        expectedCompletion: p.expectedCompletion,
-        memberCount: p.members.length,
-        clientName: p.clientName,
+      projects: liveProjects.slice(0, 5).map((project) => ({
+        id: project.id,
+        name: project.name,
+        status: project.status,
+        priority: project.priority,
+        progress: project.progress,
+        budget: project.budget ? Number(project.budget) : null,
+        spent: Number(project.spent),
+        location: project.location,
+        expectedCompletion: project.expectedCompletion,
+        memberCount: project.members.length,
+        clientName: project.clientName,
       })),
-      recentActivity: recentActivities.map((a) => ({
-        id: a.id,
-        type: a.type,
-        title: a.title,
-        description: a.description,
-        createdAt: a.createdAt,
-        actor: a.actor,
+      recentActivity: recentActivities.map((activity) => ({
+        id: activity.id,
+        type: activity.type,
+        title: activity.title,
+        description: activity.description,
+        createdAt: activity.createdAt,
+        actor: activity.actor,
       })),
-      budgetTrend,
+      spendTrend: paidPayments ? spendTrend(projects, paidPayments, today) : null,
     };
-  }
-
-  private computeBudgetTrend(
-    totalBudget: number,
-    totalSpent: number,
-  ): { month: string; budget: number; spend: number }[] {
-    const now = new Date();
-    const months = 7;
-    const monthlyBudget = totalBudget / 12;
-    const monthlySpend = totalSpent / months;
-
-    return Array.from({ length: months }, (_, i) => {
-      const d = subMonths(now, months - 1 - i);
-      const variance = 0.85 + Math.sin(i * 1.3) * 0.12;
-      return {
-        month: format(d, 'MMM'),
-        budget: Math.round(monthlyBudget),
-        spend: Math.round(monthlySpend * variance),
-      };
-    });
   }
 }

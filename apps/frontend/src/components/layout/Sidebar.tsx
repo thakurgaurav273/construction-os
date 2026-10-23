@@ -116,7 +116,7 @@ export function Sidebar() {
       initial={false}
       animate={{ width: isCollapsed ? 72 : 240 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className="relative flex flex-col border-r bg-sidebar h-screen z-20 hidden md:flex shrink-0 overflow-hidden"
+      className="relative flex flex-col border-r bg-sidebar h-screen z-20 hidden md:flex shrink-0"
     >
       {/* Logo */}
       <div className="flex h-16 items-center px-4 border-b border-sidebar-border shrink-0">
@@ -156,10 +156,11 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Collapse toggle */}
+      {/* Collapse toggle: straddles the sidebar's edge on the line under the logo, so the container must not clip. */}
       <button
+        type="button"
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-[4.5rem] flex h-6 w-6 items-center justify-center rounded-full border bg-background shadow-sm hover:bg-accent text-muted-foreground z-30 shrink-0"
+        className="absolute -right-3 top-16 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full border bg-background shadow-sm hover:bg-accent hover:text-foreground text-muted-foreground z-30 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}

@@ -2,6 +2,7 @@ import {
   BadRequestException, ConflictException, Injectable, NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { findOpenProject } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
 import { normalizeOptionalText } from '../../common/utils/normalize-text';
 import {
@@ -22,7 +23,7 @@ export class WarehouseSetupService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(organizationId: string, dto: CreateWarehouseDto): Promise<{ id: string }> {
-    await this.assertProject(organizationId, dto.projectId);
+    if (dto.projectId) await findOpenProject(this.prisma, dto.projectId, organizationId, 'link a store to it');
     try {
       return await this.prisma.warehouse.create({
         data: {
@@ -44,8 +45,10 @@ export class WarehouseSetupService {
   }
 
   async update(id: string, organizationId: string, dto: UpdateWarehouseDto): Promise<{ id: string }> {
-    await this.findWarehouse(id, organizationId);
-    await this.assertProject(organizationId, dto.projectId);
+    const store = await this.findWarehouse(id, organizationId);
+    if (dto.projectId && dto.projectId !== store.projectId) {
+      await findOpenProject(this.prisma, dto.projectId, organizationId, 'link a store to it');
+    }
     try {
       return await this.prisma.warehouse.update({
         where: { id },
@@ -136,10 +139,10 @@ export class WarehouseSetupService {
     return { id: locationId };
   }
 
-  private async findWarehouse(id: string, organizationId: string): Promise<{ id: string; name: string }> {
+  private async findWarehouse(id: string, organizationId: string): Promise<{ id: string; name: string; projectId: string | null }> {
     const warehouse = await this.prisma.warehouse.findFirst({
       where: { id, organizationId, deletedAt: null },
-      select: { id: true, name: true },
+      select: { id: true, name: true, projectId: true },
     });
     if (!warehouse) throw new NotFoundException('Store not found');
     return warehouse;
@@ -154,14 +157,6 @@ export class WarehouseSetupService {
     if (!location) throw new NotFoundException('Bin location not found');
   }
 
-  private async assertProject(organizationId: string, projectId: string | null | undefined): Promise<void> {
-    if (!projectId) return;
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, organizationId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!project) throw new BadRequestException('Choose a project from your organization.');
-  }
 }
 
 function toCodeConflict(error: unknown, kind: 'store' | 'bin', code: string): unknown {

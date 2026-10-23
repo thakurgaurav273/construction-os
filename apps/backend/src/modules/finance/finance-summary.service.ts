@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { monthKey, roundMoney, toNumber, wholeDaysBetween } from '../procurement/procurement-math';
 import { ATTENTION_LIMIT, DUE_SOON_DAYS } from './finance.constants';
+import { BudgetService } from './budget.service';
 import { InvoicesService } from './invoices.service';
 
 /** Budget lines at or above this utilization are called out as overrun risks. */
@@ -37,14 +38,15 @@ export class FinanceSummaryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly invoices: InvoicesService,
+    private readonly budgets: BudgetService,
   ) {}
 
   async getSummary(organizationId: string): Promise<FinanceSummary> {
     const today = new Date();
-    const [invoices, payments, budgetItems, latestCashFlow] = await Promise.all([
+    const [invoices, payments, budgetLines, latestCashFlow] = await Promise.all([
       this.invoices.findAll(organizationId, {}),
       this.prisma.payment.findMany({ where: { organizationId }, select: { amount: true, status: true, paidDate: true } }),
-      this.prisma.budgetItem.findMany({ where: { organizationId }, include: { project: { select: { name: true } } } }),
+      this.budgets.lines(organizationId),
       this.prisma.cashFlowEntry.findFirst({ where: { organizationId }, orderBy: [{ year: 'desc' }, { month: 'desc' }] }),
     ]);
 
@@ -64,18 +66,6 @@ export class FinanceSummaryService {
       .filter((payment) => payment.status === 'PAID' && payment.paidDate && monthKey(payment.paidDate) === month)
       .map((payment) => toNumber(payment.amount)));
 
-    const budgetLines = budgetItems.map((item) => {
-      const allocated = toNumber(item.allocated);
-      const spent = toNumber(item.spent);
-      return {
-        projectName: item.project.name,
-        category: item.category,
-        allocated,
-        spent,
-        committed: toNumber(item.committed),
-        utilizationPercent: allocated > 0 ? Math.round((spent / allocated) * 100) : 0,
-      };
-    });
     const allocated = sum(budgetLines.map((line) => line.allocated));
     const spent = sum(budgetLines.map((line) => line.spent));
     const committed = sum(budgetLines.map((line) => line.committed));

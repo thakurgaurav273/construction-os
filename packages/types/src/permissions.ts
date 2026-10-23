@@ -26,6 +26,7 @@ export type Permission =
   | 'po.approve'
   | 'delivery.receive'
   | 'finance.view'
+  | 'budget.manage'
   | 'invoice.create'
   | 'invoice.approve'
   | 'payment.request'
