@@ -37,5 +37,6 @@ import { VendorsService } from './vendors.service';
     ProcurementSummaryService,
     ProcurementAnalyticsService,
   ],
+  exports: [VendorsService, PurchaseOrdersService],
 })
 export class ProcurementModule {}

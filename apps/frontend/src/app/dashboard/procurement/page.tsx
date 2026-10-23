@@ -13,6 +13,7 @@ import {
 import { useProjects } from '@/hooks/api/use-projects';
 import { useCan } from '@/hooks/api/use-access';
 import { downloadCsv } from '@/lib/download-csv';
+import { ImportButton } from '@/features/data-import/components/ImportButton';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { buildProcurementInsights, type ProcurementInsight } from '@/features/procurement/utils/insights';
 import { PurchaseOrderFormDialog } from '@/features/procurement/components/PurchaseOrderFormDialog';
@@ -124,6 +125,7 @@ export default function ProcurementPage(): React.ReactElement {
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-1.5 h-4 w-4" /> Export
           </Button>
+          <ImportButton />
           {can('vendor.manage') && (
             <Button variant="outline" onClick={() => setCreateDialog('vendor')}>
               <Building2 className="mr-1.5 h-4 w-4" /> Add Vendor

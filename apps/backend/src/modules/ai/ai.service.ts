@@ -5,7 +5,7 @@ import { AiAccessService } from './ai-access.service';
 import { AiMessage, AiProviderError } from './providers/ai-provider';
 import { ProviderRegistry } from './providers/provider-registry';
 
-export type AiFeature = 'project_chat' | 'org_chat' | 'daily_report_summary' | 'insights';
+export type AiFeature = 'project_chat' | 'org_chat' | 'daily_report_summary' | 'insights' | 'import_mapping';
 
 export interface AiCallContext {
   organizationId: string;

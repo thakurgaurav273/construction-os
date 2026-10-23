@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Bell, Building2, Users, Shield, Palette, Plug, Sparkles, History, Trash2, CheckCircle2, Settings2, Mail } from 'lucide-react';
+import { Bell, Building2, Users, Shield, Palette, Plug, Sparkles, History, Trash2, CheckCircle2, Settings2, Mail, FileSpreadsheet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@sitepilot/ui';
 import { Button } from '@sitepilot/ui';
 import { Input } from '@sitepilot/ui';
@@ -35,6 +35,7 @@ import { NotificationPreferencesTab } from '@/features/notifications/components/
 import { AiSettingsTab } from '@/features/ai/components/AiSettingsTab';
 import { BrandingTab } from '@/features/branding/components/BrandingTab';
 import { OrganizationSettingsTab } from '@/features/settings/components/OrganizationSettingsTab';
+import { ImportTemplatesTab } from '@/features/data-import/components/ImportTemplatesTab';
 
 /** Must match OrgRole on the backend. */
 const ROLES = ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'SITE_ENGINEER', 'STORE_MANAGER', 'PROCUREMENT', 'FINANCE', 'VIEWER'] as const;
@@ -47,6 +48,7 @@ const tabs = [
   { id: 'branding', name: 'Branding', icon: Palette },
   { id: 'integrations', name: 'Integrations', icon: Plug },
   { id: 'ai', name: 'AI', icon: Sparkles },
+  { id: 'data-import', name: 'Data Import', icon: FileSpreadsheet },
   { id: 'audit', name: 'Audit Logs', icon: History },
 ];
 
@@ -293,7 +295,9 @@ export default function SettingsPage() {
 
           {activeTab === 'branding' && <BrandingTab />}
 
-          {activeTab !== 'organization' && activeTab !== 'members' && activeTab !== 'audit' && activeTab !== 'notifications' && activeTab !== 'ai' && activeTab !== 'branding' && (
+          {activeTab === 'data-import' && <ImportTemplatesTab />}
+
+          {activeTab !== 'organization' && activeTab !== 'members' && activeTab !== 'audit' && activeTab !== 'notifications' && activeTab !== 'ai' && activeTab !== 'branding' && activeTab !== 'data-import' && (
             <Card className="border-dashed border-border/60 bg-gradient-to-b from-muted/10 to-muted/30 shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)]">
               <div className="flex flex-col items-center justify-center p-20 text-center text-muted-foreground">
                 <div className="h-16 w-16 rounded-2xl bg-background border shadow-sm flex items-center justify-center mb-6">

@@ -12,5 +12,6 @@ import { ProjectMaterialsService } from './project-materials.service';
   imports: [DatabaseModule, AuthModule, InventoryModule],
   controllers: [MaterialsController, ProjectMaterialsController],
   providers: [MaterialsService, MaterialsDashboardService, ProjectMaterialsService],
+  exports: [MaterialsService],
 })
 export class MaterialsModule {}

@@ -180,6 +180,7 @@ model Organization {
   aiUsage                 AiUsage[]
   aiInsightSnapshots      AiInsightSnapshot[]
   aiConversations         AiConversation[]
+  importTemplates         ImportTemplate[]
 
   @@map("organizations")
 }
@@ -1070,6 +1071,8 @@ model PurchaseOrder {
   amount           Decimal             @default(0) @db.Decimal(15, 2)
   deliveryAddress  String              @default("")
   notes            String              @default("")
+  /// The organization's own order number when the order was imported from their spreadsheet.
+  externalReference String?
   submittedAt      DateTime?
   reviewedAt       DateTime?
   reviewNote       String?
@@ -1093,6 +1096,7 @@ model PurchaseOrder {
   invoices     Invoice[]
 
   @@unique([poNumber, organizationId])
+  @@unique([externalReference, organizationId])
   @@index([organizationId])
   @@index([organizationId, status])
   @@index([projectId])
@@ -1705,4 +1709,39 @@ model AiChatMessage {
 
   @@index([conversationId, createdAt])
   @@map("ai_chat_messages")
+}
+
+enum ImportEntity {
+  MATERIAL
+  VENDOR
+  OPENING_STOCK
+  PURCHASE_ORDER
+}
+
+/// How one organization's spreadsheet layout maps onto SitePilot fields. Learned once (AI-assisted), then
+/// reused deterministically for every later upload whose header row matches `headerSignature`.
+model ImportTemplate {
+  id              String       @id @default(uuid())
+  name            String
+  entity          ImportEntity
+  /// Normalized header row, used to recognise the same layout on the next upload.
+  headerSignature String
+  /// 1-based row holding the column headings.
+  headerRow       Int
+  /// The headings in sheet order, so exports can reproduce the layout.
+  headers         String[]
+  /// { columns: { field: heading }, defaults: { field: value }, values: { field: { sheetValue: value } } }
+  mapping         Json
+  lastUsedAt      DateTime?
+  organizationId  String
+  createdById     String?
+  updatedById     String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, entity, name])
+  @@index([organizationId, entity, headerSignature])
+  @@map("import_templates")
 }
