@@ -15,6 +15,8 @@ export const AUDIT_ACTIONS = {
   'auth.signed_in': action('signed in', 'user'),
   'auth.password_reset': action('reset their password', 'user'),
   'organization.updated': action('updated organization settings', 'organization'),
+  'organization.logo_updated': action('uploaded a new organization logo', 'organization'),
+  'organization.logo_removed': action('removed the organization logo', 'organization'),
   'invitation.accepted': action('joined the organization', 'user'),
 
   'member.role_changed': action('changed a member\'s role', 'member'),
@@ -26,6 +28,11 @@ export const AUDIT_ACTIONS = {
   'project.created': action('created a project', 'project'),
   'project.updated': action('updated a project', 'project'),
   'project.member_added': action('added a member to a project', 'project'),
+  'project.member_role_changed': action('changed a project member\'s role', 'project'),
+  'project.member_removed': action('removed a member from a project', 'project'),
+  'project.archived': action('archived a project', 'project'),
+  'project.restored': action('restored a project', 'project'),
+  'project.deleted': action('deleted a project', 'project'),
 
   'daily_report.created': action('created a daily report', 'daily_report'),
   'daily_report.updated': action('edited a daily report', 'daily_report'),

@@ -280,6 +280,10 @@ model Project {
   startDate          DateTime?
   expectedCompletion DateTime?
   actualCompletion   DateTime?
+  /// Status to return to when an archived project is restored.
+  archivedFromStatus ProjectStatus?
+  archivedAt         DateTime?
+  deletedById        String?
   organizationId     String
   createdById        String
   createdAt          DateTime        @default(now())

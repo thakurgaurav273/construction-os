@@ -1,7 +1,12 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, HttpCode } from '@nestjs/common';
+import {
+  Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, HttpCode, UploadedFile, UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SettingsService } from './settings.service';
+import { MAX_LOGO_BYTES, OrganizationSettingsService, OrganizationSettingsView } from './organization-settings.service';
+import { UpdateOrganizationSettingsDto } from './dto/organization.dto';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 import { ChangeMemberRoleDto, InviteMemberDto } from './dto/member.dto';
 import { Audit } from '../../common/audit';
@@ -11,7 +16,38 @@ interface AuthUser { id: string; organizationId: string }
 @Controller('settings')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class SettingsController {
-  constructor(private readonly settings: SettingsService) {}
+  constructor(
+    private readonly settings: SettingsService,
+    private readonly organization: OrganizationSettingsService,
+  ) {}
+
+  @Get('organization')
+  getOrganization(@CurrentUser() user: AuthUser): Promise<OrganizationSettingsView> {
+    return this.organization.get(user.organizationId);
+  }
+
+  @RequirePermission('organization.manage')
+  @Audit('organization.updated')
+  @Patch('organization')
+  updateOrganization(@CurrentUser() user: AuthUser, @Body() dto: UpdateOrganizationSettingsDto): Promise<OrganizationSettingsView> {
+    return this.organization.update(user.organizationId, dto);
+  }
+
+  @RequirePermission('organization.manage')
+  @Audit('organization.logo_updated')
+  @Post('organization/logo')
+  // The limit here stops oversized uploads before they are buffered; the service checks type and size again.
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_LOGO_BYTES + 1 } }))
+  uploadLogo(@CurrentUser() user: AuthUser, @UploadedFile() file: Express.Multer.File | undefined): Promise<OrganizationSettingsView> {
+    return this.organization.uploadLogo(user.organizationId, file);
+  }
+
+  @RequirePermission('organization.manage')
+  @Audit('organization.logo_removed')
+  @Delete('organization/logo')
+  removeLogo(@CurrentUser() user: AuthUser): Promise<OrganizationSettingsView> {
+    return this.organization.removeLogo(user.organizationId);
+  }
 
   @Get('members')
   getMembers(@CurrentUser() user: AuthUser) {

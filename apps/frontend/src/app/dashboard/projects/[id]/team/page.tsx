@@ -2,28 +2,31 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, MoreHorizontal, Users } from 'lucide-react';
+import { AlertTriangle, Mail, Users } from 'lucide-react';
 import { Card, CardContent, Button, Skeleton } from '@sitepilot/ui';
 import { useProject } from '@/hooks/api/use-projects';
 import { getInitials } from '@/lib/utils';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { AddMemberDialog } from '../../components/AddMemberDialog';
-import { Can } from '@/components/shared/Can';
+import { useCan } from '@/hooks/api/use-access';
+import { ProjectMemberMenu } from '../../components/ProjectMemberMenu';
 
 function roleLabel(role: string): string {
   return role.charAt(0) + role.slice(1).toLowerCase();
 }
 
 export default function ProjectTeamPage({ params }: { params: { id: string } }) {
-  const { data: project, isLoading } = useProject(params.id);
+  const { data: project, isLoading, isError, refetch } = useProject(params.id);
   const [addOpen, setAddOpen] = useState(false);
   const members = project?.members ?? [];
+  const isArchived = project?.status === 'ARCHIVED';
+  const canManage = useCan()('project.members.manage') && !isArchived;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-semibold tracking-tight">Project Team</h3>
-        <Can permission="project.members.manage"><Button onClick={() => setAddOpen(true)}>Add Member</Button></Can>
+        {canManage && <Button onClick={() => setAddOpen(true)}>Add Member</Button>}
       </div>
 
       {isLoading ? (
@@ -39,12 +42,19 @@ export default function ProjectTeamPage({ params }: { params: { id: string } }) 
             </Card>
           ))}
         </div>
+      ) : isError ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title="Unable to load the project team"
+          description="Check your connection and try again."
+          action={<Button variant="outline" onClick={() => refetch()}>Retry</Button>}
+        />
       ) : members.length === 0 ? (
         <EmptyState
           icon={Users}
           title="No team members yet"
           description="Assign engineers, managers, and viewers to this project to see them here."
-          action={<Can permission="project.members.manage"><Button onClick={() => setAddOpen(true)}>Add Member</Button></Can>}
+          action={canManage ? <Button onClick={() => setAddOpen(true)}>Add Member</Button> : undefined}
         />
       ) : (
         <motion.div
@@ -63,11 +73,9 @@ export default function ProjectTeamPage({ params }: { params: { id: string } }) 
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start">
                     <div className="h-16 w-16 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xl font-bold mb-4">
-                      {member.user.avatar || getInitials(member.user.name)}
+                      {getInitials(member.user.name)}
                     </div>
-                    <Button variant="ghost" size="icon" className="-mt-2 -mr-2">
-                      <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                    </Button>
+                    {canManage && <ProjectMemberMenu projectId={params.id} member={member} />}
                   </div>
                   <h4 className="font-semibold text-lg">{member.user.name}</h4>
                   <p className="text-sm text-primary mb-4 font-medium">{roleLabel(member.role)}</p>

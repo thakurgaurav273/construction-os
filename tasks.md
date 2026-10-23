@@ -138,11 +138,17 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 - [ ] Budget line items CRUD linked to project budget
 - [ ] Fix KPI formatting (currency, variance %), error state
 
-### T13. Projects & Settings
-- [ ] Project archive/delete, remove member, change member role, list pagination
-- [ ] Remove "Coming Soon" `[tab]` route
-- [ ] Settings → Organization tab wired to `PATCH /auth/organization` + real logo upload
-- [ ] Error states on projects list, budget, team, timeline
+### T13. Projects & Settings  `[x]`
+- [x] Archive / restore (back to the previous status), delete only for projects with no history (new `project.delete` permission, code freed for reuse), remove member (never the last project manager), change project role
+- [x] Server-side pagination, search, status and priority filters, sorting; archived projects hidden by default; `GET /projects/options` for pickers (archived excluded)
+- [x] Archived projects are read-only for project details and team, with a banner and Restore in the project menu
+- [x] Remove "Coming Soon" `[tab]` route; Timeline's dead Export button removed
+- [x] Settings → Organization tab wired to `GET/PATCH /settings/organization` (validated GSTIN, currency, IANA time zone) + logo upload/remove (PNG/JPG/WebP ≤ 2 MB, signed URLs); onboarding uses the same endpoint; `PATCH /auth/organization` removed; header shows the real organization name
+- [x] Error states on projects list, project layout (covers budget, team, timeline), team, organization settings
+- [ ] Block new work (POs, reports, issues, attendance…) on archived projects in the other modules; today they're only hidden from pickers
+- [ ] Verify logo upload against running MinIO/R2 (validation paths tested; storage write not exercised locally)
+
+> Verified 2026-10-23: 41 HTTP checks (pagination, search, sort, options, archive/restore/delete rules, permissions, team changes, organization validation, logo validation, audit entries) and a headless-browser run (search, archive banner, restore, team role change, organization save updating the sidebar).
 
 ---
 

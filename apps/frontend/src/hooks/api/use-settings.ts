@@ -107,3 +107,65 @@ export function useCancelInvitation() {
     },
   });
 }
+export interface OrganizationSettings {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  address: string | null;
+  gstNumber: string | null;
+  currency: string;
+  timezone: string;
+}
+
+export interface OrganizationSettingsInput {
+  name: string;
+  address: string | null;
+  gstNumber: string | null;
+  currency: string;
+  timezone: string;
+}
+
+const ORGANIZATION_KEY = ['settings', 'organization'] as const;
+
+export function useOrganizationSettings() {
+  return useQuery<OrganizationSettings>({
+    queryKey: ORGANIZATION_KEY,
+    queryFn: async () => {
+      const res = await apiClient.get('/settings/organization');
+      return res.data.data ?? res.data;
+    },
+    staleTime: 60_000,
+  });
+}
+
+function useOrganizationMutation<TVariables>(request: (variables: TVariables) => Promise<OrganizationSettings>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: request,
+    onSuccess: (organization) => queryClient.setQueryData(ORGANIZATION_KEY, organization),
+  });
+}
+
+export function useUpdateOrganizationSettings() {
+  return useOrganizationMutation(async (input: OrganizationSettingsInput) => {
+    const res = await apiClient.patch('/settings/organization', input);
+    return res.data.data ?? res.data;
+  });
+}
+
+export function useUploadOrganizationLogo() {
+  return useOrganizationMutation(async (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await apiClient.post('/settings/organization/logo', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return res.data.data ?? res.data;
+  });
+}
+
+export function useRemoveOrganizationLogo() {
+  return useOrganizationMutation<void>(async () => {
+    const res = await apiClient.delete('/settings/organization/logo');
+    return res.data.data ?? res.data;
+  });
+}

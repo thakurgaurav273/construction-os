@@ -2,12 +2,12 @@
 
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@sitepilot/ui';
-import type { Project } from '@/hooks/api/use-projects';
+import type { ProjectOption } from '@/hooks/api/use-projects';
 
 interface SelectProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projects: Project[];
+  projects: ProjectOption[];
   isLoading: boolean;
 }
 

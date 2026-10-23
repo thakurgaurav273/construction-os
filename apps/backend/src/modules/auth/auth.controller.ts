@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Get, HttpCode, HttpStatus, Logger, Patch, Post, Req, Res, UseGuards,
+  Body, Controller, Get, HttpCode, HttpStatus, Logger, Post, Req, Res, UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
@@ -10,11 +10,9 @@ import { AuthService, SessionView } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password.dto';
 import { RegisterDto } from './dto/register.dto';
-import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PasswordResetService } from './password-reset.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 import { AuthenticatedUser } from './strategies/jwt.strategy';
 import { Audit } from '../../common/audit';
 
@@ -101,13 +99,5 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   getMe(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
     return user;
-  }
-
-  @Audit('organization.updated')
-  @Patch('organization')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermission('organization.manage')
-  updateOrganization(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateOrganizationDto) {
-    return this.authService.updateOrganization(user.organizationId, dto);
   }
 }

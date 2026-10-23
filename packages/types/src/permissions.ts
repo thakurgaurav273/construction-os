@@ -6,6 +6,7 @@
 export type Permission =
   | 'project.create'
   | 'project.update'
+  | 'project.delete'
   | 'project.members.manage'
   | 'dailyReport.write'
   | 'dailyReport.approve'

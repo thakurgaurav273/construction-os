@@ -5,7 +5,6 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
-import type { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { TokenPair, TokenService } from './token.service';
 
 export const PASSWORD_HASH_ROUNDS = 12;
@@ -98,19 +97,6 @@ export class AuthService {
 
   async logout(refreshToken: string | undefined): Promise<void> {
     if (refreshToken) await this.tokens.revoke(refreshToken);
-  }
-
-  async updateOrganization(organizationId: string, dto: UpdateOrganizationDto): Promise<{ success: true; organization: Organization }> {
-    const organization = await this.prisma.organization.update({
-      where: { id: organizationId },
-      data: {
-        ...(dto.address !== undefined && { address: dto.address }),
-        ...(dto.gstNumber !== undefined && { gstNumber: dto.gstNumber }),
-        ...(dto.currency !== undefined && { currency: dto.currency }),
-        ...(dto.timezone !== undefined && { timezone: dto.timezone }),
-      },
-    });
-    return { success: true, organization };
   }
 
   /** Emails are stored as typed by older sign-ups, so match without case. */

@@ -3,7 +3,7 @@
 import { Bell, Search, Menu, CheckCircle2, AlertTriangle, FileText, Check, UserCircle } from 'lucide-react';
 import { Button } from '@sitepilot/ui';
 import { usePathname } from 'next/navigation';
-import { company } from '@/data/demo';
+import { useAuthStore } from '@/store/auth.store';
 
 import {
   DropdownMenu,
@@ -21,6 +21,7 @@ import { UserMenu } from '@/features/auth/components/UserMenu';
 
 export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void, onSearchClick: () => void }) {
   const pathname = usePathname();
+  const organizationName = useAuthStore((state) => state.organization?.name);
   const { theme, setTheme } = useTheme();
   
   // Decoupled from direct demo store, now using API hooks layer
@@ -64,7 +65,7 @@ export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void
       <div className="flex flex-1 items-center justify-between gap-x-4 self-stretch lg:gap-x-6">
         
         <div className="flex items-center text-sm font-medium text-muted-foreground hidden sm:flex">
-          <span>{company.name}</span>
+          <span>{organizationName ?? 'SitePilot'}</span>
           <span className="mx-2 text-border">/</span>
           <span className="text-foreground">{currentPath}</span>
         </div>

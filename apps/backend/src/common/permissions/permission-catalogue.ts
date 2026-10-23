@@ -9,7 +9,8 @@ export interface PermissionInfo {
 /** Typed as a full Record so adding a Permission without describing it fails to compile. */
 export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
   'project.create': { group: 'Projects', label: 'Create projects' },
-  'project.update': { group: 'Projects', label: 'Edit projects and progress' },
+  'project.update': { group: 'Projects', label: 'Edit, archive and restore projects' },
+  'project.delete': { group: 'Projects', label: 'Delete projects created by mistake' },
   'project.members.manage': { group: 'Projects', label: 'Assign people to projects' },
   'dailyReport.write': { group: 'Site', label: 'Write and submit daily reports' },
   'dailyReport.approve': { group: 'Site', label: 'Approve daily reports' },

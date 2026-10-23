@@ -74,7 +74,7 @@ export const authApi = {
   },
 
   updateOrganization: async (data: UpdateOrganizationPayload) => {
-    const response = await api.patch('/auth/organization', data);
+    const response = await api.patch('/settings/organization', data);
     return response.data.data;
   },
 };

@@ -3,14 +3,16 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Plus, Search, Filter, Building2, Users, Clock, MapPin } from 'lucide-react';
+import { Plus, Search, Filter, Building2, Users, Clock, MapPin, AlertTriangle, ChevronLeft, ChevronRight, Archive } from 'lucide-react';
 import { format } from 'date-fns';
 
 import {
   Button, Input, Badge, Card, CardContent, Progress, Skeleton,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@sitepilot/ui';
-import { useProjects } from '@/hooks/api/use-projects';
+import { useProjectList } from '@/hooks/api/use-projects';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { ProjectFormDialog } from './components/ProjectFormDialog';
 import { Can } from '@/components/shared/Can';
 
@@ -27,10 +29,10 @@ const itemVariants = {
 };
 
 function statusVariant(status: string) {
-  if (status === 'ACTIVE')    return 'default';
-  if (status === 'ON_HOLD')   return 'secondary';
+  if (status === 'ACTIVE') return 'default';
   if (status === 'COMPLETED') return 'outline';
-  return 'destructive';
+  if (status === 'CANCELLED') return 'destructive';
+  return 'secondary';
 }
 
 function statusLabel(status: string) {
@@ -42,23 +44,31 @@ function formatCrore(n: number | null | undefined) {
   return `₹${(n / 10_000_000).toFixed(1)} Cr`;
 }
 
+const PAGE_SIZE = 12;
+
 export default function ProjectsListPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
-  const { data: projects = [], isLoading } = useProjects();
-
-  const query = search.toLowerCase();
-  const filtered = projects.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(query) ||
-      (p.clientName ?? '').toLowerCase().includes(query) ||
-      (p.location ?? '').toLowerCase().includes(query);
-    const matchesStatus = statusFilter === 'ALL' || p.status === statusFilter;
-    const matchesPriority = priorityFilter === 'ALL' || p.priority === priorityFilter;
-    return matchesSearch && matchesStatus && matchesPriority;
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const { data, isLoading, isError, isFetching, refetch } = useProjectList({
+    search: debouncedSearch.trim() || undefined,
+    status: statusFilter === 'ALL' ? undefined : statusFilter,
+    priority: priorityFilter === 'ALL' ? undefined : priorityFilter,
+    page,
+    limit: PAGE_SIZE,
   });
+  const projects = data?.items ?? [];
+  const filtersActive = !!search || statusFilter !== 'ALL' || priorityFilter !== 'ALL';
+
+  function changeFilter(setter: (value: string) => void): (value: string) => void {
+    return (value) => {
+      setter(value);
+      setPage(1);
+    };
+  }
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 max-w-7xl mx-auto">
@@ -66,7 +76,9 @@ export default function ProjectsListPage() {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Projects</h2>
           <p className="text-muted-foreground mt-1">
-            {isLoading ? 'Loading...' : `${projects.length} project${projects.length !== 1 ? 's' : ''} across your organisation`}
+            {isLoading || !data
+              ? 'Loading…'
+              : `${data.total} ${statusFilter === 'ARCHIVED' ? 'archived ' : ''}project${data.total !== 1 ? 's' : ''}${statusFilter === 'ALL' ? ' (archived projects are hidden)' : ''}`}
           </p>
         </div>
         <Can permission="project.create">
@@ -83,23 +95,24 @@ export default function ProjectsListPage() {
             placeholder="Search by name, client, or location..."
             className="pl-9"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search projects"
+            onChange={(e) => changeFilter(setSearch)(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={changeFilter(setStatusFilter)}>
             <SelectTrigger className="w-full sm:w-40">
               <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">All statuses</SelectItem>
+              <SelectItem value="ALL">All except archived</SelectItem>
               {STATUS_FILTERS.map((s) => (
                 <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <Select value={priorityFilter} onValueChange={changeFilter(setPriorityFilter)}>
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
@@ -117,16 +130,23 @@ export default function ProjectsListPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-64 rounded-xl" />)}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : isError ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title="Unable to load projects"
+          description="Check your connection and try again."
+          action={<Button variant="outline" onClick={() => refetch()}>Retry</Button>}
+        />
+      ) : projects.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold">No projects found</h3>
           <p className="text-muted-foreground mt-1">
-            {search || statusFilter !== 'ALL' || priorityFilter !== 'ALL'
+            {filtersActive
               ? 'Try adjusting your search or filters.'
               : 'Create your first project to get started.'}
           </p>
-          {!search && statusFilter === 'ALL' && priorityFilter === 'ALL' && (
+          {!filtersActive && (
             <Can permission="project.create">
               <Button className="mt-4" onClick={() => setCreateOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" /> New Project
@@ -139,9 +159,9 @@ export default function ProjectsListPage() {
           variants={containerVariants}
           initial="hidden"
           animate="show"
-          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+          className={`grid gap-6 md:grid-cols-2 lg:grid-cols-3 ${isFetching ? 'opacity-70 transition-opacity' : ''}`}
         >
-          {filtered.map((project) => (
+          {projects.map((project) => (
             <motion.div key={project.id} variants={itemVariants}>
               <Link href={`/dashboard/projects/${project.id}`}>
                 <Card className="h-full hover:shadow-md transition-all duration-200 group cursor-pointer border-border/50 hover:border-primary/50">
@@ -150,7 +170,8 @@ export default function ProjectsListPage() {
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                         <Building2 className="h-5 w-5" />
                       </div>
-                      <Badge variant={statusVariant(project.status)} className="capitalize text-xs">
+                      <Badge variant={statusVariant(project.status)} className="capitalize text-xs gap-1">
+                        {project.status === 'ARCHIVED' && <Archive className="h-3 w-3" />}
                         {statusLabel(project.status)}
                       </Badge>
                     </div>
@@ -199,6 +220,18 @@ export default function ProjectsListPage() {
             </motion.div>
           ))}
         </motion.div>
+      )}
+
+      {data && data.totalPages > 1 && (
+        <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+          <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Previous page" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span>Page {data.page} of {data.totalPages}</span>
+          <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Next page" disabled={page >= data.totalPages} onClick={() => setPage(page + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       )}
 
       <ProjectFormDialog open={createOpen} onOpenChange={setCreateOpen} />

@@ -969,6 +969,39 @@ The handbook requires an immutable audit log (actor, action, timestamp, metadata
 
 ---
 
+# ADR-025 - Archiving and Deleting Projects
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-23
+
+---
+
+## Context
+
+Finished or abandoned projects cluttered every list and picker, and there was no way to remove a project created by mistake. Construction records (reports, orders, bills, stock, attendance) have to stay retrievable for years.
+
+---
+
+## Decision
+
+- **Archive is the normal way out.** It sets status `ARCHIVED`, remembers the previous status (`archivedFromStatus`) and the time. Archived projects are hidden from the default list and from every picker (`GET /projects/options`) but remain readable. Their details and team can't change until restored. Restore returns the previous status. Needs `project.update`.
+- **Delete is only for mistakes.** It's refused while the project has any daily reports, purchase orders, invoices, payments, material issues, attendance, documents, assigned workers or site stores, and the error names what's there. It's a soft delete that renames the code (`CODE~deleted-xxxx`) so the code can be reused. Needs the new `project.delete` permission (owners and admins).
+- `GET /projects` is paginated on the server (search, status, priority, sort). Pickers use the separate lightweight options endpoint instead of paging.
+
+---
+
+## Consequences
+
+- Other modules don't yet refuse new records on an archived project; they only stop offering it in pickers. Enforcing that belongs in each module's project check.
+- A project always keeps at least one project manager on its team.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.
