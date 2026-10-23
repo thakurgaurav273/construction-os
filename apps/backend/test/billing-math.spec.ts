@@ -37,3 +37,28 @@ describe('bill totals', () => {
     assert.equal(totals.netAmount, 155_500);
   });
 });
+
+describe('settlement', () => {
+  it('raises a vendor bill whose total equals the RA bill net to the paisa', async () => {
+    const { invoiceTotals } = await import('../src/modules/finance/invoice.mapper');
+    const work = [{ quantity: 27.6, rate: 1833.33 }, { quantity: 647.885, rate: 85 }, { quantity: 0.331, rate: 400.07 }];
+    const adjustments = [
+      { effect: 'ADD' as const, calculation: 'PERCENT' as const, value: 9 },
+      { effect: 'ADD' as const, calculation: 'PERCENT' as const, value: 9 },
+      { effect: 'DEDUCT' as const, calculation: 'PERCENT' as const, value: 1 },
+      { effect: 'DEDUCT' as const, calculation: 'PERCENT' as const, value: 5 },
+      { effect: 'DEDUCT' as const, calculation: 'FIXED' as const, value: 2000 },
+    ];
+    const totals = billTotals(work.map((line) => Math.round(line.quantity * line.rate * 100) / 100), adjustments);
+    const invoice = invoiceTotals([
+      ...work.map((line) => ({ ...line, taxPercent: 0 })),
+      ...totals.adjustments.map((amount) => ({ quantity: 1, rate: amount, taxPercent: 0 })),
+    ]);
+    assert.equal(invoice.totalAmount, totals.netAmount);
+  });
+
+  it('ages receivables by days past due', async () => {
+    const { ageingBucket } = await import('../src/modules/billing/receivables.service');
+    assert.deepEqual([0, 1, 30, 31, 61, 91].map(ageingBucket), ['current', 'days1to30', 'days1to30', 'days31to60', 'days61to90', 'over90']);
+  });
+});

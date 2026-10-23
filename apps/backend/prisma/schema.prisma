@@ -1335,9 +1335,15 @@ model Invoice {
   reviewNote      String?
   createdById     String?
   reviewedById    String?
+  /// Set when the bill was raised from a certified subcontract RA bill.
+  raBillId        String?       @unique
+  /// Set when the bill pays out subcontract retention.
+  retentionReleaseId String?    @unique
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  raBill           RaBill?           @relation(fields: [raBillId], references: [id])
+  retentionRelease RetentionRelease? @relation(fields: [retentionReleaseId], references: [id])
   project       Project?       @relation(fields: [projectId], references: [id])
   organization  Organization   @relation(fields: [organizationId], references: [id])
   vendor        Vendor?        @relation(fields: [vendorId], references: [id])
@@ -1840,6 +1846,8 @@ model Contract {
   startDate      DateTime?
   endDate        DateTime?
   notes          String            @default("")
+  /// Days after certification that a bill falls due, for receivables and vendor bills alike.
+  paymentTermDays Int              @default(30)
   projectId      String
   clientId       String?
   vendorId       String?
@@ -1855,6 +1863,7 @@ model Contract {
   items        ContractItem[]
   adjustments  ContractAdjustmentRule[]
   bills        RaBill[]
+  retentionReleases RetentionRelease[]
 
   @@unique([organizationId, code])
   @@index([organizationId, direction])
@@ -1898,6 +1907,8 @@ model ContractAdjustmentRule {
   calculation BillAdjustmentCalculation
   /// Percent for PERCENT, rupees for FIXED.
   value       Decimal                   @db.Decimal(15, 2)
+  /// Held back and paid out later (security deposit, retention), as opposed to a final deduction such as TDS.
+  isRetention Boolean                   @default(false)
   sortOrder   Int                       @default(0)
 
   contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
@@ -1928,6 +1939,10 @@ model RaBill {
   submittedAt     DateTime?
   certifiedById   String?
   certifiedAt     DateTime?
+  /// When the net amount falls due: certification + the contract's payment terms.
+  dueDate         DateTime?
+  /// Our tax invoice number to the client (client contracts only).
+  invoiceNumber   String?
   reviewNote      String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -1941,6 +1956,9 @@ model RaBill {
   measurements RaBillMeasurement[]
   adjustments  RaBillAdjustment[]
   events       RaBillEvent[]
+  receipts     RaBillReceipt[]
+  /// The vendor bill raised in Finance when a subcontract bill is certified.
+  invoice      Invoice?
 
   @@unique([contractId, sequence])
   @@index([organizationId, status])
@@ -2000,6 +2018,7 @@ model RaBillAdjustment {
   effect      BillAdjustmentEffect
   calculation BillAdjustmentCalculation
   value       Decimal                   @db.Decimal(15, 2)
+  isRetention Boolean                   @default(false)
   sortOrder   Int                       @default(0)
 
   bill RaBill @relation(fields: [billId], references: [id], onDelete: Cascade)
@@ -2021,4 +2040,44 @@ model RaBillEvent {
 
   @@index([billId])
   @@map("ra_bill_events")
+}
+
+/// Money received from the client against a certified client RA bill. Voided rather than deleted.
+model RaBillReceipt {
+  id           String    @id @default(uuid())
+  billId       String
+  amount       Decimal   @db.Decimal(15, 2)
+  receivedDate DateTime
+  method       String    @default("bank_transfer")
+  reference    String    @default("")
+  notes        String    @default("")
+  recordedById String?
+  voidedAt     DateTime?
+  voidedById   String?
+  voidNote     String?
+  createdAt    DateTime  @default(now())
+
+  bill RaBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("ra_bill_receipts")
+}
+
+/// Retention handed back. On a subcontract it raises an approved vendor bill to pay; on a client contract it
+/// records the retention the client paid us.
+model RetentionRelease {
+  id             String   @id @default(uuid())
+  contractId     String
+  amount         Decimal  @db.Decimal(15, 2)
+  releasedOn     DateTime
+  reference      String   @default("")
+  note           String   @default("")
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id])
+  invoice  Invoice?
+
+  @@index([contractId])
+  @@map("retention_releases")
 }

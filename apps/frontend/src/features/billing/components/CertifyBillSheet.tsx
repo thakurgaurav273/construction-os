@@ -49,6 +49,7 @@ export function CertifyBillSheet({ bill, open, onOpenChange }: CertifyBillSheetP
         action: 'certify',
         lines: values.lines.map(({ contractItemId, certifiedQuantity, note }) => ({ contractItemId, certifiedQuantity, note: note || null })),
         note: values.note || undefined,
+        invoiceNumber: toClient && values.invoiceNumber ? values.invoiceNumber : undefined,
       });
       toast.success(`${bill.code} certified`);
       onOpenChange(false);
@@ -65,8 +66,8 @@ export function CertifyBillSheet({ bill, open, onOpenChange }: CertifyBillSheetP
             <SheetTitle>{toClient ? `Record client certification · ${bill.code}` : `Certify ${bill.code}`}</SheetTitle>
             <p className="text-sm text-muted-foreground">
               {toClient
-                ? 'Enter the quantities the client certified. Anything less than claimed is held on this bill.'
-                : 'Certify what was done to specification. Anything less than claimed is held back from this bill.'}
+                ? 'Enter the quantities the client certified. Anything less than claimed is held on this bill. The net becomes a receivable.'
+                : 'Certify what was done to specification. Anything less than claimed is held back. The net goes to Finance as an approved bill to pay.'}
             </p>
           </div>
           <ScrollArea className="flex-1">
@@ -99,7 +100,12 @@ export function CertifyBillSheet({ bill, open, onOpenChange }: CertifyBillSheetP
                 );
               })}
             </ul>
-            <div className="px-6 pb-6">
+            <div className="space-y-4 px-6 pb-6">
+              {toClient && (
+                <FormField label="Our tax invoice number (optional)" htmlFor="certify-invoice" hint="The GST invoice you raise on the client for this bill.">
+                  <Input id="certify-invoice" placeholder="INV/2026-27/014" {...register('invoiceNumber')} />
+                </FormField>
+              )}
               <FormField label="Note on the bill (optional)" htmlFor="certify-note">
                 <Textarea id="certify-note" rows={2} placeholder={toClient ? 'e.g. Certified by the client engineer on 12 Mar' : ''} {...register('note')} />
               </FormField>

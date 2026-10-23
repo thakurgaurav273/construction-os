@@ -49,7 +49,10 @@ export class NotificationRulesService implements OnModuleInit {
     'daily_report.approved': (event) => this.dailyReportDecided(event, NotificationType.SUCCESS, 'approved'),
     'daily_report.rejected': (event) => this.dailyReportDecided(event, NotificationType.WARNING, 'sent back'),
     'ra_bill.submitted': (event) => this.raBillSubmitted(event),
-    'ra_bill.certified': (event) => this.raBillDecided(event, NotificationType.SUCCESS, 'certified'),
+    'ra_bill.certified': async (event) => [
+      ...await this.raBillDecided(event, NotificationType.SUCCESS, 'certified'),
+      ...await this.raBillReadyToPay(event),
+    ],
     'ra_bill.changes_requested': (event) => this.raBillDecided(event, NotificationType.WARNING, 'sent back'),
     'invoice.submitted': (event) => this.invoiceSubmitted(event),
     'invoice.approved': (event) => this.invoiceDecided(event, NotificationType.SUCCESS, 'approved'),
@@ -181,6 +184,21 @@ export class NotificationRulesService implements OnModuleInit {
       title: `${code} on ${bill.contract.code} ${verb}`,
       body: `${event.actorName} ${verb} the RA bill you prepared.${reviewNote(event)}`,
       link: `/dashboard/billing/ra-bills/${event.entityId}`,
+    }];
+  }
+
+  /** A certified subcontract bill is now an approved vendor bill; whoever requests payments should hear. */
+  private async raBillReadyToPay(event: DomainEvent): Promise<NotificationPlan[]> {
+    const bill = await this.findRaBill(event.entityId);
+    if (!bill || bill.contract.direction !== 'SUBCONTRACT') return [];
+    const code = `RA-${String(bill.sequence).padStart(2, '0')}`;
+    return [{
+      recipients: await this.recipients.withPermission('payment.request', event.organizationId, event.actorId, bill.projectId),
+      category: 'approvals',
+      type: NotificationType.INFO,
+      title: `${code} on ${bill.contract.code} is ready for payment`,
+      body: `${event.actorName} certified a subcontractor bill. Its vendor bill is approved in Finance.`,
+      link: '/dashboard/finance',
     }];
   }
 

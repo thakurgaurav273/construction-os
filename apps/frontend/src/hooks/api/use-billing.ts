@@ -3,7 +3,7 @@ import { apiClient } from '@/lib/api/client';
 import type {
   AdjustmentRule, CertifiedLineInput, Client, ClientInput, ContractDetail, ContractDirection, ContractInput,
   ContractItemInput, ContractStatus, ContractSummary, MeasurementInput, RaBillDetail, RaBillInput, RaBillStatus,
-  RaBillSummary,
+  RaBillSummary, ReceiptInput, Receivables, RetentionReleaseInput,
 } from '@/features/billing/types';
 
 function unwrap<T>(res: { data: { data?: T } & T }): T {
@@ -18,6 +18,8 @@ function useBillingMutation<TInput, TResult>(request: (input: TInput) => Promise
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['billing'] });
       queryClient.invalidateQueries({ queryKey: ['timeline'] });
+      // Certified subcontract bills and retention releases raise vendor bills in Finance.
+      queryClient.invalidateQueries({ queryKey: ['finance'] });
     },
   });
 }
@@ -123,7 +125,7 @@ export function useSaveMeasurements() {
 
 export type RaBillAction =
   | { action: 'submit' }
-  | { action: 'certify'; lines: CertifiedLineInput[]; note?: string }
+  | { action: 'certify'; lines: CertifiedLineInput[]; note?: string; invoiceNumber?: string }
   | { action: 'request-changes'; note: string }
   | { action: 'cancel'; note?: string };
 
@@ -132,4 +134,29 @@ export function useRaBillTransition() {
     const { action, ...payload } = body;
     return unwrap(await apiClient.post(`/ra-bills/${id}/${action}`, payload));
   });
+}
+
+/* ---------- Settlement ---------- */
+
+export function useReceivables(projectId?: string) {
+  return useQuery<Receivables>({
+    queryKey: ['billing', 'receivables', projectId ?? null],
+    queryFn: async () => unwrap(await apiClient.get('/receivables', { params: { projectId } })),
+    staleTime: 30_000,
+  });
+}
+
+export function useRecordReceipt() {
+  return useBillingMutation(async ({ billId, input }: { billId: string; input: ReceiptInput }): Promise<RaBillDetail> =>
+    unwrap(await apiClient.post(`/ra-bills/${billId}/receipts`, input)));
+}
+
+export function useVoidReceipt() {
+  return useBillingMutation(async ({ billId, receiptId, note }: { billId: string; receiptId: string; note: string }): Promise<RaBillDetail> =>
+    unwrap(await apiClient.post(`/ra-bills/${billId}/receipts/${receiptId}/void`, { note })));
+}
+
+export function useReleaseRetention() {
+  return useBillingMutation(async ({ contractId, input }: { contractId: string; input: RetentionReleaseInput }): Promise<ContractDetail> =>
+    unwrap(await apiClient.post(`/contracts/${contractId}/retention-releases`, input)));
 }

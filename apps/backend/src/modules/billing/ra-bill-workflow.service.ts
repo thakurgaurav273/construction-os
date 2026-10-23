@@ -6,6 +6,7 @@ import { BILL_EVENTS, EDITABLE_BILL_STATUSES, OPEN_BILL_STATUSES } from './billi
 import { billCode } from './contract.mapper';
 import { BillNoteDto, CertifyRaBillDto, RequiredBillNoteDto } from './dto/ra-bill.dto';
 import { BillHistoryEntry, RaBillHistoryService } from './ra-bill-history.service';
+import { RaBillSettlementService } from './ra-bill-settlement.service';
 import { RaBillTotalsService } from './ra-bill-totals.service';
 import { DetailBill, RaBillDetailView } from './ra-bill.mapper';
 import { RaBillsService } from './ra-bills.service';
@@ -34,6 +35,7 @@ export class RaBillWorkflowService {
     private readonly prisma: PrismaService,
     private readonly bills: RaBillsService,
     private readonly totals: RaBillTotalsService,
+    private readonly settlement: RaBillSettlementService,
     private readonly history: RaBillHistoryService,
   ) {}
 
@@ -103,6 +105,7 @@ export class RaBillWorkflowService {
           });
         }
         await this.totals.refresh(tx, id);
+        await this.settlement.settleCertifiedBill(tx, id, userId, dto.invoiceNumber);
       },
     });
     return this.bills.findOne(id, organizationId);

@@ -40,6 +40,7 @@ export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
   'contract.manage': { group: 'Billing', label: 'Set up clients, contracts, BOQs and deductions' },
   'billing.prepare': { group: 'Billing', label: 'Prepare RA bills and measurement books' },
   'billing.certify': { group: 'Billing', label: 'Certify RA bills' },
+  'billing.receipts': { group: 'Billing', label: 'Record money received from clients' },
   'members.manage': { group: 'Administration', label: 'Invite members and change roles' },
   'organization.manage': { group: 'Administration', label: 'Edit organization settings' },
   'audit.view': { group: 'Administration', label: 'View the audit log' },
@@ -80,7 +81,7 @@ export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
   FINANCE: [
     'ai.use', 'document.upload', 'finance.view', 'invoice.create', 'invoice.approve',
     'payment.request', 'payment.approve', 'payment.release', 'report.manage',
-    'billing.view', 'contract.manage', 'billing.prepare',
+    'billing.view', 'contract.manage', 'billing.prepare', 'billing.receipts',
   ],
   VIEWER: [],
 };

@@ -69,6 +69,13 @@ export class CertifyRaBillDto {
   lines?: CertifiedLineDto[];
 
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(MAX_NOTE_LENGTH) note?: string;
+
+  @ApiPropertyOptional({ description: 'Our tax invoice number to the client (client contracts only)' })
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(60)
+  invoiceNumber?: string | null;
 }
 
 export class BillNoteDto {

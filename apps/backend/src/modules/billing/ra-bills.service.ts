@@ -82,7 +82,7 @@ export class RaBillsService {
           adjustments: {
             createMany: {
               data: contract.adjustments.map((rule) => ({
-                label: rule.label, effect: rule.effect, calculation: rule.calculation, value: rule.value, sortOrder: rule.sortOrder,
+                label: rule.label, effect: rule.effect, calculation: rule.calculation, value: rule.value, isRetention: rule.isRetention, sortOrder: rule.sortOrder,
               })),
             },
           },

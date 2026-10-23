@@ -143,6 +143,9 @@ export function ContractFormDialog({ open, onOpenChange, contract, defaultDirect
             <FormField label="Their WO / PO number (optional)" htmlFor="contract-reference" error={errors.reference?.message}>
               <Input id="contract-reference" placeholder="5500044952-025-1041" {...register('reference')} />
             </FormField>
+            <FormField label="Payment terms (days)" htmlFor="contract-terms" error={errors.paymentTermDays?.message} hint="Certified bills fall due this many days later.">
+              <Input id="contract-terms" type="number" min={0} max={365} step={1} {...register('paymentTermDays')} />
+            </FormField>
             <div className="grid grid-cols-2 gap-2">
               <FormField label="Start (optional)" htmlFor="contract-start" error={errors.startDate?.message}>
                 <Input id="contract-start" type="date" {...register('startDate')} />

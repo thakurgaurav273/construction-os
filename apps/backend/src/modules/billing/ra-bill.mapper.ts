@@ -1,6 +1,7 @@
 import { ContractDirection, MeasurementType, Prisma, RaBillStatus } from '@prisma/client';
 import { adjustmentAmount, roundMoney, roundQuantity } from './billing-math';
 import { AdjustmentRuleView, billCode, toAdjustmentView } from './contract.mapper';
+import { SETTLEMENT_INCLUDE, SettlementView, toSettlementView } from './ra-bill-settlement.mapper';
 
 const PARTY = { select: { id: true, name: true } } as const;
 
@@ -24,6 +25,7 @@ export const RA_BILL_DETAIL_INCLUDE = {
   measurements: { orderBy: { sortOrder: 'asc' } },
   adjustments: { orderBy: { sortOrder: 'asc' } },
   events: { orderBy: { createdAt: 'asc' } },
+  ...SETTLEMENT_INCLUDE,
 } satisfies Prisma.RaBillInclude;
 
 export type SummaryBill = Prisma.RaBillGetPayload<{ include: typeof RA_BILL_SUMMARY_INCLUDE }>;
@@ -53,6 +55,7 @@ export interface RaBillSummaryView {
   certifiedBy: { id: string; name: string } | null;
   submittedAt: Date | null;
   certifiedAt: Date | null;
+  dueDate: Date | null;
   createdAt: Date;
 }
 
@@ -106,6 +109,8 @@ export interface RaBillDetailView extends RaBillSummaryView {
   adjustments: BillAdjustmentView[];
   totals: { previousGross: number; claimedGross: number; grossAmount: number; upToDateGross: number; netAmount: number };
   events: { id: string; stage: string; actorName: string; note: string; createdAt: Date }[];
+  /** Where the money stands once certified: a vendor bill to pay, or a receivable to collect. */
+  settlement: SettlementView | null;
 }
 
 const num = (value: Prisma.Decimal | null): number | null => (value === null ? null : value.toNumber());
@@ -129,6 +134,7 @@ export function toRaBillSummary(bill: SummaryBill): RaBillSummaryView {
     certifiedBy: bill.certifiedBy,
     submittedAt: bill.submittedAt,
     certifiedAt: bill.certifiedAt,
+    dueDate: bill.dueDate,
     createdAt: bill.createdAt,
   };
 }
@@ -211,5 +217,6 @@ export function toRaBillDetail(bill: DetailBill, previousLines: PreviousLine[]):
       netAmount: roundMoney(grossAmount + adjustments.reduce((total, adjustment) => total + adjustment.amount, 0)),
     },
     events: bill.events.map(({ id, stage, actorName, note, createdAt }) => ({ id, stage, actorName, note, createdAt })),
+    settlement: toSettlementView(bill, new Date()),
   };
 }

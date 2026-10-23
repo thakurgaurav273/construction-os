@@ -92,6 +92,9 @@ export const AUDIT_ACTIONS = {
   'ra_bill.certified': action('certified an RA bill', 'ra_bill'),
   'ra_bill.changes_requested': action('sent back an RA bill', 'ra_bill'),
   'ra_bill.cancelled': action('cancelled an RA bill', 'ra_bill'),
+  'ra_bill.receipt_recorded': action('recorded money received on an RA bill', 'ra_bill'),
+  'ra_bill.receipt_voided': action('voided a receipt on an RA bill', 'ra_bill'),
+  'contract.retention_released': action('released retention on a contract', 'contract'),
 
   'vendor.created': action('added a vendor', 'vendor'),
   'vendor.updated': action('updated a vendor', 'vendor'),

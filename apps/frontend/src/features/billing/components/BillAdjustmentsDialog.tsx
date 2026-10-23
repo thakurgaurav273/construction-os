@@ -17,7 +17,7 @@ const billAdjustmentsSchema = z.object({ adjustments: z.array(adjustmentSchema).
 type BillAdjustmentsValues = z.infer<typeof billAdjustmentsSchema>;
 
 const toValues = (bill: RaBillDetail): BillAdjustmentsValues => ({
-  adjustments: bill.adjustments.map(({ label, effect, calculation, value }) => ({ label, effect, calculation, value })),
+  adjustments: bill.adjustments.map(({ label, effect, calculation, value, isRetention }) => ({ label, effect, calculation, value, isRetention })),
 });
 
 /** Changes taxes and deductions on this bill only, e.g. this month's advance recovery. */

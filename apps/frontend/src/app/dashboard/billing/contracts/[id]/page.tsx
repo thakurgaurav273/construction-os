@@ -16,6 +16,7 @@ import { ContractBoqCard } from '@/features/billing/components/ContractBoqCard';
 import { ContractFormDialog } from '@/features/billing/components/ContractFormDialog';
 import { ContractOverview } from '@/features/billing/components/ContractOverview';
 import { NewRaBillDialog } from '@/features/billing/components/NewRaBillDialog';
+import { RetentionCard } from '@/features/billing/components/RetentionCard';
 import type { ContractDetail } from '@/features/billing/types';
 
 function newBillBlockedReason(contract: ContractDetail): string | null {
@@ -105,6 +106,7 @@ export default function ContractPage(): React.ReactElement {
         canPrepare={can('billing.prepare')}
         onNewBill={() => setNewBillOpen(true)}
       />
+      <RetentionCard contract={contract} />
       <ContractBoqCard contract={contract} canEdit={editable} />
 
       <ContractFormDialog open={editOpen} onOpenChange={setEditOpen} contract={contract} />

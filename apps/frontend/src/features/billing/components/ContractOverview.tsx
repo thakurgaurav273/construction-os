@@ -24,7 +24,7 @@ export function ContractOverview({ contract }: { contract: ContractDetail }): Re
           <Stat label={DIRECTION_LABELS[contract.direction].party} value={contract.party?.name ?? '—'} hint={contract.reference ? `WO/PO ${contract.reference}` : undefined} />
           <Stat label="Contract value" value={formatAmount(contract.contractValue)} hint={`${contract.itemCount} BOQ lines`} />
           <Stat label="Certified to date (gross)" value={formatAmount(contract.certifiedToDate)} hint={`${certifiedPercent}% of contract value`} />
-          <Stat label="Bills" value={String(contract.billCount)} hint={contract.openBill ? `${contract.openBill.code} open` : 'None open'} />
+          <Stat label="Bills" value={String(contract.billCount)} hint={`${contract.openBill ? `${contract.openBill.code} open` : 'None open'} · due in ${contract.paymentTermDays} days`} />
         </div>
         <div>
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Taxes & deductions on each bill</p>
@@ -35,7 +35,7 @@ export function ContractOverview({ contract }: { contract: ContractDetail }): Re
               {contract.adjustments.map((rule) => (
                 <li key={rule.id} className="rounded-md border px-2.5 py-1 text-xs">
                   <span className={rule.effect === 'ADD' ? 'text-emerald-600' : 'text-destructive'}>{rule.effect === 'ADD' ? '+' : '−'}</span>{' '}
-                  {rule.label} <span className="text-muted-foreground">· {rule.calculation === 'FIXED' ? formatAmount(rule.value) : describeAdjustment(rule)}</span>
+                  {rule.label} <span className="text-muted-foreground">· {rule.calculation === 'FIXED' ? formatAmount(rule.value) : describeAdjustment(rule)}{rule.isRetention && ' · retention'}</span>
                 </li>
               ))}
             </ul>

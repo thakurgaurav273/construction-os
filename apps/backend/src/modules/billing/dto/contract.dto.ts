@@ -2,8 +2,8 @@ import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs
 import { BillAdjustmentCalculation, BillAdjustmentEffect, ContractDirection, ContractStatus } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import {
-  ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsISO8601, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, MaxLength,
-  Min, ValidateNested,
+  ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsISO8601, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max,
+  MaxLength, Min, ValidateNested,
 } from 'class-validator';
 import { MAX_ADJUSTMENT_RULES, MAX_CONTRACT_ITEMS } from '../billing.constants';
 
@@ -18,6 +18,11 @@ export class AdjustmentRuleDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   value!: number;
+
+  @ApiPropertyOptional({ description: 'Held back and released later, e.g. security deposit or retention' })
+  @IsOptional()
+  @IsBoolean()
+  isRetention?: boolean;
 }
 
 export class ContractItemDto {
@@ -41,6 +46,14 @@ export class CreateContractDto {
   @ApiPropertyOptional() @IsOptional() @IsISO8601({ strict: true }) startDate?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsISO8601({ strict: true }) endDate?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) notes?: string;
+
+  @ApiPropertyOptional({ description: 'Days after certification that a bill falls due', default: 30 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  paymentTermDays?: number;
 
   @ApiPropertyOptional({ type: [AdjustmentRuleDto] })
   @IsOptional()

@@ -10,6 +10,8 @@ import { ContractQueryDto, CreateContractDto, ReplaceContractItemsDto, UpdateCon
 import { CreateRaBillDto } from './dto/ra-bill.dto';
 import { RaBillDetailView } from './ra-bill.mapper';
 import { RaBillsService } from './ra-bills.service';
+import { ReleaseRetentionDto } from './dto/settlement.dto';
+import { RetentionService } from './retention.service';
 
 interface AuthUser { id: string; organizationId: string }
 
@@ -21,6 +23,7 @@ export class ContractsController {
     private readonly contracts: ContractsService,
     private readonly items: ContractItemsService,
     private readonly bills: RaBillsService,
+    private readonly retention: RetentionService,
   ) {}
 
   @Get()
@@ -81,4 +84,15 @@ export class ContractsController {
     return this.bills.create(id, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('contract.manage')
+  @Audit('contract.retention_released')
+  @Post(':id/retention-releases')
+  async releaseRetention(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReleaseRetentionDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<ContractDetailView> {
+    await this.retention.release(id, user.organizationId, user.id, dto);
+    return this.contracts.findOne(id, user.organizationId);
+  }
 }

@@ -33,6 +33,8 @@ export interface AdjustmentRule {
   effect: AdjustmentEffect;
   calculation: AdjustmentCalculation;
   value: number;
+  /** Held back and released later (security deposit, retention), not a final deduction. */
+  isRetention: boolean;
 }
 
 export interface ContractBillSummary {
@@ -79,11 +81,32 @@ export interface ContractItem {
   inUse: boolean;
 }
 
+export interface RetentionRelease {
+  id: string;
+  amount: number;
+  releasedOn: string;
+  reference: string;
+  note: string;
+  /** The vendor bill raised to pay it (subcontracts). */
+  invoiceId: string | null;
+  createdAt: string;
+}
+
+export interface Retention {
+  held: number;
+  released: number;
+  balance: number;
+  byBill: { billId: string; code: string; amount: number }[];
+  releases: RetentionRelease[];
+}
+
 export interface ContractDetail extends ContractSummary {
   notes: string;
+  paymentTermDays: number;
   items: ContractItem[];
   adjustments: (AdjustmentRule & { id: string })[];
   bills: ContractBillSummary[];
+  retention: Retention;
 }
 
 export interface ContractInput {
@@ -96,6 +119,7 @@ export interface ContractInput {
   startDate: string | null;
   endDate: string | null;
   notes: string;
+  paymentTermDays: number;
   adjustments: AdjustmentRule[];
 }
 
@@ -127,6 +151,7 @@ export interface RaBillSummary {
   certifiedBy: { id: string; name: string } | null;
   submittedAt: string | null;
   certifiedAt: string | null;
+  dueDate: string | null;
   createdAt: string;
 }
 
@@ -176,6 +201,70 @@ export interface RaBillDetail extends RaBillSummary {
   adjustments: (AdjustmentRule & { id: string; amount: number })[];
   totals: { previousGross: number; claimedGross: number; grossAmount: number; upToDateGross: number; netAmount: number };
   events: { id: string; stage: string; actorName: string; note: string; createdAt: string }[];
+  settlement: Settlement | null;
+}
+
+export interface Receipt {
+  id: string;
+  amount: number;
+  receivedDate: string;
+  method: string;
+  reference: string;
+  notes: string;
+  voided: boolean;
+  voidNote: string | null;
+}
+
+/** Where the money stands once a bill is certified. */
+export type Settlement =
+  | {
+    kind: 'payable';
+    dueDate: string | null;
+    invoice: { id: string; invoiceNumber: string; status: string; totalAmount: number; paidAmount: number; balanceDue: number } | null;
+  }
+  | {
+    kind: 'receivable';
+    dueDate: string | null;
+    invoiceNumber: string | null;
+    received: number;
+    outstanding: number;
+    daysOverdue: number;
+    receipts: Receipt[];
+  };
+
+export interface ReceiptInput {
+  amount: number;
+  receivedDate: string;
+  method: string;
+  reference: string;
+  notes: string;
+}
+
+export interface RetentionReleaseInput {
+  amount: number;
+  releasedOn: string;
+  reference: string;
+  note: string;
+}
+
+export interface Receivable extends RaBillSummary {
+  invoiceNumber: string | null;
+  received: number;
+  outstanding: number;
+  daysOverdue: number;
+}
+
+export interface AgeingBuckets {
+  current: number;
+  days1to30: number;
+  days31to60: number;
+  days61to90: number;
+  over90: number;
+}
+
+export interface Receivables {
+  items: Receivable[];
+  totals: { outstanding: number; overdue: number; ageing: AgeingBuckets };
 }
 
 export interface RaBillInput {

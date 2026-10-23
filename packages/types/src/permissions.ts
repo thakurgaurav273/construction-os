@@ -36,6 +36,7 @@ export type Permission =
   | 'contract.manage'
   | 'billing.prepare'
   | 'billing.certify'
+  | 'billing.receipts'
   | 'members.manage'
   | 'organization.manage'
   | 'audit.view'

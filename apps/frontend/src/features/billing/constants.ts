@@ -33,14 +33,14 @@ export const BOQ_UNITS = ['Sqm', 'Cum', 'Rmt', 'Kg', 'MT', 'Nos', 'Each', 'Trip'
 
 /** Common Indian works-contract lines, offered as one-click starting points. */
 export const ADJUSTMENT_PRESETS: AdjustmentRule[] = [
-  { label: 'CGST 9%', effect: 'ADD', calculation: 'PERCENT', value: 9 },
-  { label: 'SGST 9%', effect: 'ADD', calculation: 'PERCENT', value: 9 },
-  { label: 'IGST 18%', effect: 'ADD', calculation: 'PERCENT', value: 18 },
-  { label: 'TDS 1%', effect: 'DEDUCT', calculation: 'PERCENT', value: 1 },
-  { label: 'BOCW cess 1%', effect: 'DEDUCT', calculation: 'PERCENT', value: 1 },
-  { label: 'Security deposit 10%', effect: 'DEDUCT', calculation: 'PERCENT', value: 10 },
-  { label: 'Retention 5%', effect: 'DEDUCT', calculation: 'PERCENT', value: 5 },
-  { label: 'Safety hold 2%', effect: 'DEDUCT', calculation: 'PERCENT', value: 2 },
+  { label: 'CGST 9%', effect: 'ADD', calculation: 'PERCENT', value: 9, isRetention: false },
+  { label: 'SGST 9%', effect: 'ADD', calculation: 'PERCENT', value: 9, isRetention: false },
+  { label: 'IGST 18%', effect: 'ADD', calculation: 'PERCENT', value: 18, isRetention: false },
+  { label: 'TDS 1%', effect: 'DEDUCT', calculation: 'PERCENT', value: 1, isRetention: false },
+  { label: 'BOCW cess 1%', effect: 'DEDUCT', calculation: 'PERCENT', value: 1, isRetention: false },
+  { label: 'Security deposit 10%', effect: 'DEDUCT', calculation: 'PERCENT', value: 10, isRetention: true },
+  { label: 'Retention 5%', effect: 'DEDUCT', calculation: 'PERCENT', value: 5, isRetention: true },
+  { label: 'Safety hold 2%', effect: 'DEDUCT', calculation: 'PERCENT', value: 2, isRetention: true },
 ]
 
 export const MAX_BOQ_ITEMS = 500;

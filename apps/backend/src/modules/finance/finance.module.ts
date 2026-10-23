@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../database/database.module';
 import { AuthModule } from '../auth/auth.module';
+import { BillingPayablesService } from './billing-payables.service';
 import { FinanceController } from './finance.controller';
 import { FinanceHistoryService } from './finance-history.service';
 import { FinanceService } from './finance.service';
@@ -23,6 +24,8 @@ import { PaymentsService } from './payments.service';
     InvoicesService,
     InvoiceWorkflowService,
     PaymentsService,
+    BillingPayablesService,
   ],
+  exports: [BillingPayablesService],
 })
 export class FinanceModule {}

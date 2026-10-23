@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -56,6 +56,12 @@ function FinanceWorkspace({ canRecordInvoice }: { canRecordInvoice: boolean }): 
   const [tab, setTab] = useState('invoices');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+
+  // Other screens open a bill directly, e.g. Billing links to /dashboard/finance?invoice=<id>.
+  useEffect(() => {
+    const linkedInvoice = new URLSearchParams(window.location.search).get('invoice');
+    if (linkedInvoice) setSelectedInvoiceId(linkedInvoice);
+  }, []);
 
   const invoicesQuery = useInvoices();
   const { data: payments = [] } = usePayments();

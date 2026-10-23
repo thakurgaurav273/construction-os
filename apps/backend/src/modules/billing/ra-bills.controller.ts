@@ -7,6 +7,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   BillNoteDto, CertifyRaBillDto, RaBillQueryDto, ReplaceMeasurementsDto, RequiredBillNoteDto, UpdateRaBillDto,
 } from './dto/ra-bill.dto';
+import { RecordReceiptDto, VoidReceiptDto } from './dto/settlement.dto';
+import { RaBillReceiptsService } from './ra-bill-receipts.service';
 import { RaBillWorkflowService } from './ra-bill-workflow.service';
 import { RaBillDetailView, RaBillSummaryView } from './ra-bill.mapper';
 import { RaBillsService } from './ra-bills.service';
@@ -20,6 +22,7 @@ export class RaBillsController {
   constructor(
     private readonly bills: RaBillsService,
     private readonly workflow: RaBillWorkflowService,
+    private readonly receipts: RaBillReceiptsService,
   ) {}
 
   @Get()
@@ -87,4 +90,25 @@ export class RaBillsController {
     return this.workflow.cancel(id, user.organizationId, user.id, dto, user.permissions.includes('billing.certify'));
   }
 
+  @RequirePermission('billing.receipts')
+  @Audit('ra_bill.receipt_recorded')
+  @Post(':id/receipts')
+  async recordReceipt(@Param('id', ParseUUIDPipe) id: string, @Body() dto: RecordReceiptDto, @CurrentUser() user: AuthUser): Promise<RaBillDetailView> {
+    await this.receipts.record(id, user.organizationId, user.id, dto);
+    return this.bills.findOne(id, user.organizationId);
+  }
+
+  @RequirePermission('billing.receipts')
+  @Audit('ra_bill.receipt_voided')
+  @HttpCode(200)
+  @Post(':id/receipts/:receiptId/void')
+  async voidReceipt(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('receiptId', ParseUUIDPipe) receiptId: string,
+    @Body() dto: VoidReceiptDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<RaBillDetailView> {
+    await this.receipts.void(id, receiptId, user.organizationId, user.id, dto);
+    return this.bills.findOne(id, user.organizationId);
+  }
 }

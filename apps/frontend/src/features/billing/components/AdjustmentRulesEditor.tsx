@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Controller, useFieldArray, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form';
+import { Controller, useFieldArray, useWatch, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form';
 import {
   Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Input,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -28,6 +28,7 @@ export function AdjustmentRulesEditor<T extends AdjustmentsForm>(props: Adjustme
   const register = props.register as unknown as UseFormRegister<AdjustmentsForm>;
   const errors = props.errors as FieldErrors<AdjustmentsForm>;
   const { fields, append, remove } = useFieldArray({ control, name: 'adjustments' });
+  const rules = useWatch({ control, name: 'adjustments' });
 
   return (
     <fieldset className="space-y-3">
@@ -46,7 +47,7 @@ export function AdjustmentRulesEditor<T extends AdjustmentsForm>(props: Adjustme
             {ADJUSTMENT_PRESETS.map((preset) => (
               <DropdownMenuItem key={preset.label} onSelect={() => append(preset)}>{preset.label}</DropdownMenuItem>
             ))}
-            <DropdownMenuItem onSelect={() => append({ label: '', effect: 'DEDUCT', calculation: 'PERCENT', value: 0 })}>Custom line…</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => append({ label: '', effect: 'DEDUCT', calculation: 'PERCENT', value: 0, isRetention: false })}>Custom line…</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -94,6 +95,12 @@ export function AdjustmentRulesEditor<T extends AdjustmentsForm>(props: Adjustme
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+                {rules?.[index]?.effect === 'DEDUCT' && (
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <input type="checkbox" className="h-4 w-4 rounded border-input" {...register(`adjustments.${index}.isRetention`)} />
+                    Held back and released later (security deposit, retention)
+                  </label>
+                )}
                 {message && <p className="text-xs text-destructive" role="alert">{message}</p>}
               </li>
             );

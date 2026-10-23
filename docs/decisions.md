@@ -1261,6 +1261,50 @@ Contractors bill their clients in running account (RA) bills against a BOQ, and 
 
 ---
 
+# ADR-032 - Billing Settlement: Vendor Bills, Receivables and Retention
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Phase 1 (ADR-031) stopped at certification: a certified RA bill moved no money. Subcontract bills need paying through the existing Finance flow (vendor bill → payment request → approval → release), client bills need collecting, and security deposit / retention held back on bills needs tracking until it is released.
+
+---
+
+## Decision
+
+- **A certified subcontract bill raises an APPROVED vendor bill in Finance**, linked by `Invoice.raBillId`. Certification is already maker-checker (the preparer can't certify), so it stands in for invoice approval; payments still go through request → approval (maker-checker) → release. Finance exposes `BillingPayablesService` for this; Billing never writes Finance tables directly.
+- **The vendor bill total equals the RA bill net to the paisa.** Its lines are the certified work lines plus one line per tax or deduction with its signed amount (deductions negative), all at 0% tax. Payments are capped at the invoice total, so this is what stops finance paying out TDS or retention. A unit test holds the two totals equal.
+- The vendor bill uses the subcontractor's own bill number when given, falling back to `CT-0003/RA-01` if that number is already recorded for the vendor.
+- **Billing-raised vendor bills can't be cancelled in Finance**: they mirror a certified bill or a retention release, and cancelling one would orphan it. Correcting a certified bill is a later feature.
+- **Client bills become receivables in Billing**, not Finance's payables model: due date = certification + the contract's `paymentTermDays`; finance records receipts (`billing.receipts`), which are voided with a reason rather than deleted. Receivables are listed with ageing buckets.
+- **Retention is a flag on deduction lines** (`isRetention`), not a separate calculation. Held = retention lines on certified bills; released = `RetentionRelease` records. Releasing on a subcontract raises another approved vendor bill (`Invoice.retentionReleaseId`); on a client contract it records the retention received.
+
+---
+
+## Alternatives
+
+- **Create subcontract vendor bills as drafts or pending approval**: a second approval of the same money, adding a step without adding a check.
+- **Put tax on vendor bill lines (taxPercent) and deductions elsewhere**: per-line GST rounding drifts from the bill's net by paise, and deductions would still need representing.
+- **Model client receivables as Finance invoices**: Finance invoices are vendor-shaped (vendor, PO match, approval); bending them to clients would complicate every payables screen.
+
+---
+
+## Consequences
+
+- Finance's payables, overdue and cash-out figures now include subcontract bills automatically; receivables and retention are not yet on the Finance dashboard.
+- A mistakenly certified bill can't be reversed yet; its vendor bill stays approved until a correction flow exists.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

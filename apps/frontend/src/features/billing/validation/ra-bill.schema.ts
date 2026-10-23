@@ -92,6 +92,7 @@ export const certifySchema = z.object({
     note: z.string().trim().max(300),
   }).refine((line) => line.certifiedQuantity <= line.claimedQuantity, { path: ['certifiedQuantity'], message: "Can't exceed the claim" })),
   note: z.string().trim().max(1000),
+  invoiceNumber: z.string().trim().max(60),
 });
 
 export type CertifyFormValues = z.infer<typeof certifySchema>;
@@ -102,5 +103,6 @@ export function toCertifyFormValues(bill: RaBillDetail): CertifyFormValues {
       .filter((line) => line.claimedQuantity > 0)
       .map((line) => ({ contractItemId: line.contractItemId, claimedQuantity: line.claimedQuantity, certifiedQuantity: line.claimedQuantity, note: '' })),
     note: '',
+    invoiceNumber: '',
   };
 }

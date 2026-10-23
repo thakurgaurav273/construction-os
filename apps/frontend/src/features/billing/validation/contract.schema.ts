@@ -9,6 +9,7 @@ export const adjustmentSchema = z.object({
   effect: z.enum(['ADD', 'DEDUCT']),
   calculation: z.enum(['PERCENT', 'FIXED']),
   value: z.coerce.number({ invalid_type_error: 'Enter a value' }).min(0, "Can't be negative"),
+  isRetention: z.boolean(),
 }).refine((rule) => rule.calculation !== 'PERCENT' || rule.value <= 100, { path: ['value'], message: 'Max 100%' });
 
 export const contractSchema = z.object({
@@ -20,6 +21,7 @@ export const contractSchema = z.object({
   startDate: optionalDay,
   endDate: optionalDay,
   notes: z.string().trim().max(2000),
+  paymentTermDays: z.coerce.number({ invalid_type_error: 'Enter the number of days' }).int('Whole days only').min(0, "Can't be negative").max(365, 'At most 365 days'),
   adjustments: z.array(adjustmentSchema).max(MAX_ADJUSTMENTS),
 }).refine((values) => !values.startDate || !values.endDate || values.startDate <= values.endDate, {
   path: ['endDate'],
@@ -39,7 +41,8 @@ export function toContractFormValues(contract?: ContractDetail, defaults: Partia
     startDate: contract?.startDate?.slice(0, 10) ?? '',
     endDate: contract?.endDate?.slice(0, 10) ?? '',
     notes: contract?.notes ?? '',
-    adjustments: contract?.adjustments.map(({ label, effect, calculation, value }) => ({ label, effect, calculation, value })) ?? [],
+    paymentTermDays: contract?.paymentTermDays ?? 30,
+    adjustments: contract?.adjustments.map(({ label, effect, calculation, value, isRetention }) => ({ label, effect, calculation, value, isRetention })) ?? [],
   };
 }
 
@@ -54,6 +57,7 @@ export function toContractInput(values: ContractFormValues): ContractInput {
     startDate: values.startDate || null,
     endDate: values.endDate || null,
     notes: values.notes,
-    adjustments: values.adjustments,
+    paymentTermDays: values.paymentTermDays,
+    adjustments: values.adjustments.map((rule) => ({ ...rule, isRetention: rule.effect === 'DEDUCT' && rule.isRetention })),
   };
 }

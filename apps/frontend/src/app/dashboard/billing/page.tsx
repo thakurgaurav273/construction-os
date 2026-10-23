@@ -10,9 +10,10 @@ import { ClientsList } from '@/features/billing/components/ClientsList';
 import { ContractFormDialog } from '@/features/billing/components/ContractFormDialog';
 import { ContractsList } from '@/features/billing/components/ContractsList';
 import { RaBillsList } from '@/features/billing/components/RaBillsList';
+import { ReceivablesList } from '@/features/billing/components/ReceivablesList';
 import BillingLoading from './loading';
 
-const TABS = ['bills', 'contracts', 'clients'] as const;
+const TABS = ['bills', 'receivables', 'contracts', 'clients'] as const;
 type BillingTab = (typeof TABS)[number];
 
 function isBillingTab(value: string | null): value is BillingTab {
@@ -58,10 +59,12 @@ function BillingContent(): React.ReactElement {
       <Tabs value={tab} onValueChange={openTab}>
         <TabsList>
           <TabsTrigger value="bills">RA Bills</TabsTrigger>
+          <TabsTrigger value="receivables">Receivables</TabsTrigger>
           <TabsTrigger value="contracts">Contracts</TabsTrigger>
           <TabsTrigger value="clients">Clients</TabsTrigger>
         </TabsList>
         <TabsContent value="bills" className="mt-4"><RaBillsList onBrowseContracts={() => openTab('contracts')} /></TabsContent>
+        <TabsContent value="receivables" className="mt-4"><ReceivablesList /></TabsContent>
         <TabsContent value="contracts" className="mt-4"><ContractsList onCreate={canManage ? () => setCreateOpen(true) : undefined} /></TabsContent>
         <TabsContent value="clients" className="mt-4"><ClientsList canManage={canManage} /></TabsContent>
       </Tabs>

@@ -5,6 +5,7 @@ import { nextDocumentNumber, withDocumentNumberRetry } from '../procurement/docu
 import { VendorsService } from '../procurement/vendors.service';
 import { OPEN_BILL_STATUSES } from './billing.constants';
 import { ClientsService } from './clients.service';
+import { RetentionService } from './retention.service';
 import {
   CONTRACT_INCLUDE, ContractDetailView, ContractSummaryView, LoadedContract, toContractDetail, toContractSummary,
 } from './contract.mapper';
@@ -16,7 +17,9 @@ const toDay = (value: string | null | undefined): Date | null | undefined => {
 };
 
 export function adjustmentRows(rules: AdjustmentRuleDto[]): Omit<Prisma.ContractAdjustmentRuleCreateManyInput, 'contractId'>[] {
-  return rules.map((rule, index) => ({ label: rule.label, effect: rule.effect, calculation: rule.calculation, value: rule.value, sortOrder: index }));
+  return rules.map((rule, index) => ({
+    label: rule.label, effect: rule.effect, calculation: rule.calculation, value: rule.value, isRetention: rule.isRetention ?? false, sortOrder: index,
+  }));
 }
 
 /** Contracts (work orders) and their deduction rules. The BOQ lives in ContractItemsService. */
@@ -26,6 +29,7 @@ export class ContractsService {
     private readonly prisma: PrismaService,
     private readonly clients: ClientsService,
     private readonly vendors: VendorsService,
+    private readonly retention: RetentionService,
   ) {}
 
   async findAll(organizationId: string, query: ContractQueryDto): Promise<ContractSummaryView[]> {
@@ -40,16 +44,17 @@ export class ContractsService {
   async findOne(id: string, organizationId: string): Promise<ContractDetailView> {
     const contract = await this.findContractOrThrow(id, organizationId);
     const itemIds = contract.items.map((item) => item.id);
-    const [certified, used] = await Promise.all([
+    const [certified, used, retention] = await Promise.all([
       this.prisma.raBillLine.groupBy({
         by: ['contractItemId'],
         where: { contractItemId: { in: itemIds }, bill: { status: 'CERTIFIED' } },
         _sum: { certifiedQuantity: true },
       }),
       this.prisma.raBillLine.findMany({ where: { contractItemId: { in: itemIds } }, select: { contractItemId: true }, distinct: ['contractItemId'] }),
+      this.retention.summary(id),
     ]);
     const certifiedByItem = new Map(certified.map((entry) => [entry.contractItemId, entry._sum.certifiedQuantity?.toNumber() ?? 0]));
-    return toContractDetail(contract, certifiedByItem, new Set(used.map((line) => line.contractItemId)));
+    return toContractDetail(contract, certifiedByItem, new Set(used.map((line) => line.contractItemId)), retention);
   }
 
   async create(organizationId: string, userId: string, dto: CreateContractDto): Promise<ContractDetailView> {
@@ -64,6 +69,7 @@ export class ContractsService {
         startDate: toDay(dto.startDate),
         endDate: toDay(dto.endDate),
         notes: dto.notes?.trim() ?? '',
+        paymentTermDays: dto.paymentTermDays,
         projectId: dto.projectId,
         ...party,
         organizationId,
@@ -93,6 +99,7 @@ export class ContractsService {
           startDate: toDay(dto.startDate),
           endDate: toDay(dto.endDate),
           notes: dto.notes?.trim(),
+          paymentTermDays: dto.paymentTermDays,
         },
       });
       // Rules only seed new bills; bills already started keep their own copy.

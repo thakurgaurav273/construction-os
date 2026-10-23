@@ -33,6 +33,8 @@ export interface Invoice {
   createdBy: NamedRef | null;
   matchStatus: MatchStatus;
   lineCount: number;
+  /** Set when Billing raised the bill (a certified subcontract RA bill or a retention release). */
+  source: { kind: 'ra_bill' | 'retention_release'; label: string; contractId: string; raBillId: string | null } | null;
 }
 
 export interface InvoiceLine {

@@ -3,6 +3,7 @@ import {
 } from '@prisma/client';
 import { roundMoney } from './billing-math';
 import { OPEN_BILL_STATUSES } from './billing.constants';
+import type { RetentionView } from './retention.service';
 
 export const CONTRACT_INCLUDE = {
   project: { select: { id: true, name: true } },
@@ -30,6 +31,7 @@ export interface AdjustmentRuleView {
   effect: BillAdjustmentEffect;
   calculation: BillAdjustmentCalculation;
   value: number;
+  isRetention: boolean;
 }
 
 export interface ContractBillSummary {
@@ -82,17 +84,30 @@ export interface ContractItemView {
 
 export interface ContractDetailView extends ContractSummaryView {
   notes: string;
+  paymentTermDays: number;
   items: ContractItemView[];
   adjustments: AdjustmentRuleView[];
   bills: ContractBillSummary[];
+  retention: RetentionView;
 }
 
 export function billCode(sequence: number): string {
   return `RA-${String(sequence).padStart(2, '0')}`;
 }
 
-export function toAdjustmentView(rule: { id: string; label: string; effect: BillAdjustmentEffect; calculation: BillAdjustmentCalculation; value: Prisma.Decimal }): AdjustmentRuleView {
-  return { id: rule.id, label: rule.label, effect: rule.effect, calculation: rule.calculation, value: rule.value.toNumber() };
+interface StoredAdjustment {
+  id: string;
+  label: string;
+  effect: BillAdjustmentEffect;
+  calculation: BillAdjustmentCalculation;
+  value: Prisma.Decimal;
+  isRetention: boolean;
+}
+
+export function toAdjustmentView(rule: StoredAdjustment): AdjustmentRuleView {
+  return {
+    id: rule.id, label: rule.label, effect: rule.effect, calculation: rule.calculation, value: rule.value.toNumber(), isRetention: rule.isRetention,
+  };
 }
 
 function partyOf(contract: LoadedContract): ContractParty | null {
@@ -140,10 +155,12 @@ export function toContractDetail(
   contract: LoadedContract,
   certifiedByItem: Map<string, number>,
   itemsInUse: Set<string>,
+  retention: RetentionView,
 ): ContractDetailView {
   return {
     ...toContractSummary(contract),
     notes: contract.notes,
+    paymentTermDays: contract.paymentTermDays,
     items: contract.items.map((item) => ({
       id: item.id,
       itemNo: item.itemNo,
@@ -159,5 +176,6 @@ export function toContractDetail(
     })),
     adjustments: contract.adjustments.map(toAdjustmentView),
     bills: contract.bills.map(toBillSummary),
+    retention,
   };
 }
