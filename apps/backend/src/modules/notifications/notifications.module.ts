@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
+import { AuthModule } from '../auth/auth.module';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { NotificationsGateway } from './notifications.gateway';
@@ -8,7 +8,7 @@ import { PUSH_PROVIDER } from './push/push-provider.interface';
 import { FirebasePushProvider } from './push/firebase-push.provider';
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [AuthModule],
   controllers: [NotificationsController],
   providers: [
     NotificationsService,

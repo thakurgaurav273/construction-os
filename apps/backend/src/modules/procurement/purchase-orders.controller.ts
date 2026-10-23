@@ -11,6 +11,7 @@ import { PurchaseOrderDetailView, PurchaseOrderView } from './purchase-order.map
 import { PurchaseOrdersService } from './purchase-orders.service';
 import type { Permission } from '@sitepilot/types';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { Audit } from '../../common/audit';
 
 interface AuthUser { id: string; organizationId: string; role: string; permissions: Permission[] }
 
@@ -34,12 +35,14 @@ export class PurchaseOrdersController {
   }
 
   @RequirePermission('po.create')
+  @Audit('purchase_order.created')
   @Post()
   create(@Body() dto: CreatePurchaseOrderDto, @CurrentUser() user: AuthUser): Promise<PurchaseOrderDetailView> {
     return this.orders.create(user.organizationId, user.id, dto);
   }
 
   @RequirePermission('po.create')
+  @Audit('purchase_order.updated')
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -50,18 +53,21 @@ export class PurchaseOrdersController {
   }
 
   @RequirePermission('po.create')
+  @Audit('purchase_order.duplicated')
   @Post(':id/duplicate')
   duplicate(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<PurchaseOrderDetailView> {
     return this.orders.duplicate(id, user.organizationId, user.id);
   }
 
   @RequirePermission('po.create')
+  @Audit('purchase_order.submitted')
   @Post(':id/submit')
   submit(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<PurchaseOrderDetailView> {
     return this.workflow.submit(id, user.organizationId, user.id);
   }
 
   @RequirePermission('po.approve')
+  @Audit('purchase_order.approved')
   @Post(':id/approve')
   approve(
     @Param('id', ParseUUIDPipe) id: string,
@@ -72,6 +78,7 @@ export class PurchaseOrdersController {
   }
 
   @RequirePermission('po.approve')
+  @Audit('purchase_order.rejected')
   @Post(':id/reject')
   reject(
     @Param('id', ParseUUIDPipe) id: string,
@@ -82,6 +89,7 @@ export class PurchaseOrdersController {
   }
 
   @RequirePermission('po.approve')
+  @Audit('purchase_order.changes_requested')
   @Post(':id/request-changes')
   requestChanges(
     @Param('id', ParseUUIDPipe) id: string,
@@ -92,6 +100,7 @@ export class PurchaseOrdersController {
   }
 
   @RequirePermission('po.create')
+  @Audit('purchase_order.cancelled')
   @Post(':id/cancel')
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
@@ -102,6 +111,7 @@ export class PurchaseOrdersController {
   }
 
   @RequirePermission('delivery.receive')
+  @Audit('delivery.scheduled')
   @Post(':id/deliveries')
   scheduleDelivery(
     @Param('id', ParseUUIDPipe) id: string,
@@ -112,6 +122,7 @@ export class PurchaseOrdersController {
   }
 
   @RequirePermission('delivery.receive')
+  @Audit('delivery.goods_received')
   @Post(':id/receipts')
   receiveGoods(
     @Param('id', ParseUUIDPipe) id: string,

@@ -23,6 +23,7 @@ import {
 import { cn } from '@sitepilot/ui';
 import type { Permission } from '@sitepilot/types';
 import { useAuthStore } from '@/store/auth.store';
+import { UserMenu } from '@/features/auth/components/UserMenu';
 import { useCan } from '@/hooks/api/use-access';
 
 interface NavItem {
@@ -213,29 +214,38 @@ export function Sidebar() {
 
       {/* User */}
       <div className="p-3 border-t border-sidebar-border shrink-0">
-        <div className={cn('flex items-center gap-3 overflow-hidden', isCollapsed && 'justify-center')}>
-          <div className="h-8 w-8 rounded-full bg-primary/10 border flex items-center justify-center text-xs font-semibold text-primary shrink-0">
-            {userInitials}
-          </div>
-          <AnimatePresence>
-            {!isCollapsed && (
-              <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.2 }}
-                className="flex flex-col overflow-hidden"
-              >
-                <span className="text-sm font-medium text-sidebar-foreground truncate leading-tight">
-                  {user?.name ?? 'User'}
-                </span>
-                <span className="text-xs text-muted-foreground truncate">
-                  {user?.email ?? ''}
-                </span>
-              </motion.div>
+        <UserMenu side={isCollapsed ? 'right' : 'top'}>
+          <button
+            type="button"
+            aria-label="Account menu"
+            className={cn(
+              'flex w-full items-center gap-3 overflow-hidden rounded-md p-1 text-left transition-colors hover:bg-sidebar-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              isCollapsed && 'justify-center',
             )}
-          </AnimatePresence>
-        </div>
+          >
+            <div className="h-8 w-8 rounded-full bg-primary/10 border flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+              {userInitials}
+            </div>
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex flex-col overflow-hidden"
+                >
+                  <span className="text-sm font-medium text-sidebar-foreground truncate leading-tight">
+                    {user?.name ?? 'User'}
+                  </span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {user?.email ?? ''}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </button>
+        </UserMenu>
       </div>
     </motion.div>
   );

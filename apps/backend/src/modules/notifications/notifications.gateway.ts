@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { readCookieFromHeader } from '../auth/auth-cookies';
+import { TokenService } from '../auth/token.service';
+import { AUTH_COOKIES } from '../auth/auth.constants';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -20,17 +22,18 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
   @WebSocketServer()
   server: Server;
 
-  constructor(private jwt: JwtService) {}
+  constructor(private readonly tokens: TokenService) {}
 
   handleConnection(client: Socket) {
-    const token = client.handshake.auth?.token ?? client.handshake.query?.token;
+    // Browsers send the access cookie with the handshake; other clients can pass the token explicitly.
+    const token = readCookieFromHeader(client.handshake.headers.cookie, AUTH_COOKIES.access) ?? client.handshake.auth?.token;
     if (!token || typeof token !== 'string') {
       client.disconnect();
       return;
     }
 
     try {
-      const payload = this.jwt.verify<{ sub: string }>(token);
+      const payload = this.tokens.verify(token, 'access');
       client.data.userId = payload.sub;
       if (!this.userSockets.has(payload.sub)) this.userSockets.set(payload.sub, new Set());
       this.userSockets.get(payload.sub)!.add(client.id);

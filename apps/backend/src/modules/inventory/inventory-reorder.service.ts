@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PurchaseOrderStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { num } from './inventory.helpers';
+import { availableStock, num } from './inventory.helpers';
 
 /** Orders that will still bring stock in: committed (approved) or on their way to approval. */
 const OPEN_ORDER_STATUSES: PurchaseOrderStatus[] = ['DRAFT', 'PENDING', 'CHANGES_REQUESTED', 'APPROVED'];
@@ -62,7 +62,7 @@ export class InventoryReorderService {
       const item = await this.prisma.inventoryItem.findUnique({
         where: { materialId_warehouseId: { materialId, warehouseId: warehouse.id } },
       });
-      available = item ? Math.max(0, num(item.quantity) - num(item.reserved) - num(item.damaged)) : 0;
+      available = item ? availableStock(num(item.quantity), num(item.reserved)) : 0;
       reorderLevel = item ? num(item.reorderLevel) : 0;
       targetLevel = reorderLevel * 2;
     } else {

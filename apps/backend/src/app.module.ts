@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
 
+import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -24,14 +25,13 @@ import { SettingsModule } from './modules/settings/settings.module';
       isGlobal: true,
       envFilePath: ['.env', '../../.env'],
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 100,
-      },
-    ]),
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: 60000, limit: 100 }],
+      errorMessage: 'Too many attempts. Wait a minute and try again.',
+    }),
     DatabaseModule,
     AuthModule,
+    AuditModule,
     ProjectsModule,
     DashboardModule,
     WorkforceModule,

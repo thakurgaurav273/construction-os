@@ -154,7 +154,7 @@ export interface WarehouseCard {
   id: string;
   name: string;
   code: string;
-  type: string;
+  type: WarehouseType;
   city: string | null;
   manager: string | null;
   projectId: string | null;
@@ -199,7 +199,7 @@ export interface WarehouseDetail {
   id: string;
   name: string;
   code: string;
-  type: string;
+  type: WarehouseType;
   address: string | null;
   city: string | null;
   manager: string | null;
@@ -220,6 +220,11 @@ export interface WarehouseDetail {
   };
 }
 
+export interface Person {
+  id: string;
+  name: string;
+}
+
 export interface TransferListItem {
   id: string;
   code: string;
@@ -231,8 +236,10 @@ export interface TransferListItem {
   itemCount: number;
   totalQuantity: number;
   note: string | null;
-  requestedBy: string | null;
-  approvedBy: string | null;
+  reviewNote: string | null;
+  requestedBy: Person;
+  approvedBy: Person | null;
+  completedBy: Person | null;
   createdAt: string;
   approvedAt: string | null;
   completedAt: string | null;
@@ -245,14 +252,16 @@ export interface TransferDetail {
   fromWarehouse: { id: string; name: string; type: string; city: string | null };
   toWarehouse: { id: string; name: string; type: string; city: string | null };
   note: string | null;
-  requestedBy: string | null;
-  approvedBy: string | null;
+  reviewNote: string | null;
+  requestedBy: Person;
+  approvedBy: Person | null;
+  completedBy: Person | null;
   createdAt: string;
   approvedAt: string | null;
   completedAt: string | null;
   items: { id: string; materialId: string; materialName: string; sku: string; unit: string; quantity: number }[];
   transactions: { id: string; type: InventoryTransactionType; warehouseName: string; quantity: number; occurredAt: string }[];
-  timeline: { stage: string; date: string | null; done: boolean }[];
+  timeline: { stage: string; date: string | null; done: boolean; actor: string | null }[];
 }
 
 export interface InventoryTransactionListItem {
@@ -327,7 +336,6 @@ export interface CreateTransferInput {
   fromWarehouseId: string;
   toWarehouseId: string;
   note?: string;
-  requestedBy?: string;
   items: { materialId: string; quantity: number }[];
 }
 
@@ -337,7 +345,25 @@ export interface CreateAdjustmentInput {
   reason: AdjustmentReason;
   quantityAfter: number;
   note?: string;
-  adjustedBy?: string;
+}
+
+export type WarehouseType = 'CENTRAL' | 'SITE_STORE' | 'YARD' | 'TRANSIT';
+
+export interface WarehouseInput {
+  name: string;
+  code: string;
+  type: WarehouseType;
+  address: string | null;
+  city: string | null;
+  manager: string | null;
+  capacity: number | null;
+  projectId: string | null;
+}
+
+export interface LocationInput {
+  code: string;
+  name: string;
+  zone: string | null;
 }
 
 function buildParams(filters: Record<string, unknown>): Record<string, string> {
@@ -371,15 +397,27 @@ export function useInventoryAnalytics() {
   });
 }
 
-export function useInventoryItems(filters: InventoryItemFilters = {}) {
+export function useInventoryItems(filters: InventoryItemFilters = {}, options: { enabled?: boolean } = {}) {
   return useQuery<Paginated<InventoryItemListItem>>({
     queryKey: ['inventory', 'items', filters],
     queryFn: async () => {
       const res = await apiClient.get('/inventory/items', { params: buildParams(filters) });
       return res.data.data ?? res.data;
     },
+    enabled: options.enabled ?? true,
     staleTime: 30_000,
   });
+}
+
+/** Every store line, page by page, for exports. The API caps a page at 100 rows. */
+export async function fetchAllInventoryItems(): Promise<InventoryItemListItem[]> {
+  const items: InventoryItemListItem[] = [];
+  for (let page = 1; ; page += 1) {
+    const res = await apiClient.get('/inventory/items', { params: { page: String(page), limit: '100' } });
+    const result: Paginated<InventoryItemListItem> = res.data.data ?? res.data;
+    items.push(...result.items);
+    if (page >= result.totalPages) return items;
+  }
 }
 
 export function useInventoryItem(id: string) {
@@ -472,7 +510,7 @@ export function useUpdateInventoryItem() {
       data,
     }: {
       id: string;
-      data: { reorderLevel?: number; damaged?: number; incoming?: number; locationId?: string };
+      data: { reorderLevel?: number; locationId?: string | null };
     }) => {
       const res = await apiClient.patch(`/inventory/items/${id}`, data);
       return res.data.data ?? res.data;
@@ -487,7 +525,7 @@ export function useUpdateInventoryItem() {
 export function useCreateTransfer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: CreateTransferInput) => {
+    mutationFn: async (data: CreateTransferInput): Promise<TransferDetail> => {
       const res = await apiClient.post('/inventory/transfers', data);
       return res.data.data ?? res.data;
     },
@@ -497,27 +535,72 @@ export function useCreateTransfer() {
   });
 }
 
-export function useUpdateTransfer() {
+export function useTransferAction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      id,
-      action,
-      actor,
-      note,
-    }: {
-      id: string;
-      action: TransferAction;
-      actor?: string;
-      note?: string;
-    }) => {
-      const res = await apiClient.patch(`/inventory/transfers/${id}`, { action, actor, note });
+    mutationFn: async ({ id, action, note }: { id: string; action: TransferAction; note?: string }): Promise<TransferDetail> => {
+      const res = await apiClient.post(`/inventory/transfers/${id}/${action}`, action === 'reject' || action === 'cancel' ? { note } : {});
       return res.data.data ?? res.data;
     },
     onSuccess: (_result, variables) => {
       qc.invalidateQueries({ queryKey: ['inventory'] });
       qc.invalidateQueries({ queryKey: ['inventory', 'transfer', variables.id] });
+      if (variables.action === 'complete') qc.invalidateQueries({ queryKey: ['material'] });
     },
+  });
+}
+
+/** Store setup changes the warehouse cards, pickers and the open drawer. */
+function invalidateWarehouses(qc: ReturnType<typeof useQueryClient>): void {
+  qc.invalidateQueries({ queryKey: ['inventory'] });
+}
+
+export function useSaveWarehouse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, input }: { id?: string; input: WarehouseInput }): Promise<{ id: string }> => {
+      const res = id
+        ? await apiClient.patch(`/inventory/warehouses/${id}`, input)
+        : await apiClient.post('/inventory/warehouses', input);
+      return res.data.data ?? res.data;
+    },
+    onSuccess: () => invalidateWarehouses(qc),
+  });
+}
+
+export function useArchiveWarehouse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      await apiClient.delete(`/inventory/warehouses/${id}`);
+    },
+    onSuccess: () => invalidateWarehouses(qc),
+  });
+}
+
+export function useSaveLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ warehouseId, locationId, input }: {
+      warehouseId: string;
+      locationId?: string;
+      input: LocationInput;
+    }) => {
+      const path = `/inventory/warehouses/${warehouseId}/locations`;
+      const res = locationId ? await apiClient.patch(`${path}/${locationId}`, input) : await apiClient.post(path, input);
+      return res.data.data ?? res.data;
+    },
+    onSuccess: () => invalidateWarehouses(qc),
+  });
+}
+
+export function useRemoveLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ warehouseId, locationId }: { warehouseId: string; locationId: string }): Promise<void> => {
+      await apiClient.delete(`/inventory/warehouses/${warehouseId}/locations/${locationId}`);
+    },
+    onSuccess: () => invalidateWarehouses(qc),
   });
 }
 
@@ -530,6 +613,9 @@ export function useCreateAdjustment() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['inventory'] });
+      // Adjustments also change the organization-wide material totals.
+      qc.invalidateQueries({ queryKey: ['materials'] });
+      qc.invalidateQueries({ queryKey: ['material'] });
     },
   });
 }

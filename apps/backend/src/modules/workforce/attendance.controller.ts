@@ -4,6 +4,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AttendanceRecordView, AttendanceRoster, AttendanceService } from './attendance.service';
 import { AttendanceDateQueryDto, MarkAttendanceDto, WorkerShiftEventDto } from './dto/attendance.dto';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { Audit } from '../../common/audit';
 
 interface AuthUser {
   id: string;
@@ -26,6 +27,7 @@ export class AttendanceController {
   }
 
   @RequirePermission('attendance.mark')
+  @Audit('attendance.marked')
   @Put()
   markAttendance(
     @Param('projectId') projectId: string,
@@ -36,6 +38,7 @@ export class AttendanceController {
   }
 
   @RequirePermission('attendance.mark')
+  @Audit('attendance.checked_in')
   @Post('check-in')
   checkIn(
     @Param('projectId') projectId: string,
@@ -46,6 +49,7 @@ export class AttendanceController {
   }
 
   @RequirePermission('attendance.mark')
+  @Audit('attendance.checked_out')
   @Post('check-out')
   checkOut(
     @Param('projectId') projectId: string,

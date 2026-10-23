@@ -6,6 +6,7 @@ import { RfqDetailView, RfqView } from './rfq.mapper';
 import { RfqQuotesService } from './rfq-quotes.service';
 import { RfqsService } from './rfqs.service';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { Audit } from '../../common/audit';
 
 interface AuthUser { id: string; organizationId: string; role: string }
 
@@ -28,12 +29,14 @@ export class RfqsController {
   }
 
   @RequirePermission('rfq.manage')
+  @Audit('rfq.created')
   @Post()
   create(@Body() dto: CreateRfqDto, @CurrentUser() user: AuthUser): Promise<RfqDetailView> {
     return this.rfqs.create(user.organizationId, user.id, dto);
   }
 
   @RequirePermission('rfq.manage')
+  @Audit('rfq.vendors_invited')
   @Post(':id/invitations')
   invite(
     @Param('id', ParseUUIDPipe) id: string,
@@ -44,6 +47,7 @@ export class RfqsController {
   }
 
   @RequirePermission('rfq.manage')
+  @Audit('rfq.quote_recorded')
   @Put(':id/invitations/:invitationId/quote')
   recordQuote(
     @Param('id', ParseUUIDPipe) id: string,
@@ -55,6 +59,7 @@ export class RfqsController {
   }
 
   @RequirePermission('rfq.manage')
+  @Audit('rfq.vendor_declined')
   @Post(':id/invitations/:invitationId/decline')
   decline(
     @Param('id', ParseUUIDPipe) id: string,
@@ -65,18 +70,21 @@ export class RfqsController {
   }
 
   @RequirePermission('rfq.manage')
+  @Audit('rfq.closed')
   @Post(':id/close')
   close(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<RfqDetailView> {
     return this.rfqs.close(id, user.organizationId);
   }
 
   @RequirePermission('rfq.manage')
+  @Audit('rfq.cancelled')
   @Post(':id/cancel')
   cancel(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<RfqDetailView> {
     return this.rfqs.cancel(id, user.organizationId);
   }
 
   @RequirePermission('rfq.award')
+  @Audit('rfq.awarded')
   @Post(':id/award')
   award(
     @Param('id', ParseUUIDPipe) id: string,

@@ -1,86 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { subDays, startOfDay, format } from 'date-fns';
 import { PrismaService } from '../../database/prisma.service';
 import { MaterialQueryDto } from './dto/material-query.dto';
 import { MovementQueryDto } from './dto/movement-query.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
 import { CreateMaterialDto } from './dto/create-material.dto';
+import {
+  MATERIAL_LIST_INCLUDE, MaterialView, MaterialWithRelations, num, toMaterialView,
+} from './material.mapper';
 
-const LIST_INCLUDE = {
-  category: { select: { id: true, name: true } },
-  supplier: { select: { id: true, name: true } },
-  _count: { select: { usages: true } },
-} satisfies Prisma.MaterialInclude;
-
-type MaterialWithRels = Prisma.MaterialGetPayload<{ include: typeof LIST_INCLUDE }>;
-
-type MaterialStatus = 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'OVERSTOCKED';
-
-function num(d: Prisma.Decimal | number | null | undefined): number {
-  if (d == null) return 0;
-  return typeof d === 'number' ? d : Number(d);
-}
-
-function deriveStatus(quantity: number, reserved: number, minStock: number, maxStock: number | null): MaterialStatus {
-  const available = quantity - reserved;
-  if (quantity <= 0) return 'OUT_OF_STOCK';
-  if (available <= minStock) return 'LOW_STOCK';
-  if (maxStock != null && quantity > maxStock) return 'OVERSTOCKED';
-  return 'IN_STOCK';
-}
+const SORTABLE_FIELDS = [
+  'name', 'sku', 'unit', 'unitCost', 'quantity', 'available', 'reserved', 'minStock', 'stockValue', 'status', 'categoryName', 'supplierName', 'updatedAt',
+] as const satisfies readonly (keyof MaterialView)[];
 
 @Injectable()
 export class MaterialsService {
   constructor(private readonly prisma: PrismaService) {}
-
-  async create(organizationId: string, dto: CreateMaterialDto) {
-    const material = await this.prisma.material.create({
-      data: {
-        ...dto,
-        organizationId,
-      },
-      include: LIST_INCLUDE,
-    });
-    return {
-      message: 'Material created successfully',
-      data: this.mapMaterial(material),
-    };
-  }
-
-  private mapMaterial(m: MaterialWithRels) {
-    const quantity = num(m.quantity);
-    const reserved = num(m.reserved);
-    const incoming = num(m.incoming);
-    const minStock = num(m.minStock);
-    const maxStock = m.maxStock == null ? null : num(m.maxStock);
-    const unitCost = num(m.unitCost);
-    const available = quantity - reserved;
-    return {
-      id: m.id,
-      name: m.name,
-      sku: m.sku,
-      unit: m.unit,
-      unitCost,
-      quantity,
-      reserved,
-      incoming,
-      available,
-      minStock,
-      maxStock,
-      stockValue: quantity * unitCost,
-      status: deriveStatus(quantity, reserved, minStock, maxStock),
-      warehouse: m.warehouse,
-      imageUrl: m.imageUrl,
-      categoryId: m.categoryId,
-      categoryName: m.category?.name ?? null,
-      supplierId: m.supplierId,
-      supplierName: m.supplier?.name ?? null,
-      projectCount: m._count.usages,
-      updatedAt: m.updatedAt,
-      createdAt: m.createdAt,
-    };
-  }
 
   async findAll(organizationId: string, query: MaterialQueryDto) {
     const where: Prisma.MaterialWhereInput = { organizationId, deletedAt: null };
@@ -96,11 +31,11 @@ export class MaterialsService {
 
     const rows = await this.prisma.material.findMany({
       where,
-      include: LIST_INCLUDE,
+      include: MATERIAL_LIST_INCLUDE,
       orderBy: { name: 'asc' },
     });
 
-    let items = rows.map((m) => this.mapMaterial(m));
+    let items = rows.map((m) => toMaterialView(m));
 
     if (query.status) {
       const status = query.status.toUpperCase();
@@ -110,11 +45,11 @@ export class MaterialsService {
       items = items.filter((m) => m.status === 'LOW_STOCK' || m.status === 'OUT_OF_STOCK');
     }
 
-    const sortKey = query.sort ?? 'name';
+    const sortKey = SORTABLE_FIELDS.find((field) => field === query.sort) ?? 'name';
     const dir = query.order === 'desc' ? -1 : 1;
     items.sort((a, b) => {
-      const av = (a as Record<string, unknown>)[sortKey];
-      const bv = (b as Record<string, unknown>)[sortKey];
+      const av = a[sortKey];
+      const bv = b[sortKey];
       if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
       return String(av).localeCompare(String(bv)) * dir;
     });
@@ -147,7 +82,7 @@ export class MaterialsService {
 
     if (!material) throw new NotFoundException('Material not found');
 
-    const base = this.mapMaterial(material as unknown as MaterialWithRels);
+    const base = toMaterialView(material as unknown as MaterialWithRelations);
     return {
       ...base,
       specifications: material.specifications ?? null,
@@ -195,11 +130,11 @@ export class MaterialsService {
   async getLowStock(organizationId: string) {
     const rows = await this.prisma.material.findMany({
       where: { organizationId, deletedAt: null },
-      include: LIST_INCLUDE,
+      include: MATERIAL_LIST_INCLUDE,
       orderBy: { name: 'asc' },
     });
     return rows
-      .map((m) => this.mapMaterial(m))
+      .map((m) => toMaterialView(m))
       .filter((m) => m.status === 'LOW_STOCK' || m.status === 'OUT_OF_STOCK')
       .sort((a, b) => a.available - b.available);
   }
@@ -276,99 +211,110 @@ export class MaterialsService {
     }));
   }
 
-  async getDashboard(organizationId: string) {
-    const [materials, movements, suppliers] = await Promise.all([
-      this.prisma.material.findMany({ where: { organizationId, deletedAt: null }, include: LIST_INCLUDE }),
-      this.prisma.materialMovement.findMany({
-        where: { organizationId, occurredAt: { gte: subDays(new Date(), 7) } },
-        include: { material: { select: { unitCost: true } } },
-      }),
-      this.prisma.materialSupplier.findMany({ where: { organizationId }, select: { name: true, totalSpend: true } }),
-    ]);
-
-    const mapped = materials.map((m) => this.mapMaterial(m));
-    const inventoryValue = mapped.reduce((sum, m) => sum + m.stockValue, 0);
-    const lowStock = mapped.filter((m) => m.status === 'LOW_STOCK' || m.status === 'OUT_OF_STOCK');
-    const reservedValue = mapped.reduce((sum, m) => sum + m.reserved * m.unitCost, 0);
-    const pendingDeliveries = mapped.filter((m) => m.incoming > 0);
-
-    const today = startOfDay(new Date());
-    const todaysConsumption = movements
-      .filter((mv) => (mv.type === 'CONSUMPTION' || mv.type === 'OUTBOUND') && mv.occurredAt >= today)
-      .reduce((sum, mv) => sum + num(mv.quantity) * num(mv.material.unitCost), 0);
-
-    const catMap = new Map<string, { count: number; value: number }>();
-    for (const m of mapped) {
-      const key = m.categoryName ?? 'Uncategorised';
-      const c = catMap.get(key) ?? { count: 0, value: 0 };
-      c.count += 1;
-      c.value += m.stockValue;
-      catMap.set(key, c);
+  async create(organizationId: string, dto: CreateMaterialDto): Promise<MaterialView> {
+    assertStockLimits(dto.minStock ?? 0, dto.maxStock);
+    await this.assertCatalogueReferences(organizationId, dto);
+    try {
+      const material = await this.prisma.material.create({
+        data: {
+          name: dto.name.trim(),
+          sku: dto.sku.trim(),
+          unit: dto.unit.trim(),
+          unitCost: dto.unitCost,
+          minStock: dto.minStock,
+          maxStock: dto.maxStock,
+          categoryId: dto.categoryId ?? null,
+          supplierId: dto.supplierId ?? null,
+          specifications: dto.specifications,
+          organizationId,
+        },
+        include: MATERIAL_LIST_INCLUDE,
+      });
+      return toMaterialView(material);
+    } catch (error) {
+      throw toSkuConflict(error, dto.sku);
     }
-    const categorySplit = Array.from(catMap.entries()).map(([name, v]) => ({ name, count: v.count, value: Math.round(v.value) }));
-
-    const days = Array.from({ length: 7 }, (_, i) => startOfDay(subDays(new Date(), 6 - i)));
-    const consumptionTrend = days.map((d) => {
-      const dayMoves = movements.filter((mv) => startOfDay(mv.occurredAt).getTime() === d.getTime());
-      const inbound = dayMoves
-        .filter((mv) => mv.type === 'INBOUND')
-        .reduce((s, mv) => s + num(mv.quantity) * num(mv.material.unitCost), 0);
-      const outbound = dayMoves
-        .filter((mv) => mv.type === 'OUTBOUND' || mv.type === 'CONSUMPTION')
-        .reduce((s, mv) => s + num(mv.quantity) * num(mv.material.unitCost), 0);
-      return { day: format(d, 'EEE'), inbound: Math.round(inbound), outbound: Math.round(outbound) };
-    });
-
-    const supplierSpend = suppliers
-      .map((s) => ({ name: s.name, spend: num(s.totalSpend) }))
-      .sort((a, b) => b.spend - a.spend)
-      .slice(0, 6);
-
-    const deadStock = mapped
-      .filter((m) => m.status === 'OVERSTOCKED')
-      .map((m) => ({ id: m.id, name: m.name, quantity: m.quantity, unit: m.unit, stockValue: Math.round(m.stockValue) }));
-
-    return {
-      kpis: {
-        totalMaterials: mapped.length,
-        inventoryValue: Math.round(inventoryValue),
-        lowStockCount: lowStock.length,
-        reservedValue: Math.round(reservedValue),
-        todaysConsumption: Math.round(todaysConsumption),
-        pendingDeliveries: pendingDeliveries.length,
-      },
-      categorySplit,
-      consumptionTrend,
-      supplierSpend,
-      lowStock: lowStock.map((m) => ({ id: m.id, name: m.name, available: m.available, minStock: m.minStock, unit: m.unit, status: m.status })),
-      deadStock,
-    };
   }
 
-  async update(id: string, organizationId: string, dto: UpdateMaterialDto) {
+  async update(id: string, organizationId: string, dto: UpdateMaterialDto): Promise<MaterialView> {
     const existing = await this.prisma.material.findFirst({ where: { id, organizationId, deletedAt: null } });
     if (!existing) throw new NotFoundException('Material not found');
+    await this.assertCatalogueReferences(organizationId, dto);
 
-    const updated = await this.prisma.material.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        sku: dto.sku,
-        unit: dto.unit,
-        unitCost: dto.unitCost,
-        quantity: dto.quantity,
-        reserved: dto.reserved,
-        incoming: dto.incoming,
-        minStock: dto.minStock,
-        maxStock: dto.maxStock,
-        warehouse: dto.warehouse,
-        imageUrl: dto.imageUrl,
-        categoryId: dto.categoryId,
-        supplierId: dto.supplierId,
-      },
-      include: LIST_INCLUDE,
+    assertStockLimits(
+      dto.minStock ?? num(existing.minStock),
+      dto.maxStock === undefined ? existing.maxStock == null ? null : num(existing.maxStock) : dto.maxStock,
+    );
+
+    try {
+      const updated = await this.prisma.material.update({
+        where: { id },
+        data: {
+          name: dto.name?.trim(),
+          sku: dto.sku?.trim(),
+          unit: dto.unit?.trim(),
+          unitCost: dto.unitCost,
+          minStock: dto.minStock,
+          maxStock: dto.maxStock,
+          categoryId: dto.categoryId,
+          supplierId: dto.supplierId,
+          specifications: dto.specifications,
+        },
+        include: MATERIAL_LIST_INCLUDE,
+      });
+      return toMaterialView(updated);
+    } catch (error) {
+      throw toSkuConflict(error, dto.sku ?? existing.sku);
+    }
+  }
+
+  /**
+   * Archived materials disappear from the catalogue but keep their history (receipts, issues, POs).
+   * Only empty materials can be archived, otherwise stock would vanish from the books.
+   */
+  async archive(id: string, organizationId: string): Promise<{ id: string }> {
+    const material = await this.prisma.material.findFirst({
+      where: { id, organizationId, deletedAt: null },
+      select: { id: true, name: true, quantity: true, incoming: true },
     });
+    if (!material) throw new NotFoundException('Material not found');
+    if (num(material.quantity) > 0) {
+      throw new BadRequestException(`${material.name} still has stock on hand. Issue or adjust it to zero before archiving.`);
+    }
+    if (num(material.incoming) > 0) {
+      throw new BadRequestException(`${material.name} has deliveries on the way. Receive or cancel them before archiving.`);
+    }
 
-    return this.mapMaterial(updated);
+    await this.prisma.material.update({ where: { id }, data: { deletedAt: new Date() } });
+    return { id };
+  }
+
+  /** Category and supplier ids come from the client, so make sure they belong to this organization. */
+  private async assertCatalogueReferences(
+    organizationId: string,
+    refs: { categoryId?: string | null; supplierId?: string | null },
+  ): Promise<void> {
+    const [category, supplier] = await Promise.all([
+      refs.categoryId
+        ? this.prisma.materialCategory.findFirst({ where: { id: refs.categoryId, organizationId }, select: { id: true } })
+        : null,
+      refs.supplierId
+        ? this.prisma.materialSupplier.findFirst({ where: { id: refs.supplierId, organizationId }, select: { id: true } })
+        : null,
+    ]);
+    if (refs.categoryId && !category) throw new BadRequestException('Choose a category from your catalogue.');
+    if (refs.supplierId && !supplier) throw new BadRequestException('Choose a supplier from your catalogue.');
+  }
+}
+
+function toSkuConflict(error: unknown, sku: string): unknown {
+  const isDuplicate = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+  // Archived materials keep their SKU so their history stays traceable.
+  return isDuplicate ? new ConflictException(`SKU ${sku.trim()} is already used by another material, including archived ones.`) : error;
+}
+
+function assertStockLimits(minStock: number, maxStock: number | null | undefined): void {
+  if (maxStock != null && maxStock < minStock) {
+    throw new BadRequestException('Maximum stock must be at least the minimum stock.');
   }
 }

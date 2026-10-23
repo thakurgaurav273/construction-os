@@ -4,6 +4,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SettingsService } from './settings.service';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 import { ChangeMemberRoleDto, InviteMemberDto } from './dto/member.dto';
+import { Audit } from '../../common/audit';
 
 interface AuthUser { id: string; organizationId: string }
 
@@ -18,6 +19,7 @@ export class SettingsController {
   }
 
   @RequirePermission('members.manage')
+  @Audit('member.role_changed')
   @Patch('members/:id/role')
   changeMemberRole(
     @CurrentUser() user: AuthUser,
@@ -28,12 +30,14 @@ export class SettingsController {
   }
 
   @RequirePermission('members.manage')
+  @Audit('member.removed')
   @Delete('members/:id')
   removeMember(@CurrentUser() user: AuthUser, @Param('id') memberId: string) {
     return this.settings.removeMember(memberId, user.organizationId, user.id);
   }
 
   @RequirePermission('members.manage')
+  @Audit('invitation.sent')
   @Post('invitations')
   @HttpCode(201)
   inviteMember(@CurrentUser() user: AuthUser, @Body() dto: InviteMemberDto) {
@@ -47,12 +51,14 @@ export class SettingsController {
   }
 
   @RequirePermission('members.manage')
+  @Audit('invitation.resent')
   @Post('invitations/:id/resend')
   resendInvitation(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.settings.resendInvitation(id, user.organizationId);
   }
 
   @RequirePermission('members.manage')
+  @Audit('invitation.cancelled')
   @Delete('invitations/:id')
   @HttpCode(200)
   cancelInvitation(@CurrentUser() user: AuthUser, @Param('id') id: string) {

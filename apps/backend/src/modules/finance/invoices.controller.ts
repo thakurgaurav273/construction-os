@@ -9,6 +9,7 @@ import { InvoiceWorkflowService } from './invoice-workflow.service';
 import { InvoicesService } from './invoices.service';
 import type { Permission } from '@sitepilot/types';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { Audit } from '../../common/audit';
 
 interface AuthUser { id: string; organizationId: string; role: string; permissions: Permission[] }
 
@@ -38,12 +39,14 @@ export class InvoicesController {
   }
 
   @RequirePermission('invoice.create')
+  @Audit('invoice.created')
   @Post()
   create(@Body() dto: CreateInvoiceDto, @CurrentUser() user: AuthUser): Promise<InvoiceDetailView> {
     return this.invoices.create(user.organizationId, user.id, dto);
   }
 
   @RequirePermission('invoice.create')
+  @Audit('invoice.updated')
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -54,12 +57,14 @@ export class InvoicesController {
   }
 
   @RequirePermission('invoice.create')
+  @Audit('invoice.submitted')
   @Post(':id/submit')
   submit(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<InvoiceDetailView> {
     return this.workflow.submit(id, user.organizationId, user.id);
   }
 
   @RequirePermission('invoice.approve')
+  @Audit('invoice.approved')
   @Post(':id/approve')
   approve(
     @Param('id', ParseUUIDPipe) id: string,
@@ -70,6 +75,7 @@ export class InvoicesController {
   }
 
   @RequirePermission('invoice.approve')
+  @Audit('invoice.rejected')
   @Post(':id/reject')
   reject(
     @Param('id', ParseUUIDPipe) id: string,
@@ -80,6 +86,7 @@ export class InvoicesController {
   }
 
   @RequirePermission('invoice.create')
+  @Audit('invoice.cancelled')
   @Post(':id/cancel')
   cancel(
     @Param('id', ParseUUIDPipe) id: string,

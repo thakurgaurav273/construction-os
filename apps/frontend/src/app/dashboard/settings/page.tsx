@@ -31,6 +31,7 @@ import {
 import { useCurrentAccess } from '@/hooks/api/use-access';
 import { useAuthStore } from '@/store/auth.store';
 import { Can } from '@/components/shared/Can';
+import { AuditLogsTab } from '@/features/audit/components/AuditLogsTab';
 
 const INITIAL_ORG = {
   companyName: 'Nexus Construction Group',
@@ -364,7 +365,9 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {activeTab !== 'organization' && activeTab !== 'members' && (
+          {activeTab === 'audit' && <AuditLogsTab />}
+
+          {activeTab !== 'organization' && activeTab !== 'members' && activeTab !== 'audit' && (
             <Card className="border-dashed border-border/60 bg-gradient-to-b from-muted/10 to-muted/30 shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)]">
               <div className="flex flex-col items-center justify-center p-20 text-center text-muted-foreground">
                 <div className="h-16 w-16 rounded-2xl bg-background border shadow-sm flex items-center justify-center mb-6">

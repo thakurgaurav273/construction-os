@@ -109,7 +109,13 @@ model User {
   activities           Activity[]
   notifications        Notification[]
   refreshTokens        RefreshToken[]
+  passwordResetTokens  PasswordResetToken[]
   invitations          Invitation[]       @relation("InvitedBy")
+  materialIssues       MaterialIssue[]
+  transfersRequested   StockTransfer[]    @relation("TransferRequestedBy")
+  transfersApproved    StockTransfer[]    @relation("TransferApprovedBy")
+  transfersCompleted   StockTransfer[]    @relation("TransferCompletedBy")
+  stockAdjustments     StockAdjustment[]
 
   @@map("users")
 }
@@ -160,6 +166,8 @@ model Organization {
   reports               Report[]
   generatedReports      GeneratedReport[]
   reportSchedules       ReportSchedule[]
+  materialIssues        MaterialIssue[]
+  auditLogs             AuditLog[]
 
   @@map("organizations")
 }
@@ -195,6 +203,45 @@ model RefreshToken {
   @@index([userId])
   @@index([token])
   @@map("refresh_tokens")
+}
+
+/// Append-only record of who did what. A database trigger rejects every UPDATE and DELETE.
+/// The actor is a snapshot (id + name), not a foreign key, so entries outlive the user who made them.
+model AuditLog {
+  id             String   @id @default(uuid())
+  action         String
+  entityType     String
+  entityId       String?
+  projectId      String?
+  actorId        String?
+  actorName      String
+  metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, actorId])
+  @@map("audit_logs")
+}
+
+/// One-time link for setting a new password. Only the SHA-256 hash of the token is stored.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 model Invitation {
@@ -258,6 +305,7 @@ model Project {
   budgetItems           BudgetItem[]
   cashFlowEntries       CashFlowEntry[]
   generatedReports      GeneratedReport[]
+  materialIssues        MaterialIssue[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -536,6 +584,7 @@ model Material {
   stockTransferItems    StockTransferItem[]
   stockAdjustments      StockAdjustment[]
   poLineItems           PoLineItem[]
+  materialIssues        MaterialIssue[]
 
   @@unique([sku, organizationId])
   @@index([organizationId])
@@ -587,6 +636,41 @@ model MaterialProjectUsage {
   @@index([materialId])
   @@index([projectId])
   @@map("material_project_usages")
+}
+
+enum MaterialIssueType {
+  ISSUE
+  RETURN
+}
+
+/// A material issue note (stock leaving a store for a project site) or a return note (unused stock coming back).
+model MaterialIssue {
+  id             String            @id @default(uuid())
+  code           String
+  type           MaterialIssueType
+  quantity       Decimal           @db.Decimal(15, 3)
+  /// Carrying cost per unit when the stock moved, so issued value stays fixed if the average cost later changes.
+  unitCost       Decimal           @db.Decimal(15, 2)
+  note           String?
+  issuedOn       DateTime
+  materialId     String
+  warehouseId    String
+  projectId      String
+  issuedById     String
+  organizationId String
+  createdAt      DateTime          @default(now())
+
+  material     Material     @relation(fields: [materialId], references: [id])
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
+  project      Project      @relation(fields: [projectId], references: [id])
+  issuedBy     User         @relation(fields: [issuedById], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([code, organizationId])
+  @@index([organizationId])
+  @@index([projectId, issuedOn])
+  @@index([materialId])
+  @@map("material_issues")
 }
 
 // ─── Inventory ───────────────────────────────────────────────────────────────
@@ -657,6 +741,7 @@ model Warehouse {
   transfersFrom StockTransfer[]        @relation("TransferFrom")
   transfersTo   StockTransfer[]        @relation("TransferTo")
   deliveries    Delivery[]
+  materialIssues MaterialIssue[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -679,6 +764,7 @@ model WarehouseLocation {
   organization Organization    @relation(fields: [organizationId], references: [id])
   items        InventoryItem[]
 
+  @@unique([warehouseId, code])
   @@index([warehouseId])
   @@index([organizationId])
   @@map("warehouse_locations")
@@ -751,8 +837,11 @@ model StockTransfer {
   fromWarehouseId String
   toWarehouseId   String
   note            String?
-  requestedBy     String?
-  approvedBy      String?
+  /// Why the transfer was rejected or cancelled.
+  reviewNote      String?
+  requestedById   String
+  approvedById    String?
+  completedById   String?
   organizationId  String
   createdAt       DateTime            @default(now())
   approvedAt      DateTime?
@@ -761,6 +850,9 @@ model StockTransfer {
 
   fromWarehouse Warehouse              @relation("TransferFrom", fields: [fromWarehouseId], references: [id])
   toWarehouse   Warehouse              @relation("TransferTo", fields: [toWarehouseId], references: [id])
+  requestedBy   User                   @relation("TransferRequestedBy", fields: [requestedById], references: [id])
+  approvedBy    User?                  @relation("TransferApprovedBy", fields: [approvedById], references: [id])
+  completedBy   User?                  @relation("TransferCompletedBy", fields: [completedById], references: [id])
   organization  Organization           @relation(fields: [organizationId], references: [id])
   items         StockTransferItem[]
   transactions  InventoryTransaction[]
@@ -796,7 +888,7 @@ model StockAdjustment {
   quantityAfter   Decimal               @db.Decimal(15, 3)
   delta           Decimal               @db.Decimal(15, 3)
   note            String?
-  adjustedBy      String?
+  adjustedById    String
   inventoryItemId String
   materialId      String
   warehouseId     String
@@ -806,6 +898,7 @@ model StockAdjustment {
   inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
   material      Material      @relation(fields: [materialId], references: [id])
   warehouse     Warehouse     @relation(fields: [warehouseId], references: [id])
+  adjustedBy    User          @relation(fields: [adjustedById], references: [id])
   organization  Organization  @relation(fields: [organizationId], references: [id])
 
   @@unique([code, organizationId])

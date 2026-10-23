@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { differenceInDays, format, startOfDay, startOfMonth, subDays, subMonths } from 'date-fns';
 import { PrismaService } from '../../database/prisma.service';
-import { deriveInventoryStatus, num, round2 } from './inventory.helpers';
+import { availableStock, deriveInventoryStatus, num, round2 } from './inventory.helpers';
 
 const INBOUND_TYPES = new Set(['RECEIVE', 'TRANSFER_IN', 'RETURN']);
 const OUTBOUND_TYPES = new Set(['ISSUE', 'CONSUMPTION', 'TRANSFER_OUT', 'DAMAGE']);
@@ -40,7 +40,7 @@ export class InventoryDashboardService {
     ]);
 
     let inventoryValue = 0;
-    let availableStock = 0;
+    let totalAvailable = 0;
     let reservedValue = 0;
     let lowStockCount = 0;
     const valueByWarehouse = new Map<
@@ -61,15 +61,14 @@ export class InventoryDashboardService {
     for (const item of items) {
       const quantity = num(item.quantity);
       const reserved = num(item.reserved);
-      const damaged = num(item.damaged);
       const reorderLevel = num(item.reorderLevel);
       const unitCost = num(item.material.unitCost);
-      const available = Math.max(0, quantity - reserved - damaged);
+      const available = availableStock(quantity, reserved);
       const value = quantity * unitCost;
       const status = deriveInventoryStatus(available, reorderLevel);
 
       inventoryValue += value;
-      availableStock += available;
+      totalAvailable += available;
       reservedValue += reserved * unitCost;
 
       const wh = valueByWarehouse.get(item.warehouse.id) ?? {
@@ -109,7 +108,7 @@ export class InventoryDashboardService {
     return {
       kpis: {
         inventoryValue: round2(inventoryValue),
-        availableStock: round2(availableStock),
+        availableStock: round2(totalAvailable),
         reservedValue: round2(reservedValue),
         lowStockItems: lowStockCount,
         pendingTransfers,

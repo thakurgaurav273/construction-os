@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,15 +12,22 @@ import { Button, Input, Label } from '@sitepilot/ui';
 
 import { authApi } from '../api/auth.api';
 import { useAuthStore } from '@/store/auth.store';
+import { getApiErrorMessage } from '@/lib/api/errors';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' }),
+  password: z.string().min(1, { message: 'Enter your password' }),
 });
+
+/** Only same-site paths, so a crafted login link can't send people to another site after signing in. */
+function safeRedirect(target: string | null): string {
+  return target && target.startsWith('/') && !target.startsWith('//') ? target : '/dashboard';
+}
 
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const {
@@ -40,20 +47,12 @@ export function LoginForm() {
       setIsLoading(true);
       const data = await authApi.login(values);
       
-      // Store in Zustand
-      setAuth(data.user, data.accessToken, data.organization);
-      
-      // We also need to set the refresh token somewhere (e.g., localStorage or cookies)
-      // Usually nextjs middleware expects `access_token` in cookies
-      document.cookie = `access_token=${data.accessToken}; path=/; max-age=86400`;
-      localStorage.setItem('access_token', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
-
-      toast.success('Logged in successfully');
-      router.push('/dashboard');
-      router.refresh(); // Important for middleware to pick up the new cookie
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to login');
+      setAuth(data.user, data.organization);
+      toast.success('Signed in');
+      router.push(safeRedirect(searchParams.get('redirect')));
+      router.refresh();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Couldn't sign in. Try again."));
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +74,12 @@ export function LoginForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          <Link href="/forgot-password" className="text-sm font-medium text-gray-600 underline-offset-4 hover:text-gray-900 hover:underline">
+            Forgot password?
+          </Link>
+        </div>
         <Input 
           id="password" 
           type="password" 

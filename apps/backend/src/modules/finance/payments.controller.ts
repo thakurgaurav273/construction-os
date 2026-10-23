@@ -6,6 +6,7 @@ import { CreatePaymentDto, MarkPaidDto, PaymentQueryDto } from './dto/payment.dt
 import { PaymentView } from './payment.mapper';
 import { PaymentsService } from './payments.service';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { Audit } from '../../common/audit';
 
 interface AuthUser { id: string; organizationId: string; role: string }
 
@@ -21,12 +22,14 @@ export class PaymentsController {
   }
 
   @RequirePermission('payment.request')
+  @Audit('payment.requested')
   @Post()
   create(@Body() dto: CreatePaymentDto, @CurrentUser() user: AuthUser): Promise<PaymentView> {
     return this.payments.create(user.organizationId, user.id, dto);
   }
 
   @RequirePermission('payment.approve')
+  @Audit('payment.approved')
   @Post(':id/approve')
   approve(
     @Param('id', ParseUUIDPipe) id: string,
@@ -37,6 +40,7 @@ export class PaymentsController {
   }
 
   @RequirePermission('payment.approve')
+  @Audit('payment.rejected')
   @Post(':id/reject')
   reject(
     @Param('id', ParseUUIDPipe) id: string,
@@ -47,6 +51,7 @@ export class PaymentsController {
   }
 
   @RequirePermission('payment.release')
+  @Audit('payment.released')
   @Post(':id/paid')
   markPaid(
     @Param('id', ParseUUIDPipe) id: string,
@@ -57,6 +62,7 @@ export class PaymentsController {
   }
 
   @RequirePermission('payment.request')
+  @Audit('payment.cancelled')
   @Post(':id/cancel')
   cancel(
     @Param('id', ParseUUIDPipe) id: string,

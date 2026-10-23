@@ -1,14 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Badge, Button, Progress, Skeleton } from '@sitepilot/ui';
 import {
-  Warehouse, Package, MapPin, AlertTriangle, Layers, Activity,
+  Warehouse, Package, MapPin, AlertTriangle, Layers, Activity, Plus,
 } from 'lucide-react';
 import { useWarehouses, type WarehouseCard as WarehouseCardData } from '@/hooks/api/use-inventory';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { formatNumber } from '@/lib/utils';
+import { useCan } from '@/hooks/api/use-access';
+import { WarehouseFormDialog } from '@/features/inventory/components/WarehouseFormDialog';
 import { formatCompactINR, formatWarehouseType } from './inventory-format';
 
 interface WarehousesTabProps {
@@ -90,6 +92,9 @@ function WarehouseCard({
 
 export function WarehousesTab({ onSelect }: WarehousesTabProps): React.ReactElement {
   const { data, isLoading, isError, refetch } = useWarehouses();
+  const canManage = useCan()('warehouse.manage');
+  const [formOpen, setFormOpen] = useState(false);
+  const formDialog = <WarehouseFormDialog open={formOpen} onOpenChange={setFormOpen} onSaved={onSelect} />;
 
   if (isError) {
     return (
@@ -116,23 +121,37 @@ export function WarehousesTab({ onSelect }: WarehousesTabProps): React.ReactElem
 
   if (warehouses.length === 0) {
     return (
-      <EmptyState
-        icon={Warehouse}
-        title="No warehouses yet"
-        description="Once warehouses and site stores are set up, they will appear here with live stock levels and utilization."
-      />
+      <>
+        <EmptyState
+          icon={Warehouse}
+          title="No stores yet"
+          description="Add your central warehouse and site stores to start receiving and tracking stock."
+          action={canManage ? <Button onClick={() => setFormOpen(true)}>Add Store</Button> : undefined}
+        />
+        {formDialog}
+      </>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-    >
-      {warehouses.map((warehouse) => (
-        <WarehouseCard key={warehouse.id} warehouse={warehouse} onSelect={onSelect} />
-      ))}
-    </motion.div>
+    <div className="space-y-4">
+      {canManage && (
+        <div className="flex justify-end">
+          <Button onClick={() => setFormOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> Add Store
+          </Button>
+        </div>
+      )}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        {warehouses.map((warehouse) => (
+          <WarehouseCard key={warehouse.id} warehouse={warehouse} onSelect={onSelect} />
+        ))}
+      </motion.div>
+      {formDialog}
+    </div>
   );
 }

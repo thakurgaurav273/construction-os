@@ -3,77 +3,73 @@
 import React, { useMemo } from 'react';
 import { Skeleton, Badge, Button } from '@sitepilot/ui';
 import { Warehouse, Package, AlertTriangle } from 'lucide-react';
-import {
-  useMaterials, type MaterialListItem,
-} from '@/hooks/api/use-materials';
+import { useInventoryItems, type InventoryItemListItem } from '@/hooks/api/use-inventory';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { formatNumber } from '@/lib/utils';
 import { formatCompactINR, getStatusMeta } from './materials-format';
 import { MaterialStatusBadge } from './MaterialStatusBadge';
 
 interface WarehouseGroup {
+  id: string;
   name: string;
-  materials: MaterialListItem[];
+  items: InventoryItemListItem[];
   inventoryValue: number;
 }
-
-const UNASSIGNED = 'Unassigned';
 
 interface InventoryTabProps {
   onSelect: (materialId: string) => void;
 }
 
-function groupByWarehouse(items: MaterialListItem[]): WarehouseGroup[] {
+function groupByWarehouse(items: InventoryItemListItem[]): WarehouseGroup[] {
   const map = new Map<string, WarehouseGroup>();
-  for (const material of items) {
-    const key = material.warehouse ?? UNASSIGNED;
-    const group = map.get(key) ?? { name: key, materials: [], inventoryValue: 0 };
-    group.materials.push(material);
-    group.inventoryValue += material.stockValue;
-    map.set(key, group);
+  for (const item of items) {
+    const group = map.get(item.warehouseId) ?? { id: item.warehouseId, name: item.warehouseName, items: [], inventoryValue: 0 };
+    group.items.push(item);
+    group.inventoryValue += item.value;
+    map.set(item.warehouseId, group);
   }
   return Array.from(map.values()).sort((a, b) => b.inventoryValue - a.inventoryValue);
 }
 
-function StockCard({ material, onSelect }: { material: MaterialListItem; onSelect: (id: string) => void }): React.ReactElement {
-  const meta = getStatusMeta(material.status);
+function StockCard({ item, onSelect }: { item: InventoryItemListItem; onSelect: (id: string) => void }): React.ReactElement {
+  const meta = getStatusMeta(item.status);
   return (
     <button
       type="button"
-      onClick={() => onSelect(material.id)}
+      onClick={() => onSelect(item.materialId)}
       className="text-left rounded-xl border bg-card p-4 hover:shadow-md hover:border-primary/40 transition-all group"
     >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
-          <p className="font-semibold truncate group-hover:text-primary transition-colors">{material.name}</p>
-          <p className="text-xs text-muted-foreground">{material.sku}</p>
+          <p className="font-semibold truncate group-hover:text-primary transition-colors">{item.materialName}</p>
+          <p className="text-xs text-muted-foreground">{item.sku}</p>
         </div>
-        <MaterialStatusBadge status={material.status} />
+        <MaterialStatusBadge status={item.status} />
       </div>
       <div className="grid grid-cols-3 gap-2 text-center">
         <div>
-          <p className={`text-base font-bold ${meta.accentClass}`}>{formatNumber(material.available)}</p>
+          <p className={`text-base font-bold ${meta.accentClass}`}>{formatNumber(item.available)}</p>
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Available</p>
         </div>
         <div>
-          <p className="text-base font-bold">{formatNumber(material.reserved)}</p>
+          <p className="text-base font-bold">{formatNumber(item.reserved)}</p>
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Reserved</p>
         </div>
         <div>
-          <p className="text-base font-bold">{formatNumber(material.incoming)}</p>
+          <p className="text-base font-bold">{formatNumber(item.incoming)}</p>
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Incoming</p>
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-        <span>Min {formatNumber(material.minStock)} {material.unit}</span>
-        <span className="font-medium text-foreground">{formatCompactINR(material.stockValue)}</span>
+        <span>Reorder at {formatNumber(item.reorderLevel)} {item.unit}</span>
+        <span className="font-medium text-foreground">{formatCompactINR(item.value)}</span>
       </div>
     </button>
   );
 }
 
 export function InventoryTab({ onSelect }: InventoryTabProps): React.ReactElement {
-  const { data, isLoading, isError, refetch } = useMaterials({ limit: 100, sort: 'name', order: 'asc' });
+  const { data, isLoading, isError, refetch } = useInventoryItems({ limit: 100 });
 
   const groups = useMemo(() => groupByWarehouse(data?.items ?? []), [data]);
 
@@ -110,7 +106,7 @@ export function InventoryTab({ onSelect }: InventoryTabProps): React.ReactElemen
       <EmptyState
         icon={Warehouse}
         title="No inventory yet"
-        description="Once materials are added and stocked, warehouse-level inventory will appear here grouped by location."
+        description="Stock appears here, grouped by store, once goods are received or counted into a store."
       />
     );
   }
@@ -118,7 +114,7 @@ export function InventoryTab({ onSelect }: InventoryTabProps): React.ReactElemen
   return (
     <div className="space-y-8">
       {groups.map((group) => (
-        <section key={group.name} className="space-y-3">
+        <section key={group.id} className="space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
@@ -127,7 +123,7 @@ export function InventoryTab({ onSelect }: InventoryTabProps): React.ReactElemen
               <div>
                 <h3 className="font-semibold leading-tight">{group.name}</h3>
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Package className="h-3 w-3" /> {group.materials.length} materials
+                  <Package className="h-3 w-3" /> {group.items.length} materials
                 </p>
               </div>
             </div>
@@ -136,8 +132,8 @@ export function InventoryTab({ onSelect }: InventoryTabProps): React.ReactElemen
             </Badge>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {group.materials.map((material) => (
-              <StockCard key={material.id} material={material} onSelect={onSelect} />
+            {group.items.map((item) => (
+              <StockCard key={item.id} item={item} onSelect={onSelect} />
             ))}
           </div>
         </section>

@@ -1,11 +1,14 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { ConfigService } from '@nestjs/config';
+import type { Request } from 'express';
 import { OrgRole, UserStatus } from '@prisma/client';
 import type { Permission } from '@sitepilot/types';
 import { PrismaService } from '../../../database/prisma.service';
 import { permissionsForRole } from '../../../common/permissions';
+import { AUTH_COOKIES } from '../auth.constants';
+import { readCookie } from '../auth-cookies';
+import { TokenPayload, TokenService } from '../token.service';
 
 export interface AuthenticatedUser {
   id: string;
@@ -21,16 +24,21 @@ export interface AuthenticatedUser {
   permissions: Permission[];
 }
 
+/** Browsers send the HttpOnly cookie; API clients and Swagger can still use a Bearer header. */
+function extractAccessToken(req: Request): string | null {
+  return readCookie(req, AUTH_COOKIES.access) ?? ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
-    private readonly configService: ConfigService,
+    tokens: TokenService,
     private readonly prisma: PrismaService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: extractAccessToken,
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET', 'super-secret-default-key-please-change-in-prod'),
+      secretOrKey: tokens.accessTokenSecret,
     });
   }
 
@@ -38,7 +46,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
    * The role is read from the membership on every request rather than trusted from the token, so a role
    * change or removal from the organization takes effect immediately instead of when the token expires.
    */
-  async validate(payload: { sub: string; email: string; organizationId: string }): Promise<AuthenticatedUser> {
+  async validate(payload: TokenPayload): Promise<AuthenticatedUser> {
+    // A refresh token is signed with a different secret, but check the claim too so the two can never be swapped.
+    if (payload.type !== 'access') throw new UnauthorizedException('Your session has expired. Sign in again.');
     const membership = await this.prisma.userOrganization.findUnique({
       where: { userId_organizationId: { userId: payload.sub, organizationId: payload.organizationId } },
       select: {

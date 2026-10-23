@@ -6,6 +6,7 @@ import { AddMemberDto } from './dto/add-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { Audit } from '../../common/audit';
 
 interface AuthUser {
   id: string;
@@ -24,6 +25,7 @@ export class ProjectsController {
   }
 
   @RequirePermission('project.create')
+  @Audit('project.created')
   @Post()
   create(@Body() dto: CreateProjectDto, @CurrentUser() user: AuthUser) {
     return this.projectsService.create(user.organizationId, user.id, dto);
@@ -35,6 +37,7 @@ export class ProjectsController {
   }
 
   @RequirePermission('project.update')
+  @Audit('project.updated')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateProjectDto, @CurrentUser() user: AuthUser) {
     return this.projectsService.update(id, user.organizationId, user.id, dto);
@@ -46,6 +49,7 @@ export class ProjectsController {
   }
 
   @RequirePermission('project.members.manage')
+  @Audit('project.member_added')
   @Post(':id/members')
   addMember(@Param('id') id: string, @Body() dto: AddMemberDto, @CurrentUser() user: AuthUser) {
     return this.projectsService.addMember(id, user.organizationId, user.id, dto);

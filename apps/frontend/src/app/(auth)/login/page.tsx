@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { LoginForm } from '@/features/auth/components/LoginForm';
 
 export default function LoginPage() {
@@ -14,7 +15,10 @@ export default function LoginPage() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white px-4 py-8 shadow sm:rounded-lg sm:px-10">
-          <LoginForm />
+          {/* LoginForm reads ?redirect=, which needs a Suspense boundary when the page is prerendered. */}
+          <Suspense>
+            <LoginForm />
+          </Suspense>
         </div>
       </div>
     </div>

@@ -1,47 +1,66 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsObject } from 'class-validator';
-import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, IsUUID, MaxLength, Min,
+} from 'class-validator';
+
+/** Selects send '' when nothing is picked; treat that as "no value" rather than an invalid id. */
+export const emptyToNull = ({ value }: { value: unknown }): unknown => (value === '' ? null : value);
 
 export class CreateMaterialDto {
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  name: string;
+  @MaxLength(150)
+  name!: string;
 
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  sku: string;
+  @MaxLength(50)
+  sku!: string;
 
+  @ApiProperty({ example: 'Bags' })
   @IsString()
   @IsNotEmpty()
-  unit: string;
+  @MaxLength(20)
+  unit!: string;
 
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
   @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   unitCost?: number;
 
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
   @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
   minStock?: number;
 
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
   @Type(() => Number)
-  maxStock?: number;
+  @IsNumber({ maxDecimalPlaces: 3 })
+  @Min(0)
+  maxStock?: number | null;
 
+  @ApiPropertyOptional()
+  @Transform(emptyToNull)
   @IsOptional()
-  @IsString()
-  categoryId?: string;
+  @IsUUID()
+  categoryId?: string | null;
 
+  @ApiPropertyOptional()
+  @Transform(emptyToNull)
   @IsOptional()
-  @IsString()
-  supplierId?: string;
+  @IsUUID()
+  supplierId?: string | null;
 
-  @IsOptional()
-  @IsString()
-  warehouse?: string;
-
+  @ApiPropertyOptional({ type: 'object', additionalProperties: { type: 'string' } })
   @IsOptional()
   @IsObject()
-  specifications?: Record<string, any>;
+  specifications?: Record<string, string>;
 }

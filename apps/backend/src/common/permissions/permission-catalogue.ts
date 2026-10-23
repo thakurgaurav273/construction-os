@@ -18,8 +18,10 @@ export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
   'workforce.manage': { group: 'Workforce', label: 'Add and edit workers' },
   'attendance.mark': { group: 'Workforce', label: 'Mark attendance' },
   'material.manage': { group: 'Materials', label: 'Manage the material catalogue' },
+  'material.issue': { group: 'Materials', label: 'Issue material to sites and take returns' },
   'inventory.adjust': { group: 'Materials', label: 'Adjust stock' },
-  'inventory.transfer': { group: 'Materials', label: 'Transfer stock between stores' },
+  'inventory.transfer': { group: 'Materials', label: 'Request, approve and receive stock transfers' },
+  'warehouse.manage': { group: 'Materials', label: 'Set up stores and bin locations' },
   'vendor.manage': { group: 'Procurement', label: 'Manage vendors' },
   'rfq.manage': { group: 'Procurement', label: 'Issue RFQs and record quotes' },
   'rfq.award': { group: 'Procurement', label: 'Award RFQs' },
@@ -35,6 +37,7 @@ export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
   'report.manage': { group: 'Reports', label: 'Generate and schedule reports' },
   'members.manage': { group: 'Administration', label: 'Invite members and change roles' },
   'organization.manage': { group: 'Administration', label: 'Edit organization settings' },
+  'audit.view': { group: 'Administration', label: 'View the audit log' },
 };
 
 export const ALL_PERMISSIONS = Object.keys(PERMISSION_CATALOGUE) as Permission[];
@@ -51,14 +54,17 @@ export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
   PROJECT_MANAGER: [
     ...SITE_BASICS,
     'project.create', 'project.update', 'project.members.manage', 'dailyReport.approve', 'document.delete',
-    'workforce.manage', 'material.manage', 'inventory.transfer',
+    'workforce.manage', 'material.manage', 'material.issue', 'inventory.transfer', 'warehouse.manage',
     'rfq.manage', 'rfq.award', 'po.create', 'po.approve',
     // Project managers certify bills for work on their sites; finance releases the money.
     'finance.view', 'invoice.approve',
     'report.manage',
   ],
   SITE_ENGINEER: [...SITE_BASICS, 'po.create'],
-  STORE_MANAGER: ['document.upload', 'delivery.receive', 'material.manage', 'inventory.adjust', 'inventory.transfer'],
+  STORE_MANAGER: [
+    'document.upload', 'delivery.receive', 'material.manage', 'material.issue', 'inventory.adjust', 'inventory.transfer',
+    'warehouse.manage',
+  ],
   PROCUREMENT: ['document.upload', 'delivery.receive', 'vendor.manage', 'rfq.manage', 'rfq.award', 'po.create'],
   FINANCE: [
     'document.upload', 'finance.view', 'invoice.create', 'invoice.approve',

@@ -1,5 +1,7 @@
-import { Controller, Get, Param, Patch, Post, Query, Body, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Patch, Post, Query, Body, UseGuards } from '@nestjs/common';
 import { MaterialsService } from './materials.service';
+import { MaterialsDashboardService } from './materials-dashboard.service';
+import { MaterialView } from './material.mapper';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MaterialQueryDto } from './dto/material-query.dto';
@@ -7,6 +9,7 @@ import { MovementQueryDto } from './dto/movement-query.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
 import { CreateMaterialDto } from './dto/create-material.dto';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { Audit } from '../../common/audit';
 
 interface AuthUser {
   id: string;
@@ -17,11 +20,15 @@ interface AuthUser {
 @Controller('materials')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class MaterialsController {
-  constructor(private readonly materialsService: MaterialsService) {}
+  constructor(
+    private readonly materialsService: MaterialsService,
+    private readonly dashboardService: MaterialsDashboardService,
+  ) {}
 
   @RequirePermission('material.manage')
+  @Audit('material.created')
   @Post()
-  create(@Body() dto: CreateMaterialDto, @CurrentUser() user: AuthUser) {
+  create(@Body() dto: CreateMaterialDto, @CurrentUser() user: AuthUser): Promise<MaterialView> {
     return this.materialsService.create(user.organizationId, dto);
   }
 
@@ -32,7 +39,7 @@ export class MaterialsController {
 
   @Get('dashboard')
   getDashboard(@CurrentUser() user: AuthUser) {
-    return this.materialsService.getDashboard(user.organizationId);
+    return this.dashboardService.getDashboard(user.organizationId);
   }
 
   @Get('categories')
@@ -61,8 +68,16 @@ export class MaterialsController {
   }
 
   @RequirePermission('material.manage')
+  @Audit('material.updated')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateMaterialDto, @CurrentUser() user: AuthUser) {
+  update(@Param('id') id: string, @Body() dto: UpdateMaterialDto, @CurrentUser() user: AuthUser): Promise<MaterialView> {
     return this.materialsService.update(id, user.organizationId, dto);
+  }
+
+  @RequirePermission('material.manage')
+  @Audit('material.archived')
+  @Delete(':id')
+  archive(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<{ id: string }> {
+    return this.materialsService.archive(id, user.organizationId);
   }
 }

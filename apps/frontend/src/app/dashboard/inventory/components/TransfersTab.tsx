@@ -214,7 +214,7 @@ export function TransfersTab({ onSelect }: TransfersTabProps): React.ReactElemen
         </>
       )}
 
-      <CreateTransferDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateTransferDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={onSelect} />
     </div>
   );
 }

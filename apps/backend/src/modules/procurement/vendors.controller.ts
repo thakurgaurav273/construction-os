@@ -5,6 +5,7 @@ import { CreateVendorDto, UpdateVendorDto } from './dto/vendor.dto';
 import { VendorView } from './vendor.mapper';
 import { VendorsService } from './vendors.service';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { Audit } from '../../common/audit';
 
 interface AuthUser { id: string; organizationId: string; role: string }
 
@@ -24,12 +25,14 @@ export class VendorsController {
   }
 
   @RequirePermission('vendor.manage')
+  @Audit('vendor.created')
   @Post()
   create(@Body() dto: CreateVendorDto, @CurrentUser() user: AuthUser): Promise<VendorView> {
     return this.vendors.create(user.organizationId, dto);
   }
 
   @RequirePermission('vendor.manage')
+  @Audit('vendor.updated')
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -40,12 +43,14 @@ export class VendorsController {
   }
 
   @RequirePermission('vendor.manage')
+  @Audit('vendor.deactivated')
   @Post(':id/deactivate')
   deactivate(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<VendorView> {
     return this.vendors.setStatus(id, user.organizationId, 'INACTIVE');
   }
 
   @RequirePermission('vendor.manage')
+  @Audit('vendor.reactivated')
   @Post(':id/reactivate')
   reactivate(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<VendorView> {
     return this.vendors.setStatus(id, user.organizationId, 'ACTIVE');

@@ -49,10 +49,10 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 
 ## Phase 2 — Security & foundations
 
-### T3. Organization isolation
-- [ ] Verify `projectId` belongs to org in documents upload, purchase-order create, materials category/supplier, report aggregation
-- [ ] Remove raw-body passthrough in `ReportsService.updateSchedule`
-- [ ] Verify `locationId` on inventory item update
+### T3. Organization isolation  `[x]`
+- [x] Verify `projectId` belongs to org in documents upload, purchase-order create, materials category/supplier, report aggregation (report project filter had no org scope; document upload wrote to storage before checking; upload names are now sanitised)
+- [x] Remove raw-body passthrough in `ReportsService.updateSchedule` (DTOs for generate / schedule create + update / history)
+- [x] Verify `locationId` on inventory item update (done in T11)
 
 ### T4. RBAC (permission-based)
 - [ ] Permission constants per module + role → permission map
@@ -61,30 +61,42 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 - [ ] Daily report approve / reject → `dailyReports.approve` permission (today any non-author member can review)
 - [ ] Attendance marking + worker create/deactivate → `workforce.manage` permission (today any member can)
 - [ ] Fix OWNER escalation in settings (ADMIN can't invite/promote to OWNER)
-- [ ] Register `ThrottlerGuard` globally
+- [~] Rate limiting: auth endpoints limited to 10/min per IP; a global limit waits for `TRUST_PROXY` to be set in production (behind a proxy every user shares one IP)
 
-### T5. Auth hardening
-- [ ] Bug: two logins in the same second → 500 (refresh JWTs are identical → unique constraint on `refresh_tokens.token`); add a random `jti`
-- [ ] Separate refresh secret + `type` claim; access strategy rejects refresh tokens
-- [ ] Remove hardcoded fallback JWT secrets
-- [ ] Re-check organization membership on refresh and in the JWT strategy
-- [ ] Move tokens to HttpOnly cookies; stop writing tokens to localStorage
-- [ ] Logout button wired to `POST /auth/logout`
-- [ ] Forgot / reset password flow
+### T5. Auth hardening  `[x]`
+- [x] Bug: two logins in the same second → 500; every token now has a random `jti`
+- [x] Separate access / refresh secrets + `type` claim; each rejects the other
+- [x] Remove hardcoded fallback JWT secrets (API refuses to start without two distinct secrets of 32+ chars). Note: docker-compose only passed `JWT_ACCESS_SECRET`, so production was signing with the hardcoded fallback until now
+- [x] Re-check organization membership on refresh and in the JWT strategy; deactivated users lose access immediately
+- [x] HttpOnly cookies (`access_token`, `refresh_token` on `/api/auth`, `sp_session` flag); nothing in localStorage or response bodies; legacy tokens cleaned up
+- [x] Refresh tokens hashed at rest, rotated, and replay of a rotated token ends all of the user's sessions
+- [x] Sign out from the account menu (sidebar + mobile header)
+- [x] Forgot / reset password: single-use hashed links, 1 hour, no account enumeration, resets end all sessions
+- [x] Login honours `?redirect=` (same-site paths only); unknown email and wrong password give the same answer
 
-### T6. Invitations
-- [ ] `POST /invitations/:token/accept` endpoint (set name + password)
-- [ ] `/accept-invitation/[token]` page; make it public in middleware
-- [ ] Align frontend role list with `OrgRole` enum (remove `ENGINEER`, add `SITE_ENGINEER`, `STORE_MANAGER`)
+> Verified 2026-10-23: 40 HTTP checks (cookies, rotation, reuse detection, logout, deactivation, reset flow, enumeration, report/document isolation, rate limit), 6 token unit tests, startup refuses missing/short secrets, and a headless-browser run (redirect, HttpOnly, silent refresh after access expiry, sign out, forgot/reset pages).
+
+### T6. Invitations  `[x]`
+- [x] `GET /invitations/:token` preview + `POST /invitations/:token/accept`: new people set name + password; existing accounts confirm with their current password; accepting signs in to the inviting organization (cookies). Single-use (claimed atomically), expired links refused, rate-limited
+- [x] `/accept-invitation/[token]` page; public in middleware (the old `/invite` prefix didn't match the emailed link)
+- [x] Align frontend role list with `OrgRole` enum (already done with RBAC)
+- [x] Removed the unused settings `acceptInvitation`, which would have created users with an empty password; invite emails normalised; invitation responses no longer include the token hash
+- [ ] Organization switcher for people who belong to several organizations (login opens the earliest-joined one)
+
+> Verified 2026-10-23: 25 HTTP checks (preview, new and existing accounts, wrong password keeps the link usable, concurrent accept, reuse, expiry, case-insensitive member check) and a headless-browser run (open link → set password → dashboard; reused link shows the expiry message).
 
 ### T7. Validation everywhere
 - [ ] DTOs for settings (role change, invite), notifications (device register), reports (generate, schedule create/update), auth refresh/logout
 - [ ] Remove remaining `any` in backend
 
-### T8. Audit log
-- [ ] `AuditLog` model (actor, action, entity, metadata, timestamp — immutable) + migration
-- [ ] `AuditService` used by every mutating service
-- [ ] Settings → Audit Logs tab reads real data
+### T8. Audit log  `[x]`
+- [x] `AuditLog` model (actor snapshot, action, entity, project, redacted input, IP, user agent, timestamp) + migration; a Postgres trigger rejects UPDATE / DELETE / TRUNCATE
+- [x] Every write endpoint declares `@Audit('<action>')` from a typed catalogue (87 endpoints); a global interceptor records successful calls; a test fails if a new write endpoint isn't audited. Exempt: token refresh, logout, forgot-password, personal notification actions. Password resets are recorded by the service in each of the person's organizations
+- [x] `GET /audit-logs` (new `audit.view` permission, owners/admins) with search, record type, action prefix, project, actor and date filters
+- [x] Settings → Audit Logs tab reads real data (filters, pagination, detail sheet, loading / empty / error / restricted states)
+- [ ] Per-record history panels (e.g. "History" on a PO drawer) reading `?entityType=&entityId=`
+
+> Verified 2026-10-23: 21 HTTP checks (sign-in with IP/agent, password redaction, PO approval with entity id, failed actions not recorded, project-scoped ids, nested id params, filters, 403 for non-admins, org isolation, password reset, trigger blocks update/delete/truncate) and a headless-browser run (owner filters and opens an entry; project manager sees the restricted state on mobile).
 
 ---
 
@@ -99,19 +111,26 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 - [ ] Project → Purchase Orders tab: correct field names + filter by project
 - [ ] Replace hardcoded analytics/KPI trend text with API data; error state + skeletons
 
-### T10. Materials
-- [ ] Fix create with empty category/supplier (FK error → 500)
-- [ ] Edit material UI, delete/archive
-- [ ] Issue material to project / record consumption (MaterialMovement + MaterialProjectUsage)
-- [ ] Warehouse select from real warehouses; single source of truth for stock
-- [ ] Project → Materials tab
+### T10. Materials  `[x]`
+- [x] Fix create with empty category/supplier (FK error → 500); category/supplier verified to belong to the org; duplicate SKU → 409
+- [x] Edit material UI, archive (only when no stock on hand or incoming)
+- [x] Issue material to project / record returns — numbered MIN/MRN notes through the stock ledger, race-safe availability check, project activity
+- [x] Single source of truth for stock: catalogue form no longer edits quantities or a free-text warehouse; drawer and Inventory tab read real per-store stock; opening stock via count adjustment
+- [x] Project → Materials tab: consumption vs planned quantity, issue/return, recent notes
+- [ ] Material requests (site requests → store approves → issue) — not modelled yet
 
-### T11. Inventory
-- [ ] Warehouse + location create / edit
-- [ ] Enforce approval before transfer completion
-- [ ] Record actor from auth context (requestedBy / approvedBy / adjustedBy)
-- [ ] Stock check inside transaction; race-safe codes
-- [ ] Export, toast typos
+> Verified 2026-10-23: migration on a fresh DB, seed, 36 HTTP checks (create/edit/archive validation, issue/return/plan, permissions, over-issue, concurrent issues, org isolation, material total = Σ store stock) and a headless-browser run as a project manager (desktop + 390px mobile).
+
+### T11. Inventory  `[x]`
+- [x] Store create / edit / archive (empty stores only) and bin locations add / edit / remove; new `warehouse.manage` permission
+- [x] Transfers: PENDING → APPROVED → COMPLETED enforced; requester can't approve or reject their own request; reject needs a note; only the requester cancels
+- [x] Actors from the auth context (requestedById / approvedById / completedById / adjustedById, FK to users; migration backfills existing rows with the org owner)
+- [x] Stock moves through the ledger with an atomic availability check; adjustments lock the row; TRF / ADJ codes retry on clash; double completion can't double-move stock
+- [x] Damaged stock no longer subtracted twice from availability; item PATCH limited to reorder level + bin (bin must be in the same store)
+- [x] Real CSV export of all store lines; transfer toasts fixed; server error messages shown
+- [x] Verify `locationId` on inventory item update (from T3)
+
+> Verified 2026-10-23: migration backfill tested on legacy rows, fresh DB + seed, 46 HTTP checks (store/bin setup, transfer state machine + maker-checker, concurrent receive, concurrent adjustments, damaged availability, material total = Σ store stock, permissions, org isolation) and a headless-browser run (owner requests, project manager approves and receives).
 
 ### T12. Finance
 - [ ] Create / approve / cancel invoice
@@ -134,7 +153,8 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 
 ### T15. Notifications
 - [ ] Emit notifications from domain events (PO approved, report submitted, transfer approved…)
-- [ ] Fix WebSocket gateway secret; frontend socket client
+- [x] Fix WebSocket gateway secret (it had none, so every connection was rejected; now verifies the access cookie)
+- [ ] Frontend socket client
 - [ ] Header: correct type icons, timestamps, mark-all-read
 - [ ] Notification preferences endpoint + UI
 

@@ -795,6 +795,180 @@ Goods receipts didn't touch inventory, so stock drifted from reality after every
 
 ---
 
+# ADR-021 - Material Issues to Project Sites
+
+**Status**
+
+Accepted (closes the Material.quantity consequence of ADR-020)
+
+**Date**
+
+2026-10-23
+
+---
+
+## Context
+
+Stock arrived through GRNs but never left a store except through transfers and adjustments, so project consumption (`MaterialProjectUsage.consumed`) was seed data only. The Materials form could still edit `quantity`, `reserved` and `incoming` directly, and stored a free-text warehouse name that didn't match the real stores.
+
+---
+
+## Decision
+
+- **Issue and return notes.** Stock leaves a store for a site on a numbered Material Issue Note (`MIN-0001`) and comes back on a Material Return Note (`MRN-0001`), both stored as `MaterialIssue` with the store, project, quantity, carrying cost at the time, and who recorded it. Numbers are unique per organization and retried on a clash, like PO numbers.
+- **Through the ledger.** `StockLedgerService.issueToProject` / `returnFromProject` update the store item, the material total, both movement logs and the project's consumed quantity in one transaction. The availability check (`quantity − reserved ≥ issue`) and the decrement are one SQL statement, so concurrent issues can't overdraw a store. A project can't return more than it has been issued.
+- **Consumption means issued to site.** `MaterialProjectUsage.consumed` is the net quantity issued minus returned. `allocated` is the planned quantity (e.g. from the BOQ), set per project and material.
+- **Catalogue edits don't touch stock.** The Materials form no longer accepts quantity fields or a warehouse name. Per-store stock is read from inventory items, and opening stock is recorded as a count adjustment at a store.
+- **Archive, not delete.** Only materials with no stock on hand and nothing incoming can be archived. The SKU stays reserved so history remains traceable.
+- New permission `material.issue` (project managers and store managers). Setting the plan needs `project.update`.
+
+---
+
+## Alternatives
+
+- Issuing without a document, as a plain movement: rejected. Sites and auditors reconcile against numbered issue slips, and the note records who handed the material out.
+- Valuing project consumption from issue notes rather than current cost: deferred. Seeded and historical consumption has no notes, so the project tab values consumption at the current moving-average cost. Each note still stores its own cost for later reporting.
+
+---
+
+## Consequences
+
+- Material requests (site asks, store approves, then issues) aren't modelled. Issues are recorded directly by someone with `material.issue`.
+- `Material.warehouse` is unused and can be dropped in a later migration.
+
+---
+
+# ADR-022 - Store Transfers and Adjustments Through the Ledger
+
+**Status**
+
+Accepted (extends ADR-020 and ADR-021)
+
+**Date**
+
+2026-10-23
+
+---
+
+## Context
+
+Stock transfers could be completed straight from PENDING, the availability check ran before the transaction, and requester, approver and adjuster names were free text sent by the client. Stores and bin locations could only be created by seeding. Damaged stock was subtracted from availability twice: the adjustment already removed it from `quantity`.
+
+---
+
+## Decision
+
+- **Transfer lifecycle:** PENDING → APPROVED → COMPLETED, with REJECTED (note required) or CANCELLED (requester only) before stock moves. The requester can never approve or reject their own transfer. Each step is a conditional update, so two people acting at once can't both win.
+- **Stock moves on receipt** through `StockLedgerService.transferBetweenStores`, sharing the single-statement availability check with material issues. If the origin store no longer has the stock, receiving fails and the transfer stays approved.
+- **Adjustments lock the store row** (`SELECT … FOR UPDATE`) so the before/after quantities match what was counted. Damage and loss can only reduce stock.
+- **Actors are users, not text:** `requestedById`, `approvedById`, `completedById` and `adjustedById` come from the signed-in user. The migration attributes existing rows to the organization's owner, because the old free-text names can't be matched to users reliably.
+- **Available = quantity − reserved.** `damaged` only records how much was written off.
+- **Store setup** (stores and bins) needs the new `warehouse.manage` permission. Store codes are unique per organization (archived stores keep theirs) and bin codes are unique per store. Only empty stores with no open transfers or deliveries can be archived. Removing a bin unassigns its items without touching their stock.
+- Transfer and adjustment numbers use the shared `nextDocumentNumber` + retry-on-clash pattern.
+
+---
+
+## Alternatives
+
+- A separate "dispatch" step (IN_TRANSIT) between approval and receipt: deferred. Most site transfers move the same day; the status remains in the enum for when vehicle tracking is needed.
+- Keeping the free-text actor columns next to the new foreign keys: rejected. They were unverified client input and would drift from the real actor.
+
+---
+
+## Consequences
+
+- Transfers aren't linked to a project timeline yet. They will be covered by the audit log (T8).
+- Stock reservations (`reserved`) are still only written by seed data.
+
+---
+
+# ADR-023 - Cookie Sessions and Token Hardening
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-23
+
+---
+
+## Context
+
+Access and refresh tokens were returned in response bodies and kept in localStorage, where any injected script could read them. Both were signed with one secret read from `JWT_SECRET`, which has a hard-coded fallback. Docker-compose sets only `JWT_ACCESS_SECRET`, so deployments were signing with the fallback. Tokens had no unique id: two logins in the same second produced identical refresh tokens and failed on the unique index. Refresh tokens were stored in plain text, logout wasn't reachable from the UI, and there was no password reset.
+
+---
+
+## Decision
+
+- **HttpOnly cookies.** `access_token` (15 min, path `/`), `refresh_token` (7 days, path `/api/auth` only) and `sp_session`, a flag with no secret. It lets the Next.js middleware gate pages while the access cookie is being refreshed. Cookies are `SameSite=Lax`, `Secure` when `COOKIE_SECURE=true`, and shared across subdomains through `COOKIE_DOMAIN`. Tokens never appear in response bodies. A Bearer header is still accepted for API clients and Swagger.
+- **Two secrets, no fallback.** `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` must both be set, differ, and be at least 32 characters, or the API won't start. Tokens carry `type` and a random `jti`.
+- **Refresh tokens** are stored as SHA-256 hashes and rotated on every refresh. Presenting an already-rotated token revokes every session of that user, since it means the token was copied. Refresh also re-checks membership and account status.
+- **Password reset** uses single-use random links (stored hashed) that expire after an hour. The request endpoint answers identically whether or not the email exists and returns before sending. A successful reset ends all sessions.
+- **Rate limiting:** login, register, forgot and reset are limited to 10 per minute per IP. A global limit is deferred until production sets `TRUST_PROXY`; otherwise every user behind the proxy would share one counter.
+- The notifications WebSocket verifies the access cookie with the same service. It previously had no secret configured and rejected every connection.
+
+---
+
+## Alternatives
+
+- Keeping tokens in memory and using a refresh cookie only: rejected for now. Every page load would need a refresh round trip, and the Next.js middleware still needs a cookie to gate routes.
+- CSRF tokens: not added. `SameSite=Lax` cookies aren't sent on cross-site POST/PATCH/DELETE, the API only accepts JSON bodies, and CORS is limited to configured origins. Revisit if a cross-site embed or form post is ever needed.
+
+---
+
+## Consequences
+
+- Existing refresh tokens were deleted by the migration (they were stored in plain text), so everyone signs in once after deploying.
+- Frontend and API must share a registrable domain (e.g. `app.grovyn.in` and `api.grovyn.in` with `COOKIE_DOMAIN=.grovyn.in`) for the middleware to see the session cookie.
+
+---
+
+# ADR-024 - Declarative, Append-Only Audit Log
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-23
+
+---
+
+## Context
+
+The handbook requires an immutable audit log (actor, action, timestamp, metadata) for every important action. There are close to a hundred write endpoints across modules, and adding hand-written audit calls to each service would be easy to forget and hard to keep consistent.
+
+---
+
+## Decision
+
+- **Declared at the endpoint.** Every write route carries `@Audit('<action>')`, where the action comes from a typed catalogue (`common/audit/audit-actions.ts`) that also holds its readable label and entity type. A global `AuditInterceptor` writes the entry after the handler succeeds. Failed or rejected requests changed nothing, so they aren't recorded.
+- **Enforced by a test.** Like route permissions, a unit test fails when a write endpoint has neither an `@Audit` action nor an entry on the short exemption list (token refresh, logout, forgot-password, personal notification actions).
+- **What is stored:** actor id and a name snapshot (no foreign key, so entries outlive users), organization, entity type and id (route param or the response's id), project id, the request input with passwords, tokens and secrets redacted and size-capped, IP and user agent.
+- **Append-only in the database.** A trigger rejects UPDATE, DELETE and TRUNCATE on `audit_logs`, and the API has only a read endpoint. Corrections are new entries.
+- Events with no signed-in request, like a password reset, are recorded from their service through `AuditService`.
+- Reading requires the new `audit.view` permission (owners and admins).
+
+---
+
+## Alternatives
+
+- Calling `AuditService` inside each service's transaction: rejected as the default. It would be atomic with the change, but it means ~90 hand-written calls and no reliable way to notice a missing one. Services can still call it directly when an event has no endpoint.
+- Prisma middleware on every write: rejected. It sees table rows, not business actions, so "approved a purchase order" would appear as several updates with no actor.
+
+---
+
+## Consequences
+
+- The entry is written just after the change commits. If that write fails, the error is logged and the request still succeeds, so a crash in that gap can lose an entry.
+- Entries record what was requested (the redacted input), not a before/after diff. Diffs can be added per action later if auditors need them.
+- `ON UPDATE CASCADE` on the organization foreign key would be blocked by the trigger. Organization ids never change, so this is acceptable.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

@@ -18,7 +18,6 @@ export interface MaterialListItem {
   maxStock: number | null;
   stockValue: number;
   status: MaterialStatus;
-  warehouse: string | null;
   imageUrl: string | null;
   categoryId: string | null;
   categoryName: string | null;
@@ -218,31 +217,157 @@ export function useMaterialLowStock() {
   });
 }
 
-export function useUpdateMaterial() {
-  const queryClient = useQueryClient();
+export interface MaterialInput {
+  name: string;
+  sku: string;
+  unit: string;
+  unitCost?: number;
+  minStock?: number;
+  maxStock?: number | null;
+  categoryId?: string | null;
+  supplierId?: string | null;
+}
 
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<MaterialListItem> }) => {
-      const res = await apiClient.patch(`/materials/${id}`, data);
-      return res.data;
-    },
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: ['materials'] });
-      queryClient.invalidateQueries({ queryKey: ['materials', id] });
-    },
-  });
+export type SiteStockMovementType = 'ISSUE' | 'RETURN';
+
+export interface MaterialIssue {
+  id: string;
+  code: string;
+  type: SiteStockMovementType;
+  quantity: number;
+  unitCost: number;
+  value: number;
+  note: string | null;
+  issuedOn: string;
+  material: { id: string; name: string; unit: string };
+  warehouse: { id: string; name: string };
+  issuedBy: { id: string; name: string };
+}
+
+export interface ProjectMaterialLine {
+  materialId: string;
+  name: string;
+  sku: string;
+  unit: string;
+  planned: number;
+  consumed: number;
+  remaining: number;
+  consumedValue: number;
+  storeAvailable: number;
+}
+
+export interface ProjectMaterials {
+  summary: {
+    materialCount: number;
+    consumedValue: number;
+    overPlanCount: number;
+    issuesThisWeek: number;
+  };
+  items: ProjectMaterialLine[];
+  recentIssues: MaterialIssue[];
+}
+
+export interface SiteStockMovementInput {
+  materialId: string;
+  warehouseId: string;
+  quantity: number;
+  issuedOn?: string;
+  note?: string;
+}
+
+/** Stock changes ripple into material totals, store inventory, the project tab and its timeline. */
+function invalidateStock(queryClient: ReturnType<typeof useQueryClient>, projectId?: string): void {
+  queryClient.invalidateQueries({ queryKey: ['materials'] });
+  queryClient.invalidateQueries({ queryKey: ['material'] });
+  queryClient.invalidateQueries({ queryKey: ['inventory'] });
+  if (projectId) {
+    queryClient.invalidateQueries({ queryKey: ['project-materials', projectId] });
+    queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+  }
 }
 
 export function useCreateMaterial() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: Record<string, any>) => {
-      const res = await apiClient.post('/materials', data);
-      return res.data;
+    mutationFn: async (input: MaterialInput): Promise<MaterialListItem> => {
+      const res = await apiClient.post('/materials', input);
+      return res.data.data ?? res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['materials'] });
+    },
+  });
+}
+
+export function useUpdateMaterial() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, input }: { id: string; input: Partial<MaterialInput> }): Promise<MaterialListItem> => {
+      const res = await apiClient.patch(`/materials/${id}`, input);
+      return res.data.data ?? res.data;
+    },
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ['materials'] });
+      queryClient.invalidateQueries({ queryKey: ['material', id] });
+    },
+  });
+}
+
+export function useArchiveMaterial() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      await apiClient.delete(`/materials/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['materials'] });
+    },
+  });
+}
+
+export function useProjectMaterials(projectId: string) {
+  return useQuery<ProjectMaterials>({
+    queryKey: ['project-materials', projectId],
+    queryFn: async () => {
+      const res = await apiClient.get(`/projects/${projectId}/materials`);
+      return res.data.data ?? res.data;
+    },
+    enabled: !!projectId,
+    staleTime: 30_000,
+  });
+}
+
+export function useRecordSiteStockMovement() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ projectId, type, input }: {
+      projectId: string;
+      type: SiteStockMovementType;
+      input: SiteStockMovementInput;
+    }): Promise<MaterialIssue> => {
+      const path = type === 'ISSUE' ? 'issues' : 'returns';
+      const res = await apiClient.post(`/projects/${projectId}/materials/${path}`, input);
+      return res.data.data ?? res.data;
+    },
+    onSuccess: (_, { projectId }) => invalidateStock(queryClient, projectId),
+  });
+}
+
+export function useSetMaterialPlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ projectId, materialId, planned }: { projectId: string; materialId: string; planned: number }) => {
+      const res = await apiClient.put(`/projects/${projectId}/materials/${materialId}/plan`, { planned });
+      return res.data.data ?? res.data;
+    },
+    onSuccess: (_, { projectId }) => {
+      queryClient.invalidateQueries({ queryKey: ['project-materials', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['material'] });
     },
   });
 }

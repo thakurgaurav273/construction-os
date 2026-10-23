@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Search, Menu, CheckCircle2, AlertTriangle, FileText, Check } from 'lucide-react';
+import { Bell, Search, Menu, CheckCircle2, AlertTriangle, FileText, Check, UserCircle } from 'lucide-react';
 import { Button } from '@sitepilot/ui';
 import { usePathname } from 'next/navigation';
 import { company } from '@/data/demo';
@@ -17,6 +17,7 @@ import { ScrollArea } from '@sitepilot/ui';
 import { Badge } from '@sitepilot/ui';
 import { useNotifications, useMarkNotificationsRead } from '@/hooks/api/use-notifications';
 import { useTheme } from 'next-themes';
+import { UserMenu } from '@/features/auth/components/UserMenu';
 
 export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void, onSearchClick: () => void }) {
   const pathname = usePathname();
@@ -132,6 +133,14 @@ export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
+            {/* The sidebar (with the account menu) is hidden on small screens. */}
+            <div className="md:hidden">
+              <UserMenu align="end" side="bottom">
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" aria-label="Account menu">
+                  <UserCircle className="h-5 w-5" />
+                </Button>
+              </UserMenu>
+            </div>
           </div>
         </div>
       </div>

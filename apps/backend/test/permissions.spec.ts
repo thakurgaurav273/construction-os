@@ -1,17 +1,15 @@
 import 'reflect-metadata';
 import { before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
-import { ExecutionContext, ForbiddenException, RequestMethod } from '@nestjs/common';
-import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { relative } from 'node:path';
+import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Permission } from '@sitepilot/types';
 import {
   ALL_PERMISSIONS, PERMISSIONS_KEY, PermissionsGuard, ROLE_PERMISSIONS, permissionsForRole,
 } from '../src/common/permissions';
+import { ControllerClass, MODULES_DIR, loadControllers, writeRoutes } from './controller-routes';
 
-const MODULES_DIR = join(__dirname, '..', 'src', 'modules');
 
 /** Writes that are deliberately open to any signed-in member (or anonymous, for auth). */
 const OPEN_WRITES = new Set([
@@ -19,6 +17,10 @@ const OPEN_WRITES = new Set([
   'AuthController.login',
   'AuthController.refresh',
   'AuthController.logout',
+  // Signed-out flows: the reset link itself is the credential.
+  'AuthController.forgotPassword',
+  'AuthController.resetPassword',
+  'InvitationsController.accept',
   // Personal: a member manages only their own devices and notifications.
   'NotificationsController.registerDevice',
   'NotificationsController.unregisterDevice',
@@ -26,22 +28,6 @@ const OPEN_WRITES = new Set([
   'NotificationsController.markRead',
   'NotificationsController.remove',
 ]);
-
-type ControllerClass = { name: string; prototype: Record<string, unknown> };
-
-function controllerFiles(dir: string): string[] {
-  return readdirSync(dir).flatMap((entry) => {
-    const path = join(dir, entry);
-    if (statSync(path).isDirectory()) return controllerFiles(path);
-    return entry.endsWith('.controller.ts') ? [path] : [];
-  });
-}
-
-async function loadControllers(): Promise<ControllerClass[]> {
-  const modules = await Promise.all(controllerFiles(MODULES_DIR).map((file) => import(file) as Promise<Record<string, unknown>>));
-  return modules.flatMap((exports) => Object.values(exports)
-    .filter((value): value is ControllerClass => typeof value === 'function' && Reflect.hasMetadata(PATH_METADATA, value)));
-}
 
 function requiredPermissions(controller: ControllerClass, handler: unknown): Permission[] {
   return [
@@ -61,19 +47,10 @@ describe('route permissions', () => {
   });
 
   it('protects every write endpoint with its own permission', () => {
-    const unprotected: string[] = [];
-    for (const controller of controllers) {
-      for (const name of Object.getOwnPropertyNames(controller.prototype)) {
-        const handler = controller.prototype[name];
-        if (name === 'constructor' || typeof handler !== 'function' || !Reflect.hasMetadata(PATH_METADATA, handler)) continue;
-        const method: RequestMethod = Reflect.getMetadata(METHOD_METADATA, handler);
-        if (method === RequestMethod.GET) continue;
-        const key = `${controller.name}.${name}`;
-        // A class baseline such as finance.view only grants reading; each write must name its own permission.
-        const routePermissions: Permission[] = Reflect.getMetadata(PERMISSIONS_KEY, handler) ?? [];
-        if (!OPEN_WRITES.has(key) && routePermissions.length === 0) unprotected.push(key);
-      }
-    }
+    // A class baseline such as finance.view only grants reading; each write must name its own permission.
+    const unprotected = writeRoutes(controllers)
+      .filter(({ key, handler }) => !OPEN_WRITES.has(key) && (Reflect.getMetadata(PERMISSIONS_KEY, handler) ?? []).length === 0)
+      .map(({ key }) => key);
     assert.deepEqual(unprotected, [], `Add @RequirePermission to: ${unprotected.join(', ')}`);
   });
 

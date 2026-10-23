@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { CreateScheduleDto, GenerateReportDto, UpdateScheduleDto } from './dto/report.dto';
 
 @Injectable()
 export class ReportsService {
@@ -20,9 +22,11 @@ export class ReportsService {
   }
 
   // Generate a report - aggregates data from all modules
-  async generate(input: { type: string; projectIds?: string[]; name: string; format: string; userId: string }, organizationId: string) {
-    const { type, projectIds, name, format, userId } = input;
-    
+  async generate(input: GenerateReportDto & { userId: string }, organizationId: string) {
+    const { type, projectIds, name, userId } = input;
+    const format = input.format ?? 'PDF';
+    await this.assertProjectsInOrganization(organizationId, projectIds);
+
     // Get or create template report
     let templateReport = await this.prisma.report.findFirst({ where: { type, organizationId } });
     if (!templateReport) {
@@ -60,13 +64,18 @@ export class ReportsService {
   }
 
   private async aggregateReportData(type: string, orgId: string, projectIds?: string[]) {
-    const projectFilter = projectIds?.length ? { id: { in: projectIds } } : { organizationId: orgId };
-    
+    // Every query is scoped to the organization; project ids only narrow it further.
+    const projectFilter: Prisma.ProjectWhereInput = {
+      organizationId: orgId,
+      deletedAt: null,
+      ...(projectIds?.length ? { id: { in: projectIds } } : {}),
+    };
+
     const [projects, dailyReports, purchaseOrders, inventory, finance, workforce] = await Promise.all([
       this.prisma.project.findMany({ where: projectFilter, select: { id: true, name: true, code: true, status: true, progress: true, budget: true, spent: true } }),
-      this.prisma.dailyReport.findMany({ where: { project: projectFilter }, take: 100, orderBy: { date: 'desc' } }),
+      this.prisma.dailyReport.findMany({ where: { organizationId: orgId, project: projectFilter }, take: 100, orderBy: { date: 'desc' } }),
       this.prisma.purchaseOrder.findMany({ where: { organizationId: orgId, ...(projectIds?.length ? { projectId: { in: projectIds } } : {}) } }),
-      this.prisma.inventoryItem.findMany({ where: { organization: { id: orgId } }, include: { material: true, warehouse: true } }),
+      this.prisma.inventoryItem.findMany({ where: { organizationId: orgId }, include: { material: true, warehouse: true } }),
       this.getFinanceSummary(orgId, projectIds),
       this.getWorkforceSummary(orgId, projectIds),
     ]);
@@ -84,8 +93,9 @@ export class ReportsService {
   }
 
   private async getWorkforceSummary(orgId: string, projectIds?: string[]) {
-    const projectFilter = projectIds?.length ? { id: { in: projectIds }, organizationId: orgId } : { organizationId: orgId };
-    const workers = await this.prisma.worker.findMany({ where: projectFilter });
+    const workers = await this.prisma.worker.findMany({
+      where: { organizationId: orgId, ...(projectIds?.length ? { projectId: { in: projectIds } } : {}) },
+    });
     return { workers, totalCount: workers.length };
   }
 
@@ -124,19 +134,8 @@ export class ReportsService {
   }
 
   // Schedule a report
-  async createSchedule(input: {
-    reportType: string;
-    name: string;
-    frequency: string;
-    time?: string;
-    timezone?: string;
-    projects?: string[];
-    recipients?: string[];
-    emails?: string[];
-    outputFormat?: string;
-    includeAiSummary?: boolean;
-    nextRunAt?: string;
-  }, organizationId: string, userId: string) {
+  async createSchedule(input: CreateScheduleDto, organizationId: string, userId: string) {
+    await this.assertProjectsInOrganization(organizationId, input.projects);
     // Get or create the report template
     let report = await this.prisma.report.findFirst({ where: { type: input.reportType, organizationId } });
     if (!report) {
@@ -145,7 +144,7 @@ export class ReportsService {
       });
     }
 
-    const nextRunAt = input.nextRunAt ? new Date(input.nextRunAt) : this.computeNextRun(input.frequency, input.time ?? '09:00');
+    const nextRunAt = this.computeNextRun(input.frequency, input.time ?? '09:00');
 
     return this.prisma.reportSchedule.create({
       data: {
@@ -168,11 +167,36 @@ export class ReportsService {
   }
 
   // Update schedule
-  async updateSchedule(id: string, input: Record<string, unknown>, organizationId: string) {
+  async updateSchedule(id: string, input: UpdateScheduleDto, organizationId: string) {
     const schedule = await this.prisma.reportSchedule.findFirst({ where: { id, organizationId } });
-    if (!schedule) return null;
-    const { reportType: _rt, ...rest } = input; // eslint-disable-line @typescript-eslint/no-unused-vars
-    return this.prisma.reportSchedule.update({ where: { id }, data: rest as Record<string, unknown> });
+    if (!schedule) throw new NotFoundException('Schedule not found.');
+    await this.assertProjectsInOrganization(organizationId, input.projects);
+    const timingChanged = input.frequency !== undefined || input.time !== undefined;
+    return this.prisma.reportSchedule.update({
+      where: { id },
+      data: {
+        name: input.name,
+        frequency: input.frequency,
+        time: input.time,
+        timezone: input.timezone,
+        projects: input.projects,
+        recipients: input.recipients,
+        emails: input.emails,
+        outputFormat: input.outputFormat,
+        includeAiSummary: input.includeAiSummary,
+        ...(timingChanged && {
+          nextRunAt: this.computeNextRun(input.frequency ?? schedule.frequency, input.time ?? schedule.time),
+        }),
+      },
+    });
+  }
+
+  /** Project ids arrive from the client, so every one must belong to the caller's organization. */
+  private async assertProjectsInOrganization(organizationId: string, projectIds: string[] | undefined): Promise<void> {
+    if (!projectIds?.length) return;
+    const unique = [...new Set(projectIds)];
+    const found = await this.prisma.project.count({ where: { id: { in: unique }, organizationId, deletedAt: null } });
+    if (found !== unique.length) throw new BadRequestException('Choose projects from your organization.');
   }
 
   private computeNextRun(frequency: string, time: string): Date {
@@ -209,7 +233,7 @@ export class ReportsService {
   // Toggle schedule
   async toggleSchedule(id: string, organizationId: string) {
     const schedule = await this.prisma.reportSchedule.findFirst({ where: { id, organizationId } });
-    if (!schedule) return null;
+    if (!schedule) throw new NotFoundException('Schedule not found.');
     return this.prisma.reportSchedule.update({ where: { id }, data: { enabled: !schedule.enabled } });
   }
 }

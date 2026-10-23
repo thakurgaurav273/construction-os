@@ -14,8 +14,10 @@ export type Permission =
   | 'workforce.manage'
   | 'attendance.mark'
   | 'material.manage'
+  | 'material.issue'
   | 'inventory.adjust'
   | 'inventory.transfer'
+  | 'warehouse.manage'
   | 'vendor.manage'
   | 'rfq.manage'
   | 'rfq.award'
@@ -30,7 +32,8 @@ export type Permission =
   | 'payment.release'
   | 'report.manage'
   | 'members.manage'
-  | 'organization.manage';
+  | 'organization.manage'
+  | 'audit.view';
 
 export interface CurrentAccess {
   userId: string;
