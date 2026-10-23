@@ -147,6 +147,14 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 - [x] Error states on projects list, project layout (covers budget, team, timeline), team, organization settings
 - [ ] Block new work (POs, reports, issues, attendance…) on archived projects in the other modules; today they're only hidden from pickers
 - [ ] Verify logo upload against running MinIO/R2 (validation paths tested; storage write not exercised locally)
+- [x] Settings completed: grouped navigation (Account / Workspace) with tabs kept in the URL hash; no placeholder tabs left
+- [x] Profile: edit your name (`PATCH /auth/profile`), shown at once in the sidebar and menus; "Your profile" in the account menu
+- [x] Security: change password with the current one (`POST /auth/password`, rate-limited, signs out other devices); active sessions with device, IP and last activity; sign out one device or all others. Ended sessions lose access immediately (ADR-030)
+- [x] Members & Roles: moved out of the page into feature components; invite form uses React Hook Form + Zod with a role description; real member status and last active; error states; read-only Roles & Permissions view from `GET /settings/roles`
+- [x] Integrations: email and file storage status from `GET /settings/integrations` (owners/admins) plus the organization's AI status
+- [ ] Profile photo upload (the `avatar` column exists; initials are shown today)
+
+> Verified 2026-10-26 (Settings): 65 HTTP checks (sessions listed with device, session id kept through refresh, ending one device or all others cuts off its access token at once without signing out the current one, own session protected, cross-user session ids refused, profile validation, password change rules and sign-out of other devices, role catalogue, integrations restricted to admins, member last active, audit entries with redacted passwords) and a headless-browser run (profile save updates the sidebar, password form validation and wrong-password message without sign-out, invite form validation, role view, integrations, viewer restrictions on a phone viewport with no horizontal scroll, ending a session sends that browser to sign-in).
 
 > Verified 2026-10-23: 41 HTTP checks (pagination, search, sort, options, archive/restore/delete rules, permissions, team changes, organization validation, logo validation, audit entries) and a headless-browser run (search, archive banner, restore, team role change, organization save updating the sidebar).
 

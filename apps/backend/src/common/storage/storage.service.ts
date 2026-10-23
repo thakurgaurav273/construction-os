@@ -8,17 +8,22 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
+export type StorageBackend = 'r2' | 's3-compatible' | 'local-default';
+
 @Injectable()
 export class StorageService {
   private readonly s3: S3Client;
   private readonly bucket: string;
   private readonly publicUrl: string;
   private readonly logger = new Logger(StorageService.name);
+  /** Which backend files go to; the local MinIO default only suits development. */
+  readonly backend: StorageBackend;
 
   constructor(private readonly config: ConfigService) {
     const accountId = config.get<string>('R2_ACCOUNT_ID', '');
     this.bucket = config.get<string>('R2_BUCKET', 'sitepilot');
     this.publicUrl = config.get<string>('R2_PUBLIC_URL', '');
+    this.backend = accountId ? 'r2' : config.get<string>('STORAGE_ENDPOINT') ? 's3-compatible' : 'local-default';
 
     this.s3 = new S3Client({
       region: 'auto',

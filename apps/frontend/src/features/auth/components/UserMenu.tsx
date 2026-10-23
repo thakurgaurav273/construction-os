@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@sitepilot/ui';
-import { LogOut, Settings, ShieldCheck } from 'lucide-react';
+import { LogOut, Settings, ShieldCheck, UserRound } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useSignOut } from '../hooks/use-sign-out';
 import { useCurrentAccess } from '@/hooks/api/use-access';
@@ -31,6 +31,11 @@ export function UserMenu({ children, align = 'start', side = 'top' }: UserMenuPr
           {user?.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/dashboard/settings#profile">
+            <UserRound className="mr-2 h-4 w-4" /> Your profile
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/dashboard/settings">
             <Settings className="mr-2 h-4 w-4" /> Settings

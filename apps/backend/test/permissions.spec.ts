@@ -30,6 +30,11 @@ const OPEN_WRITES = new Set([
   'NotificationsController.markRead',
   'NotificationsController.remove',
   'NotificationsController.updatePreferences',
+  // Personal: a member edits only their own profile, password and sessions.
+  'AccountController.updateProfile',
+  'AccountController.changePassword',
+  'AccountController.endOtherSessions',
+  'AccountController.endSession',
 ]);
 
 function requiredPermissions(controller: ControllerClass, handler: unknown): Permission[] {

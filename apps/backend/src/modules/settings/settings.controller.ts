@@ -4,7 +4,8 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { SettingsService } from './settings.service';
+import { InvitationView, MemberView, RoleCatalogue, SettingsService } from './settings.service';
+import { IntegrationView, IntegrationsService } from './integrations.service';
 import { MAX_LOGO_BYTES, OrganizationSettingsService, OrganizationSettingsView } from './organization-settings.service';
 import { UpdateBrandingDto, UpdateOrganizationSettingsDto } from './dto/organization.dto';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
@@ -19,6 +20,7 @@ export class SettingsController {
   constructor(
     private readonly settings: SettingsService,
     private readonly organization: OrganizationSettingsService,
+    private readonly integrations: IntegrationsService,
   ) {}
 
   @Get('organization')
@@ -57,8 +59,19 @@ export class SettingsController {
   }
 
   @Get('members')
-  getMembers(@CurrentUser() user: AuthUser) {
+  getMembers(@CurrentUser() user: AuthUser): Promise<MemberView[]> {
     return this.settings.getMembers(user.organizationId);
+  }
+
+  @Get('roles')
+  getRoles(): RoleCatalogue {
+    return this.settings.getRoleCatalogue();
+  }
+
+  @RequirePermission('organization.manage')
+  @Get('integrations')
+  getIntegrations(): IntegrationView[] {
+    return this.integrations.list();
   }
 
   @RequirePermission('members.manage')
@@ -89,7 +102,7 @@ export class SettingsController {
 
   @RequirePermission('members.manage')
   @Get('invitations')
-  getInvitations(@CurrentUser() user: AuthUser) {
+  getInvitations(@CurrentUser() user: AuthUser): Promise<InvitationView[]> {
     return this.settings.getInvitations(user.organizationId);
   }
 

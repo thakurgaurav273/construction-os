@@ -1,15 +1,32 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Permission } from '@sitepilot/types';
 import { apiClient } from '@/lib/api/client';
 
 export interface Member {
   id: string;
   name: string;
   email: string;
-  avatar?: string;
+  avatar?: string | null;
   role: string;
   status: string;
   joinedAt: string;
-  lastActive: string;
+  /** Last sign-in or session refresh; null if unknown. */
+  lastActive: string | null;
+}
+
+export interface RoleCatalogue {
+  permissions: { key: Permission; group: string; label: string }[];
+  roles: { role: string; permissions: Permission[] }[];
+}
+
+export type IntegrationState = 'connected' | 'development' | 'not_configured';
+
+export interface Integration {
+  id: 'email' | 'storage';
+  name: string;
+  provider: string | null;
+  state: IntegrationState;
+  detail: string;
 }
 
 export interface Invitation {
@@ -28,6 +45,31 @@ export function useMembers() {
       const res = await apiClient.get('/settings/members');
       return res.data.data ?? res.data;
     },
+  });
+}
+
+/** What each role can do. Fixed by the product, so it is cached for the session. */
+export function useRoleCatalogue() {
+  return useQuery<RoleCatalogue>({
+    queryKey: ['settings', 'roles'],
+    queryFn: async () => {
+      const res = await apiClient.get('/settings/roles');
+      return res.data.data ?? res.data;
+    },
+    staleTime: Infinity,
+  });
+}
+
+/** Server-side services (email, storage). Only people who manage the organization can read them. */
+export function useIntegrations({ enabled = true }: { enabled?: boolean } = {}) {
+  return useQuery<Integration[]>({
+    queryKey: ['settings', 'integrations'],
+    queryFn: async () => {
+      const res = await apiClient.get('/settings/integrations');
+      return res.data.data ?? res.data;
+    },
+    enabled,
+    staleTime: 5 * 60_000,
   });
 }
 

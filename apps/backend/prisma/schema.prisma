@@ -203,18 +203,26 @@ model UserOrganization {
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
+/// One row per issued refresh token. Rotation revokes the row and issues the next one with the same
+/// `sessionId`, so a sign-in on one device stays a single session that the member can see and end.
 model RefreshToken {
-  id        String   @id @default(uuid())
-  token     String   @unique
-  userId    String
-  expiresAt DateTime
-  revoked   Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id               String   @id @default(uuid())
+  token            String   @unique
+  userId           String
+  sessionId        String
+  sessionStartedAt DateTime @default(now())
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revoked          Boolean  @default(false)
+  /// When this token was issued, i.e. the session's last refresh.
+  createdAt        DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
+  @@index([sessionId])
   @@map("refresh_tokens")
 }
 

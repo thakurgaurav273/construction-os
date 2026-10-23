@@ -12,6 +12,7 @@ import { ForgotPasswordDto, ResetPasswordDto } from './dto/password.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PasswordResetService } from './password-reset.service';
+import { sessionClientOf } from './session-client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from './strategies/jwt.strategy';
 import { Audit } from '../../common/audit';
@@ -34,8 +35,8 @@ export class AuthController {
   @Throttle(AUTH_RATE_LIMIT)
   @Audit('auth.registered')
   @Post('register')
-  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response): Promise<SessionView> {
-    const { session, tokens } = await this.authService.register(dto);
+  async register(@Body() dto: RegisterDto, @Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<SessionView> {
+    const { session, tokens } = await this.authService.register(dto, sessionClientOf(req));
     setAuthCookies(res, this.config, tokens);
     return session;
   }
@@ -45,8 +46,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Audit('auth.signed_in')
   @Post('login')
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<SessionView> {
-    const { session, tokens } = await this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<SessionView> {
+    const { session, tokens } = await this.authService.login(dto, sessionClientOf(req));
     setAuthCookies(res, this.config, tokens);
     return session;
   }
@@ -55,7 +56,7 @@ export class AuthController {
   @Post('refresh')
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<{ success: true }> {
     try {
-      setAuthCookies(res, this.config, await this.authService.refresh(readCookie(req, AUTH_COOKIES.refresh)));
+      setAuthCookies(res, this.config, await this.authService.refresh(readCookie(req, AUTH_COOKIES.refresh), sessionClientOf(req)));
       return { success: true };
     } catch (error) {
       clearAuthCookies(res, this.config);

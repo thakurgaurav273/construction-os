@@ -1,10 +1,12 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Invitation, OrgRole } from '@prisma/client';
+import { Invitation, OrgRole, UserStatus } from '@prisma/client';
+import type { Permission } from '@sitepilot/types';
 import { PrismaService } from '../../database/prisma.service';
 import { MailService } from '../../common/mail/mail.service';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
+import { ALL_PERMISSIONS, PERMISSION_CATALOGUE, PermissionInfo, permissionsForRole } from '../../common/permissions';
 
 @Injectable()
 export class SettingsService {
@@ -22,13 +24,19 @@ export class SettingsService {
     return `${frontendUrl}/accept-invitation/${token}`;
   }
 
-  // Get all members of an organization
-  async getMembers(organizationId: string) {
+  async getMembers(organizationId: string): Promise<MemberView[]> {
     const members = await this.prisma.userOrganization.findMany({
       where: { organizationId },
-      include: { user: { select: { id: true, name: true, email: true, avatar: true } } },
+      include: { user: { select: { id: true, name: true, email: true, avatar: true, status: true } } },
       orderBy: { joinedAt: 'asc' },
     });
+    // Each session refresh issues a token, so the newest one is when the member was last active.
+    const lastRefreshes = await this.prisma.refreshToken.groupBy({
+      by: ['userId'],
+      where: { userId: { in: members.map((member) => member.userId) } },
+      _max: { createdAt: true },
+    });
+    const lastActiveByUser = new Map(lastRefreshes.map((entry) => [entry.userId, entry._max.createdAt]));
 
     return members.map((m) => ({
       id: m.userId,
@@ -36,10 +44,17 @@ export class SettingsService {
       email: m.user.email,
       avatar: m.user.avatar,
       role: m.role,
-      status: 'ACTIVE',
+      status: m.user.status,
       joinedAt: m.joinedAt,
-      lastActive: new Date(),
+      lastActive: lastActiveByUser.get(m.userId) ?? null,
     }));
+  }
+
+  getRoleCatalogue(): RoleCatalogue {
+    return {
+      permissions: ALL_PERMISSIONS.map((key) => ({ key, ...PERMISSION_CATALOGUE[key] })),
+      roles: Object.values(OrgRole).map((role) => ({ role, permissions: permissionsForRole(role) })),
+    };
   }
 
   // Change member role
@@ -188,6 +203,24 @@ export class SettingsService {
     const membership = await this.prisma.userOrganization.findFirst({ where: { userId, organizationId }, select: { role: true } });
     return membership?.role ?? null;
   }
+}
+
+export interface MemberView {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  role: OrgRole;
+  status: UserStatus;
+  joinedAt: Date;
+  /** Last sign-in or session refresh; null if they haven't signed in since sessions were recorded. */
+  lastActive: Date | null;
+}
+
+/** What each role can do, for the read-only Roles & Permissions view. */
+export interface RoleCatalogue {
+  permissions: (PermissionInfo & { key: Permission })[];
+  roles: { role: OrgRole; permissions: Permission[] }[];
 }
 
 export interface InvitationView {

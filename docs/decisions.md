@@ -1168,6 +1168,52 @@ Every organization keeps materials, vendors, stock and purchase orders in its ow
 
 ---
 
+# ADR-030 - Visible Sessions and Self-Service Account Security
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-26
+
+---
+
+## Context
+
+Members could sign out only the browser they were using. They had no way to see where else they were signed in, change their password without the email reset flow, or cut off a lost phone. An access token also stayed valid for up to 15 minutes after its session was revoked.
+
+---
+
+## Decision
+
+- A session is a chain of refresh tokens. Every token row carries a `sessionId` (kept through rotation), the session's start time, and the latest user agent and IP. Access and refresh tokens carry the session as the `sid` claim.
+- `JwtStrategy` checks on every request that the session still has a live refresh token, so signing out, ending a session from another device, a password change or a password reset cut off access tokens at once. Tokens issued before this change have no `sid` and expire on their own.
+- Rotation revokes the old token and stores the next one in one transaction, so a session always has exactly one live token.
+- Ending a session (one device, all other devices, or by changing the password) **deletes** its tokens instead of marking them revoked. A revoked token that comes back is treated as stolen and ends every session of that user; the ended device would otherwise do exactly that on its next refresh and sign the member out everywhere.
+- Account endpoints live under `/auth` (`PATCH /auth/profile`, `POST /auth/password`, `GET/DELETE /auth/sessions`, `DELETE /auth/sessions/:id`) because the refresh cookie is only sent to that path, and it identifies "this device".
+- A wrong current password answers 400, not 401: the client treats 401 as an expired session.
+- Roles stay fixed collections of permissions defined in code. Settings shows them read-only (`GET /settings/roles`); custom roles are out of scope until customers need them.
+- Settings → Integrations reports whether email and file storage are configured (`GET /settings/integrations`, owners and admins). It never returns keys or endpoints; the configuration itself stays in server environment variables.
+
+---
+
+## Alternatives
+
+- **A separate `Session` table**: cleaner model, but every token query and the rotation path would change; the token rows already hold everything a session needs.
+- **Revoke-and-keep for ended sessions**: preserves history, but collides with replay detection as described above.
+- **Editable roles per organization**: more flexible, but needs a permission editor, migration of existing members and guardrails against locking everyone out.
+
+---
+
+## Consequences
+
+- Each authenticated request makes one extra indexed lookup (`refresh_tokens.sessionId`), run in parallel with the membership check.
+- Members' "last active" is the time of their latest token, i.e. sign-in or refresh, accurate to the 15-minute access token lifetime.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

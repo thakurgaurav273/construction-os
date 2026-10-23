@@ -10,12 +10,17 @@ import { PasswordResetService } from './password-reset.service';
 import { TokenService } from './token.service';
 import { InvitationAcceptanceService } from './invitation-acceptance.service';
 import { InvitationsController } from './invitations.controller';
+import { AccountController } from './account.controller';
+import { AccountService } from './account.service';
+import { SessionsService } from './sessions.service';
 
 @Module({
   // Secrets are passed per call by TokenService, so access and refresh tokens never share one.
   imports: [DatabaseModule, PassportModule, JwtModule.register({})],
-  controllers: [AuthController, InvitationsController],
-  providers: [AuthService, TokenService, PasswordResetService, InvitationAcceptanceService, JwtStrategy, MailService],
+  controllers: [AuthController, InvitationsController, AccountController],
+  providers: [
+    AuthService, TokenService, SessionsService, AccountService, PasswordResetService, InvitationAcceptanceService, JwtStrategy, MailService,
+  ],
   exports: [AuthService, TokenService],
 })
 export class AuthModule {}

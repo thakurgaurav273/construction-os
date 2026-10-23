@@ -5,7 +5,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
-import { TokenPair, TokenService } from './token.service';
+import { SessionClient, TokenPair, TokenService, UNKNOWN_CLIENT } from './token.service';
 
 export const PASSWORD_HASH_ROUNDS = 12;
 
@@ -31,7 +31,7 @@ export class AuthService {
     private readonly tokens: TokenService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<StartedSession> {
+  async register(dto: RegisterDto, client: SessionClient = UNKNOWN_CLIENT): Promise<StartedSession> {
     const existing = await this.findUserByEmail(dto.email);
     if (existing) throw new ConflictException('An account with this email already exists');
 
@@ -53,11 +53,11 @@ export class AuthService {
 
     return {
       session: { user: toPublicUser(user), organization },
-      tokens: await this.tokens.issue(user.id, organization.id),
+      tokens: await this.tokens.issue(user.id, organization.id, client),
     };
   }
 
-  async login(dto: LoginDto): Promise<StartedSession> {
+  async login(dto: LoginDto, client: SessionClient = UNKNOWN_CLIENT): Promise<StartedSession> {
     const user = await this.findUserByEmail(dto.email);
     // Compare against a dummy hash when the email is unknown so response time doesn't reveal which emails exist.
     const passwordMatches = await bcrypt.compare(dto.password, user?.password ?? DUMMY_HASH);
@@ -73,7 +73,7 @@ export class AuthService {
 
     return {
       session: { user: toPublicUser(user), organization: membership.organization },
-      tokens: await this.tokens.issue(user.id, membership.organizationId),
+      tokens: await this.tokens.issue(user.id, membership.organizationId, client),
     };
   }
 
@@ -81,9 +81,9 @@ export class AuthService {
    * Rotates the session. Membership and account status are checked again, so someone removed from the
    * organization or deactivated can't keep a session alive by refreshing.
    */
-  async refresh(refreshToken: string | undefined): Promise<TokenPair> {
+  async refresh(refreshToken: string | undefined, client: SessionClient = UNKNOWN_CLIENT): Promise<TokenPair> {
     if (!refreshToken) throw new UnauthorizedException('Your session has expired. Sign in again.');
-    const { payload, tokens } = await this.tokens.rotate(refreshToken);
+    const { payload, tokens } = await this.tokens.rotate(refreshToken, client);
     const membership = await this.prisma.userOrganization.findUnique({
       where: { userId_organizationId: { userId: payload.sub, organizationId: payload.organizationId } },
       select: { user: { select: { status: true } } },

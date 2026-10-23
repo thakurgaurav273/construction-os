@@ -18,6 +18,15 @@ export class MailService {
     }
   }
 
+  /** False when no provider key is set: emails are only logged, which is fine locally but not in production. */
+  get isDeliveryConfigured(): boolean {
+    return Boolean(this.resend);
+  }
+
+  get senderAddress(): string {
+    return process.env.EMAIL_FROM || 'noreply@sitepilot.dev';
+  }
+
   async sendInvitationEmail(to: string, organizationName: string, role: string, acceptUrl: string): Promise<boolean> {
     if (!this.resend) {
       this.logger.log(`[stub] Would send invitation email to ${to} for ${organizationName}`);
