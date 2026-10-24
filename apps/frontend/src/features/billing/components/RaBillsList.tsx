@@ -42,6 +42,7 @@ export function RaBillsList({ onBrowseContracts }: { onBrowseContracts: () => vo
           title={bills.length === 0 ? 'No RA bills yet' : 'No bills match these filters'}
           description={bills.length === 0 ? 'Bills are raised from a contract. Open a contract with a BOQ to start its first bill.' : 'Try a different status, project or search.'}
           action={bills.length === 0 ? <Button onClick={onBrowseContracts}>Go to Contracts</Button> : undefined}
+          guide={bills.length === 0 ? { id: 'billing.raise-ra-bill', label: 'Learn how RA bills work' } : undefined}
         />
       ) : (
         <ul className="divide-y rounded-xl border bg-card">

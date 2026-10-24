@@ -104,6 +104,7 @@ export function BillingImportFlow({ target, title, description, preferredSheet, 
           fileName={file.name}
           template={template}
           rereading={analyze.isPending}
+          guideId={target.kind === 'boq' ? 'billing.import-boq' : 'billing.import-measurements'}
           onReread={(options) => { void read(file, options); }}
           onSaveTemplate={(input, id) => saveLayout.mutateAsync({ input, id })}
           onSaved={(saved) => {

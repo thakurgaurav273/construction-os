@@ -8,6 +8,7 @@ import {
   Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@sitepilot/ui';
+import { GuideLink } from '@/features/help/components/GuideLink';
 import { Info, Sparkles } from 'lucide-react';
 import { FormField } from '@/components/shared/FormField';
 import {
@@ -34,10 +35,12 @@ interface ColumnMappingStepProps {
   onBack: () => void;
   /** Saves through another endpoint, e.g. Billing's BOQ or measurement book layouts. */
   onSaveTemplate?: (input: TemplateInput, id?: string) => Promise<ImportTemplate>;
+  /** Help guide for this kind of import, shown as a "?" next to the title. */
+  guideId?: string;
 }
 
 export function ColumnMappingStep({
-  definition, analysis, fileName, template, rereading, onReread, onSaved, onBack, onSaveTemplate,
+  definition, analysis, fileName, template, rereading, onReread, onSaved, onBack, onSaveTemplate, guideId,
 }: ColumnMappingStepProps): React.ReactElement {
   const saveTemplate = useSaveImportTemplate();
   const startingMapping = template?.mapping ?? analysis.suggestion?.mapping ?? EMPTY_MAPPING;
@@ -90,7 +93,7 @@ export function ColumnMappingStep({
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Match your columns</CardTitle>
+          <CardTitle className="flex items-center gap-1.5">Match your columns {guideId && <GuideLink guideId={guideId} />}</CardTitle>
           <CardDescription>
             Tell SitePilot which column holds what. This is saved as a layout, so later sheets in the same format skip this step.
           </CardDescription>

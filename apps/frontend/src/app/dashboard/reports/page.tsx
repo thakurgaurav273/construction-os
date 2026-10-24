@@ -58,7 +58,7 @@ function ReportsContent(): React.ReactElement {
       </div>
 
       <Tabs value={tab} onValueChange={(next) => navigate(isReportsTab(next) ? next : 'templates')}>
-        <TabsList>
+        <TabsList data-tour="reports-tabs">
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
           <TabsTrigger value="schedules">Schedules</TabsTrigger>

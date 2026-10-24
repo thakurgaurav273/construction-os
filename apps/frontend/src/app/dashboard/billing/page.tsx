@@ -54,11 +54,11 @@ function BillingContent(): React.ReactElement {
           <h2 className="text-3xl font-bold tracking-tight">Billing</h2>
           <p className="mt-1 text-muted-foreground">Running account bills against contract BOQs: to your clients, and from your subcontractors.</p>
         </div>
-        {canManage && <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" /> New Contract</Button>}
+        {canManage && <Button onClick={() => setCreateOpen(true)} data-tour="billing-new-contract"><Plus className="mr-2 h-4 w-4" /> New Contract</Button>}
       </div>
 
       <Tabs value={tab} onValueChange={openTab}>
-        <TabsList>
+        <TabsList data-tour="billing-tabs">
           <TabsTrigger value="bills">RA Bills</TabsTrigger>
           <TabsTrigger value="receivables">Receivables</TabsTrigger>
           {can('finance.view') && <TabsTrigger value="margin">Margin</TabsTrigger>}

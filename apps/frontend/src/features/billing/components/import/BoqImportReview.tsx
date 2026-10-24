@@ -9,6 +9,7 @@ import {
 } from '@sitepilot/ui';
 import { History } from 'lucide-react';
 import { ImportOutcomeTable } from '@/features/data-import/components/ImportOutcomeTable';
+import { GuideLink } from '@/features/help/components/GuideLink';
 import { ImportSummary } from '@/features/data-import/components/ImportSummary';
 import { useBoqImport } from '@/hooks/api/use-billing-import';
 import type { ExistingRecordPolicy } from '@/hooks/api/use-data-import';
@@ -65,7 +66,7 @@ export function BoqImportReview({ contractId, ready }: BoqImportReviewProps): Re
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Review the BOQ</CardTitle>
+          <CardTitle className="flex items-center gap-1.5">Review the BOQ <GuideLink guideId="billing.import-boq" /></CardTitle>
           <CardDescription>Nothing has been saved yet. Lines are matched to the BOQ by item number using the “{ready.template.name}” layout.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -119,6 +119,7 @@ export function ImportWizard({ initialEntity }: { initialEntity: ImportEntity | 
           fileName={file.name}
           template={template}
           rereading={analyzeSheet.isPending}
+          guideId="settings.data-import"
           onReread={(options) => { void readSheet(file, options); }}
           onSaved={(saved) => {
             setTemplate(saved);

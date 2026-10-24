@@ -5,6 +5,8 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { CommandPalette } from '@/components/CommandPalette';
 import { BrandThemeStyle } from '@/features/branding/components/BrandThemeStyle';
+import { HelpCenter } from '@/features/help/components/HelpCenter';
+import { ProductTour } from '@/features/help/components/ProductTour';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -35,6 +37,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
         
         <CommandPalette open={commandPaletteOpen} setOpen={setCommandPaletteOpen} />
+        <HelpCenter />
+        <ProductTour />
       </div>
     </>
   );

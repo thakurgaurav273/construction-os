@@ -167,7 +167,7 @@ export function Sidebar() {
       </button>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-5">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-5" data-tour="sidebar-nav">
         {visibleNavigation.map((group) => (
           <div key={group.group}>
             <AnimatePresence initial={false}>
@@ -207,6 +207,7 @@ export function Sidebar() {
                       isCollapsed && 'justify-center px-0',
                     )}
                     title={isCollapsed ? item.name : undefined}
+                    data-tour={`nav-${item.href.split('/').pop()}`}
                   >
                     {active && (
                       <motion.div

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Badge, Button, Card, CardContent, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton, cn } from '@sitepilot/ui';
 import { AlertTriangle, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { GuideLink } from '@/features/help/components/GuideLink';
 import { useContracts, useMargin } from '@/hooks/api/use-billing';
 import { useProjects } from '@/hooks/api/use-projects';
 import type { MarginRow } from '../../margin-types';
@@ -80,10 +81,13 @@ export function MarginView(): React.ReactElement {
 
   return (
     <div className="space-y-4">
-      <Select value={activeProject ?? ''} onValueChange={(value) => { if (value) setProjectId(value); }}>
-        <SelectTrigger className="sm:w-72" aria-label="Project"><SelectValue placeholder="Choose a project" /></SelectTrigger>
-        <SelectContent>{projects.map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}</SelectContent>
-      </Select>
+      <div className="flex items-center gap-2">
+        <Select value={activeProject ?? ''} onValueChange={(value) => { if (value) setProjectId(value); }}>
+          <SelectTrigger className="sm:w-72" aria-label="Project"><SelectValue placeholder="Choose a project" /></SelectTrigger>
+          <SelectContent>{projects.map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}</SelectContent>
+        </Select>
+        <GuideLink guideId="billing.margin" />
+      </div>
 
       {!activeProject ? (
         contractsLoading ? <Skeleton className="h-24 w-full rounded-xl" /> : (

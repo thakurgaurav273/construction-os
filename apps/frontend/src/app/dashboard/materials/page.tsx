@@ -87,7 +87,7 @@ export default function MaterialsPage(): React.ReactElement {
           </Button>
           <ImportButton entity="MATERIAL" />
           <Can permission="material.manage">
-            <Button onClick={() => setFormOpen(true)}>
+            <Button onClick={() => setFormOpen(true)} data-tour="materials-new">
               <Plus className="mr-1.5 h-4 w-4" /> Add Material
             </Button>
           </Can>
@@ -103,7 +103,7 @@ export default function MaterialsPage(): React.ReactElement {
         animate={{ opacity: 1, y: 0 }}
       >
         <Tabs defaultValue="materials">
-          <TabsList className="mb-4 flex-wrap h-auto">
+          <TabsList className="mb-4 flex-wrap h-auto" data-tour="materials-tabs">
             <TabsTrigger value="materials">Materials</TabsTrigger>
             <TabsTrigger value="inventory">Inventory</TabsTrigger>
             <TabsTrigger value="movements">Movements</TabsTrigger>

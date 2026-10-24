@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Skeleton } from '@sitepilot/ui';
+import { GuideLink } from '@/features/help/components/GuideLink';
 import { useMeasurementImport } from '@/hooks/api/use-billing-import';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import type { MeasurementImportResult } from '../../import-types';
@@ -70,7 +71,7 @@ export function MeasurementImportReview({ billId, ready }: MeasurementImportRevi
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Review the measurement book</CardTitle>
+          <CardTitle className="flex items-center gap-1.5">Review the measurement book <GuideLink guideId="billing.import-measurements" /></CardTitle>
           <CardDescription>
             Nothing has been saved yet. Each item’s rows replace that item’s measurements on this bill; items not in the sheet are left alone.
           </CardDescription>

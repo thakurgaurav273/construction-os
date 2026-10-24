@@ -30,6 +30,7 @@ export function ContractsList({ onCreate }: { onCreate?: () => void }): React.Re
             ? 'Add a client contract to bill a client, or a subcontract to certify a subcontractor’s bills.'
             : 'Try a different project, direction or search.'}
           action={contracts.length === 0 && onCreate ? <Button onClick={onCreate}>New Contract</Button> : undefined}
+          guide={contracts.length === 0 ? { id: 'billing.contracts', label: 'Learn how contracts work' } : undefined}
         />
       ) : (
         <ul className="divide-y rounded-xl border bg-card">

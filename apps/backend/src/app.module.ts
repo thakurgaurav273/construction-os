@@ -20,6 +20,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { HelpModule } from './modules/help/help.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SettingsModule } from './modules/settings/settings.module';
 
@@ -50,6 +51,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     FinanceModule,
     BillingModule,
     NotificationsModule,
+    HelpModule,
     ReportsModule,
     SettingsModule,
     DataImportModule,

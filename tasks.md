@@ -209,19 +209,22 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 
 > Verified 2026-10-24: 71 HTTP checks (permissions per role, client validation, contract party rules, BOQ duplicates and in-use protection, measurement maths incl. deductions and steel, totals with five tax/deduction lines, one open bill, locked submitted bills, certified ≤ claimed, held quantities, frozen rates after a rate revision, previous quantities on the next bill, over-BOQ flag, send back / cancel / close rules, subcontract maker-checker, list filters, notifications, audit, timeline), 5 unit tests for the billing maths, and a headless-browser run (finance creates a contract, pastes a BOQ, starts and measures a bill with a deduction, submits; the PM records certification with a hold; site engineer read-only on a phone with no horizontal scroll; procurement sees the restricted state).
 
-### T22. Help center & product tour
-- [ ] Help button (`?` icon) in the header next to notifications, plus "Help & guides" in the account menu and the ⌘K palette
-- [ ] Help center panel (side drawer, opens on the current page's guide): searchable list of guides per module — Projects, Daily Reports, Workforce & attendance, Materials & inventory, Procurement, Finance, Billing (contracts, RA bills, measurement book, certification, receivables, retention, imports, margin), Reports, AI, Settings
-- [ ] Guides written as short task-based steps ("Raise your first RA bill", "Import a measurement book", "Recover material from a subcontractor"), with screenshots or short clips; content kept as versioned files in the repo (MDX/JSON per module) so guides ship with the features they describe
-- [ ] Guides respect roles: only show modules and actions the member's permissions allow (e.g. no "Certify a bill" guide for site engineers)
-- [ ] Contextual "?" links on complex screens (bill abstract, measurement book, import mapping, margin) that open the matching guide section
-- [ ] Product tour after onboarding: step-by-step spotlight walkthrough (highlight an element, short tip, Next / Back / Skip) covering the sidebar, ⌘K search, notifications, creating a project, and the member's main module by role
-- [ ] Per-module mini tours the first time a member opens a module (e.g. Billing: tabs → New Contract → BOQ → RA bill → certify); can be replayed from the help center
-- [ ] Tour progress stored per user on the server (completed / skipped per tour, so it follows them across devices); "Restart tour" in the help center
-- [ ] Getting-started checklist for new organizations (invite your team, create a project, add a BOQ, record attendance…) that ticks off from real data and can be dismissed
-- [ ] Accessible: keyboard navigation and Escape to exit, focus kept inside the tour step, respects reduced motion, works on tablet and mobile layouts
-- [ ] Empty states link to the relevant guide ("Learn how contracts work")
+### T22. Help center & product tour  `[x]`
+- [x] Help button (`?`) in the header next to notifications, "Help & guides" in the account menu and the ⌘K palette (the palette also searches guide titles and keywords; its navigation now uses the real `/dashboard/...` routes)
+- [x] Help center side drawer opening on the current page's module: searchable guides for Getting started, Projects, Daily Reports, Workforce & attendance, Materials & inventory, Procurement, Finance, Billing (contracts, BOQ import, RA bills, measurement book, MB import, abstract, certification, receivables, retention, material recovery, margin), Reports, AI and Settings
+- [x] Guides written as short task-based steps, kept as typed files per module in `features/help/content/` (ADR-038)
+- [ ] Screenshots or short clips in guides
+- [x] Guides respect roles: modules and guides carry permissions (e.g. no "Certify or send back a bill" for site engineers, no Finance guides without `finance.view`)
+- [x] Contextual "?" links on the bill abstract, BOQ and measurement book import reviews, column matching (data import and billing imports) and margin
+- [x] Welcome tour on the first dashboard visit: spotlight with Next / Back / Skip covering modules (sidebar, or the menu on phones), ⌘K, notifications, help, New Project (if allowed) and the member's main module, chosen by permission
+- [x] Mini tours the first time a member opens Projects, Daily Reports, Procurement, Materials, Inventory, Workforce, Finance, Billing and Reports; replayable from each guide ("Take the … tour")
+- [x] Tour progress stored per member on the server (`help_progress`: completed / skipped per tour, follows them across devices); "Restart tours" in the help center
+- [x] Getting-started checklist on the dashboard (invite your team, create a project, submit a daily report, record attendance, add a store, raise a PO, add a BOQ) ticked from real data, only the steps the member's role can do; dismissable and restorable from the help center
+- [x] Accessible: Escape exits, arrow keys move, focus kept inside the tour card, reduced motion respected, full-width card on phones, steps for elements hidden at the current screen size skipped
+- [x] Empty states link to the relevant guide (contracts, RA bills, purchase orders, vendor bills, workers)
 - [ ] Later: AI "Ask SitePilot how to…" answering from the same guide content
+
+> Verified 2026-10-24: migration on a fresh DB, 98 backend unit tests (route-permission and audit coverage include the new endpoints), 30 HTTP checks (validation of tour keys/statuses/extra fields, string "false" refused for the checklist, upsert without duplicates, restart one / all tours keeps the checklist dismissal, per-member isolation in the same org, checklist derived from seeded data and from a brand-new org as a project and invitation are added) and a 42-step headless-browser run (fresh owner: welcome tour with focus and every step, no replay after reload, checklist 0 of 7, help center on this page, search and no-results, guide → Billing tour on its page, arrow keys / Tab trap / Escape, skipped tour stays skipped, empty-state link, procurement tour spotlight, ⌘K guide search and navigation, dismiss / restore checklist from the account menu; site engineer on a 390px phone: menu step instead of sidebar, card clear of toasts, no horizontal scroll, header fits, role-filtered checklist and guides).
 
 ### T14. Background jobs  `[x]`
 - [x] BullMQ + Redis queue module (`common/jobs`): `register` / `enqueue` / `every`, three attempts with exponential backoff, shared job scheduler for recurring jobs; runs in-process when `REDIS_URL` isn't set (ADR-035)

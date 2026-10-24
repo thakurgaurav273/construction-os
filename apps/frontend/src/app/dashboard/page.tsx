@@ -14,6 +14,7 @@ import { ProjectOverview } from '@/features/dashboard/components/ProjectOverview
 import { RecentActivity } from '@/features/dashboard/components/RecentActivity';
 import { AttendanceTrendCard, SpendTrendCard } from '@/features/dashboard/components/TrendCards';
 import { greeting } from '@/features/dashboard/format';
+import { GettingStartedChecklist } from '@/features/help/components/GettingStartedChecklist';
 import { useCan } from '@/hooks/api/use-access';
 import { useDashboardStats } from '@/hooks/api/use-dashboard';
 import { useOrganizationSettings } from '@/hooks/api/use-settings';
@@ -59,6 +60,7 @@ export default function DashboardPage(): React.ReactElement {
     const showInsights = can('ai.use');
     return (
       <>
+        <GettingStartedChecklist />
         <KpiCards stats={stats} />
         <div className="grid gap-4 lg:grid-cols-7">
           <div className="lg:col-span-4">
@@ -91,7 +93,7 @@ export default function DashboardPage(): React.ReactElement {
         <div className="flex items-center gap-2">
           <Button variant="outline" asChild><Link href="/dashboard/reports"><BarChart3 className="mr-2 h-4 w-4" /> Reports</Link></Button>
           <Can permission="project.create">
-            <Button asChild><Link href="/dashboard/projects"><Plus className="mr-2 h-4 w-4" /> New Project</Link></Button>
+            <Button asChild data-tour="dashboard-new-project"><Link href="/dashboard/projects"><Plus className="mr-2 h-4 w-4" /> New Project</Link></Button>
           </Can>
         </div>
       </div>

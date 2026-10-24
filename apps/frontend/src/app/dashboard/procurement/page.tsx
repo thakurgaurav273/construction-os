@@ -137,7 +137,7 @@ export default function ProcurementPage(): React.ReactElement {
             </Button>
           )}
           {can('po.create') && (
-            <Button onClick={() => setCreateDialog('order')}>
+            <Button onClick={() => setCreateDialog('order')} data-tour="procurement-new-order">
               <Plus className="mr-1.5 h-4 w-4" /> New Purchase Order
             </Button>
           )}
@@ -153,7 +153,7 @@ export default function ProcurementPage(): React.ReactElement {
           className="xl:col-span-3 min-w-0"
         >
           <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="mb-4 flex-wrap h-auto">
+            <TabsList className="mb-4 flex-wrap h-auto" data-tour="procurement-tabs">
               <TabsTrigger value="orders">Purchase Orders</TabsTrigger>
               <TabsTrigger value="rfqs">RFQs</TabsTrigger>
               <TabsTrigger value="vendors">Vendors</TabsTrigger>
@@ -170,6 +170,7 @@ export default function ProcurementPage(): React.ReactElement {
                     ? 'Raise your first purchase order, or issue an RFQ to compare vendor quotes first.'
                     : 'Purchase orders raised by your team will appear here.'}
                   action={can('po.create') ? <Button onClick={() => setCreateDialog('order')}>New Purchase Order</Button> : undefined}
+                  guide={{ id: 'procurement.purchase-order', label: 'Learn how purchase orders work' }}
                 />
               ) : (
                 <>

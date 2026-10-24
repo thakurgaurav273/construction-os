@@ -17,6 +17,11 @@ const UNAUDITED_WRITES = new Set([
   'NotificationsController.markRead',
   'NotificationsController.remove',
   'NotificationsController.updatePreferences',
+  // A member's own tour progress and checklist dismissal.
+  'HelpController.updateTour',
+  'HelpController.restartTour',
+  'HelpController.restartAllTours',
+  'HelpController.updateChecklist',
   // AI calls are logged per call in ai_usage instead.
   'AiController.organizationChat',
   'AiController.projectChat',

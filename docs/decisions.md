@@ -1519,6 +1519,52 @@ Budget lines held allocated, committed and spent amounts that only the seed ever
 
 ---
 
+# ADR-038 - In-App Help, Product Tours and the Getting-Started Checklist
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+New members had no guidance inside the product: workflows such as RA billing (BOQ → measurement book → certification → receivables) take several screens to learn, and nothing told a new organization what to set up first.
+
+---
+
+## Decision
+
+- **Guides are code.** One typed file per module in `features/help/content/` (title, short steps, tip, keywords, optional permission). They ship and change with the feature they describe; no CMS.
+- **Role-aware.** A guide or module with a permission is hidden from members whose role lacks it, using the same `useCan` checks as the rest of the UI.
+- **One help center.** A side drawer opened from the header `?`, the account menu, ⌘K (which also searches guide titles), empty states (“Learn how contracts work”) and contextual `?` links on complex screens. It opens on the current page's module.
+- **Tours highlight `data-tour` anchors.** A welcome tour plays on the first dashboard visit; each module's mini tour plays the first time its page opens (after the welcome tour). Steps whose element is hidden at the current screen size are skipped, so one tour works on desktop and phone. Escape exits, focus stays in the card, motion respects reduced-motion.
+- **Progress lives on the server** in `help_progress` (per member and organization: `tour.<key>` completed or skipped, plus the checklist dismissal), so it follows people across devices. Tour keys are shared through `@sitepilot/types`; the API rejects unknown keys.
+- **The checklist is derived.** Each step (invite team, create project, submit a daily report, record attendance, add a store, raise a PO, add a BOQ) is an existence check on the organization's real data, never a click. Members only see steps their role can do.
+- Help endpoints are personal (like notification preferences): no permission and no audit entry.
+
+---
+
+## Alternatives
+
+- **A third-party tour/help SaaS**: faster to start, but content drifts from the code, can't use our permissions, and sends usage data out.
+- **Tour progress in localStorage**: simpler, but replays tours on every new device.
+- **Checklist ticked by the member**: easy to fake and goes stale; derived steps stay true.
+
+---
+
+## Consequences
+
+- New pages that deserve a tour need `data-tour` attributes on their key elements and an entry in `features/help/tours/`.
+- Guides have no screenshots or clips yet; text only.
+- The AI “Ask SitePilot how to…” can later answer from the same guide files.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

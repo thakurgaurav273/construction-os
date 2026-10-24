@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, cn } from '@sitepilot/ui';
+import { GuideLink } from '@/features/help/components/GuideLink';
 import { AlertTriangle, FileSpreadsheet, Ruler } from 'lucide-react';
 import type { RaBillDetail, RaBillLine } from '../types';
 import { formatAmount, formatQuantity } from '../utils/format';
@@ -38,7 +39,7 @@ export function RaBillAbstract({ bill, onOpenLine, editable }: RaBillAbstractPro
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
         <div>
-          <CardTitle>Abstract</CardTitle>
+          <CardTitle className="flex items-center gap-1.5">Abstract <GuideLink guideId="billing.abstract" /></CardTitle>
           <CardDescription>
             {editable ? 'Open an item to enter its measurements. Totals update as you save.' : `${active.length} of ${bill.lines.length} BOQ lines billed so far.`}
           </CardDescription>

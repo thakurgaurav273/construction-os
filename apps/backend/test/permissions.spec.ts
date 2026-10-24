@@ -30,6 +30,11 @@ const OPEN_WRITES = new Set([
   'NotificationsController.markRead',
   'NotificationsController.remove',
   'NotificationsController.updatePreferences',
+  // Personal: a member's own tour progress and checklist.
+  'HelpController.updateTour',
+  'HelpController.restartTour',
+  'HelpController.restartAllTours',
+  'HelpController.updateChecklist',
   // Personal: a member edits only their own profile, password and sessions.
   'AccountController.updateProfile',
   'AccountController.changePassword',
