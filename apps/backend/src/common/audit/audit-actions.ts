@@ -101,6 +101,7 @@ export const AUDIT_ACTIONS = {
   'ra_bill.submitted': action('submitted an RA bill', 'ra_bill'),
   'ra_bill.certified': action('certified an RA bill', 'ra_bill'),
   'ra_bill.changes_requested': action('sent back an RA bill', 'ra_bill'),
+  'ra_bill.reopened': action('reopened a certified RA bill for correction', 'ra_bill'),
   'ra_bill.cancelled': action('cancelled an RA bill', 'ra_bill'),
   'ra_bill.measurements_imported': action('imported an RA bill measurement book', 'ra_bill'),
   'contract.boq_imported': action('imported a contract BOQ', 'contract'),

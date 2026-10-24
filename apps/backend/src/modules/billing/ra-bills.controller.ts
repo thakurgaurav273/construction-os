@@ -82,6 +82,18 @@ export class RaBillsController {
     return this.workflow.requestChanges(id, user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('billing.certify')
+  @Audit('ra_bill.reopened')
+  @HttpCode(200)
+  @Post(':id/reopen')
+  reopen(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RequiredBillNoteDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<RaBillDetailView> {
+    return this.workflow.reopen(id, user.organizationId, user.id, dto);
+  }
+
   @RequirePermission('billing.prepare')
   @Audit('ra_bill.cancelled')
   @HttpCode(200)

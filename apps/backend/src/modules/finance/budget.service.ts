@@ -1,13 +1,11 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { InvoiceStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { toNumber } from '../procurement/procurement-math';
 import { findProjectInOrganization } from '../projects/project-guards';
 import { BudgetFigures, BudgetHeadFigures, computeBudget } from './budget-math';
 import { CreateBudgetHeadDto, UpdateBudgetHeadDto } from './dto/budget.dto';
-
-/** Bills that count as spent: approved, whether or not they have been paid yet. */
-const SPENT_BILL_STATUSES: InvoiceStatus[] = ['APPROVED', 'PARTIALLY_PAID', 'PAID'];
+import { SPENT_BILL_STATUSES } from './project-spend';
 
 export interface BudgetLineView {
   id: string;

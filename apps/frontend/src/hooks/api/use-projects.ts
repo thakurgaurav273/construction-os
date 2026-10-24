@@ -69,7 +69,7 @@ export interface CreateProjectInput {
   expectedCompletion?: string;
 }
 
-export type UpdateProjectInput = Partial<CreateProjectInput> & { spent?: number };
+export type UpdateProjectInput = Partial<CreateProjectInput>;
 
 export interface AddMemberInput {
   userId: string;

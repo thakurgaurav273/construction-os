@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Permission } from '@sitepilot/types';
 import { PrismaService } from '../../database/prisma.service';
+import { projectSpend } from '../finance/project-spend';
 import { WorkforceService } from '../workforce/workforce.service';
 import { PendingApprovals, PendingApprovalsService } from './pending-approvals.service';
 import { SpendTrendPoint, spendTrend } from './spend-trend';
@@ -66,15 +67,16 @@ export class DashboardService {
     const { organizationId } = member;
     const canSeeFinance = member.permissions.includes('finance.view');
     const today = new Date();
-    const [projects, recentActivities, workforceStats, approvals, paidPayments] = await Promise.all([
+    const [projects, spend, recentActivities, workforceStats, approvals, paidPayments] = await Promise.all([
       this.prisma.project.findMany({
         where: { organizationId, deletedAt: null },
         select: {
-          id: true, name: true, status: true, budget: true, spent: true, progress: true, location: true, startDate: true,
+          id: true, name: true, status: true, budget: true, progress: true, location: true, startDate: true,
           expectedCompletion: true, priority: true, clientName: true, createdAt: true, members: { select: { id: true } },
         },
         orderBy: { updatedAt: 'desc' },
       }),
+      projectSpend(this.prisma, organizationId),
       this.prisma.activity.findMany({
         where: { organizationId },
         orderBy: { createdAt: 'desc' },
@@ -91,7 +93,8 @@ export class DashboardService {
     const liveProjects = projects.filter((project) => LIVE_STATUSES.includes(project.status));
     const newSince = new Date(today.getTime() - NEW_PROJECT_WINDOW_DAYS * 24 * 3600 * 1000);
     const totalBudget = projects.reduce((sum, project) => sum + (project.budget ? Number(project.budget) : 0), 0);
-    const totalSpent = projects.reduce((sum, project) => sum + Number(project.spent), 0);
+    const spentOn = (projectId: string): number => spend.get(projectId) ?? 0;
+    const totalSpent = projects.reduce((sum, project) => sum + spentOn(project.id), 0);
 
     return {
       activeProjects: liveProjects.length,
@@ -111,7 +114,7 @@ export class DashboardService {
         priority: project.priority,
         progress: project.progress,
         budget: project.budget ? Number(project.budget) : null,
-        spent: Number(project.spent),
+        spent: spentOn(project.id),
         location: project.location,
         expectedCompletion: project.expectedCompletion,
         memberCount: project.members.length,

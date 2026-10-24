@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { subDays } from 'date-fns';
 import { PrismaService } from '../../database/prisma.service';
+import { projectSpend } from '../finance/project-spend';
 
 /** Upper bound on the data block sent with every prompt (~4k tokens), so costs stay predictable. */
 const MAX_CONTEXT_CHARS = 16_000;
@@ -38,7 +39,8 @@ export class AiContextService {
     if (!project) throw new NotFoundException('Project not found');
 
     const weekAgo = subDays(new Date(), 7);
-    const [reports, orders, usages, attendance, activities] = await Promise.all([
+    const [spend, reports, orders, usages, attendance, activities] = await Promise.all([
+      projectSpend(this.prisma, organizationId, [projectId]),
       this.prisma.dailyReport.findMany({
         where: { projectId, organizationId },
         orderBy: { date: 'desc' },
@@ -75,7 +77,7 @@ export class AiContextService {
       `Status: ${project.status} | Priority: ${project.priority} | Progress: ${project.progress}%`,
       `Client: ${project.clientName ?? 'n/a'} | Location: ${project.location ?? 'n/a'}`,
       `Dates: start ${day(project.startDate)}, expected completion ${day(project.expectedCompletion)}, today ${day(new Date())}`,
-      `Budget: ${project.budget ? inr(num(project.budget)) : 'not set'} | Spent: ${inr(num(project.spent))}`,
+      `Budget: ${project.budget ? inr(num(project.budget)) : 'not set'} | Spent: ${inr(spend.get(projectId) ?? 0)}`,
       `Team members: ${project._count.members} | Workers assigned: ${project._count.workers}`,
       '',
       'ATTENDANCE (last 7 days): ' + (attendance.length ? attendance.map((row) => `${row.status} ${row._count._all}`).join(', ') : 'no records'),
@@ -100,13 +102,14 @@ export class AiContextService {
 
   async organization(organizationId: string): Promise<string> {
     const now = new Date();
-    const [projects, pendingOrders, overdueOrders, pendingInvoices, pendingPayments, pendingTransfers, submittedReports, stock, attendanceToday] = await Promise.all([
+    const [projects, spend, pendingOrders, overdueOrders, pendingInvoices, pendingPayments, pendingTransfers, submittedReports, stock, attendanceToday] = await Promise.all([
       this.prisma.project.findMany({
         where: { organizationId, deletedAt: null, status: { not: 'ARCHIVED' } },
         orderBy: { name: 'asc' },
         take: 40,
-        select: { name: true, code: true, status: true, priority: true, progress: true, budget: true, spent: true, expectedCompletion: true },
+        select: { id: true, name: true, code: true, status: true, priority: true, progress: true, budget: true, expectedCompletion: true },
       }),
+      projectSpend(this.prisma, organizationId),
       this.prisma.purchaseOrder.count({ where: { organizationId, status: 'PENDING' } }),
       this.prisma.purchaseOrder.findMany({
         where: { organizationId, status: 'APPROVED', expectedDelivery: { lt: now } },
@@ -138,7 +141,7 @@ export class AiContextService {
       'PROJECTS:',
       ...(projects.length ? projects.map((project) => {
         const budget = num(project.budget);
-        const spent = num(project.spent);
+        const spent = spend.get(project.id) ?? 0;
         const usedPct = budget > 0 ? ` (${Math.round((spent / budget) * 100)}% of budget)` : '';
         return `- ${project.name} (${project.code}) [${project.status}, ${project.priority}] progress ${project.progress}%, `
           + `spent ${inr(spent)}${budget > 0 ? ` of ${inr(budget)}` : ''}${usedPct}, due ${day(project.expectedCompletion)}`;

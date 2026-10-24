@@ -178,7 +178,7 @@ function FinanceWorkspace({ canRecordInvoice }: { canRecordInvoice: boolean }): 
             </TabsContent>
 
             <TabsContent value="cashflow">
-              <CashFlowTab cashFlow={cashFlow} remainingBudget={summary?.budget.remaining ?? 0} />
+              <CashFlowTab cashFlow={cashFlow} summary={summary} />
             </TabsContent>
           </Tabs>
         </motion.div>

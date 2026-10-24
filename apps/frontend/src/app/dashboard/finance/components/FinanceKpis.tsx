@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Skeleton } from '@sitepilot/ui';
-import { AlertTriangle, CalendarClock, ClipboardCheck, IndianRupee, Landmark, PiggyBank } from 'lucide-react';
+import { AlertTriangle, CalendarClock, ClipboardCheck, HandCoins, IndianRupee, Landmark, PiggyBank, Vault } from 'lucide-react';
 import { formatCompactINR } from '@/features/procurement/utils/format';
 import type { FinanceSummary } from '@/features/finance/types';
 import { ProcurementKpiCard, type KpiTrendDirection } from '../../procurement/components/ProcurementKpiCard';
@@ -23,12 +23,12 @@ function periodTrend(current: number, previous: number): { trendLabel?: string; 
 export function FinanceKpis({ summary }: { summary: FinanceSummary | undefined }): React.ReactElement {
   if (!summary) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-[118px] rounded-xl" />)}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-[118px] rounded-xl" />)}
       </div>
     );
   }
-  const { payables, approvals, budget } = summary;
+  const { payables, receivables, retention, approvals, budget } = summary;
   const cards = [
     {
       title: 'Payables',
@@ -38,7 +38,7 @@ export function FinanceKpis({ summary }: { summary: FinanceSummary | undefined }
       trendDirection: 'flat' as const,
     },
     {
-      title: 'Overdue',
+      title: 'Overdue Payables',
       value: formatCompactINR(payables.overdueAmount),
       description: `${payables.overdueCount} bill${payables.overdueCount === 1 ? '' : 's'} past due`,
       icon: <AlertTriangle className="h-4 w-4" />,
@@ -63,6 +63,23 @@ export function FinanceKpis({ summary }: { summary: FinanceSummary | undefined }
       trendDirection: 'flat' as const,
     },
     {
+      title: 'Receivables',
+      value: formatCompactINR(receivables.outstanding),
+      description: receivables.overdueCount
+        ? `${formatCompactINR(receivables.overdueAmount)} overdue on ${receivables.overdueCount} bill${receivables.overdueCount === 1 ? '' : 's'}`
+        : 'certified client bills, unpaid',
+      icon: <HandCoins className="h-4 w-4" />,
+      trendDirection: 'flat' as const,
+      accentClass: receivables.overdueCount ? 'border-amber-200 dark:border-amber-800/30' : '',
+    },
+    {
+      title: 'Retention',
+      value: formatCompactINR(retention.heldByClients),
+      description: `held by clients · we hold ${formatCompactINR(retention.heldFromSubcontractors)}`,
+      icon: <Vault className="h-4 w-4" />,
+      trendDirection: 'flat' as const,
+    },
+    {
       title: 'Paid This Month',
       value: formatCompactINR(summary.paidThisMonth),
       description: 'released to vendors',
@@ -80,7 +97,7 @@ export function FinanceKpis({ summary }: { summary: FinanceSummary | undefined }
   ];
 
   return (
-    <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => (
         <motion.div key={card.title} variants={itemVariants}>
           <ProcurementKpiCard {...card} />

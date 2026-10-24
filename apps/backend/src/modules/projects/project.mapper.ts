@@ -33,7 +33,8 @@ export interface ProjectOption {
   location: string | null;
 }
 
-export function toProjectSummary(project: ProjectListRow): ProjectSummary {
+/** `spent` is derived from vendor bills (see projectSpend), so callers pass it in. */
+export function toProjectSummary(project: ProjectListRow, spent: number): ProjectSummary {
   return {
     id: project.id,
     name: project.name,
@@ -45,7 +46,7 @@ export function toProjectSummary(project: ProjectListRow): ProjectSummary {
     priority: project.priority,
     progress: project.progress,
     budget: project.budget ? Number(project.budget) : null,
-    spent: Number(project.spent),
+    spent,
     startDate: project.startDate,
     expectedCompletion: project.expectedCompletion,
     archivedAt: project.archivedAt,

@@ -1,17 +1,15 @@
-import { InvoiceStatus } from '@prisma/client';
 import { PAYABLE_INVOICE_STATUSES } from '../../../finance/finance.constants';
+import { projectSpend, SPENT_BILL_STATUSES } from '../../../finance/project-spend';
 import { MONTH_LABELS, roundMoney, toNumber, wholeDaysBetween } from '../../../procurement/procurement-math';
 import { ReportBuilder, col, inPeriod, isoDay, projectIds, projectLabel, share, table } from '../report-document';
-
-const BILLED_STATUSES: InvoiceStatus[] = ['APPROVED', 'PARTIALLY_PAID', 'PAID'];
 
 /** Payables, receivables, cash movement and budget use, for people with finance access. */
 export const buildFinancialReport: ReportBuilder = async (scope) => {
   const ids = projectIds(scope);
   const now = new Date();
-  const [invoices, payments, cashFlow, projects, receivables] = await Promise.all([
+  const [invoices, payments, cashFlow, projects, spend, receivables] = await Promise.all([
     scope.prisma.invoice.findMany({
-      where: { organizationId: scope.organizationId, projectId: { in: ids }, status: { in: BILLED_STATUSES } },
+      where: { organizationId: scope.organizationId, projectId: { in: ids }, status: { in: SPENT_BILL_STATUSES } },
       select: {
         invoiceNumber: true, vendorName: true, projectId: true, totalAmount: true, status: true, issuedDate: true, dueDate: true,
         payments: { where: { status: 'PAID' }, select: { amount: true } },
@@ -27,8 +25,9 @@ export const buildFinancialReport: ReportBuilder = async (scope) => {
     }),
     scope.prisma.project.findMany({
       where: { organizationId: scope.organizationId, id: { in: ids } },
-      select: { name: true, budget: true, spent: true },
+      select: { id: true, name: true, budget: true },
     }),
+    projectSpend(scope.prisma, scope.organizationId, ids),
     scope.receivables.findAll(scope.organizationId),
   ]);
 
@@ -64,7 +63,8 @@ export const buildFinancialReport: ReportBuilder = async (scope) => {
     months.set(index, { inflow: month.inflow + toNumber(entry.inflow), outflow: month.outflow + toNumber(entry.outflow) });
   }
   const totalBudget = projects.reduce((sum, project) => sum + toNumber(project.budget), 0);
-  const totalSpent = projects.reduce((sum, project) => sum + toNumber(project.spent), 0);
+  const spentOn = (projectId: string): number => spend.get(projectId) ?? 0;
+  const totalSpent = projects.reduce((sum, project) => sum + spentOn(project.id), 0);
 
   return {
     subtitle: 'What the business owes, is owed, has paid and has spent against budget.',
@@ -96,8 +96,8 @@ export const buildFinancialReport: ReportBuilder = async (scope) => {
           projects.map((project) => ({
             project: project.name,
             budget: roundMoney(toNumber(project.budget)),
-            spent: roundMoney(toNumber(project.spent)),
-            used: share(toNumber(project.spent), toNumber(project.budget)),
+            spent: spentOn(project.id),
+            used: share(spentOn(project.id), toNumber(project.budget)),
           })),
           'No projects in scope.',
           { project: 'Total', budget: roundMoney(totalBudget), spent: roundMoney(totalSpent), used: share(totalSpent, totalBudget) },

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma, RaBillStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { BillingPayablesService } from '../finance/billing-payables.service';
 import { formatRupees } from '../procurement/purchase-order-history.service';
 import { BILL_EVENTS, EDITABLE_BILL_STATUSES, OPEN_BILL_STATUSES } from './billing.constants';
 import { billCode } from './contract.mapper';
@@ -10,6 +11,7 @@ import { RaBillSettlementService } from './ra-bill-settlement.service';
 import { RaBillTotalsService } from './ra-bill-totals.service';
 import { DetailBill, RaBillDetailView } from './ra-bill.mapper';
 import { RaBillsService } from './ra-bills.service';
+import { contractRetention } from './retention.service';
 
 interface BillTransition {
   bill: DetailBill;
@@ -26,7 +28,7 @@ interface BillTransition {
 
 /**
  * RA bill lifecycle: DRAFT → SUBMITTED → CERTIFIED, or SUBMITTED → CHANGES_REQUESTED → (edit) → SUBMITTED.
- * Open bills can be CANCELLED. On a client contract, certifying records the client's decision. On a
+ * A certified bill can be reopened (CERTIFIED → CHANGES_REQUESTED) while nothing depends on it. Open bills can be CANCELLED. On a client contract, certifying records the client's decision. On a
  * subcontract, certifying approves money we owe, so it is maker-checker: whoever prepared the bill can't certify it.
  */
 @Injectable()
@@ -36,6 +38,7 @@ export class RaBillWorkflowService {
     private readonly bills: RaBillsService,
     private readonly totals: RaBillTotalsService,
     private readonly settlement: RaBillSettlementService,
+    private readonly payables: BillingPayablesService,
     private readonly history: RaBillHistoryService,
   ) {}
 
@@ -125,6 +128,60 @@ export class RaBillWorkflowService {
       activity: { type: 'alert', title: 'RA bill sent back', description: `${this.label(bill)} was sent back: ${note}` },
     });
     return this.bills.findOne(id, organizationId);
+  }
+
+  /**
+   * Withdraws a certification so a mistake can be corrected: the bill goes back to "changes requested" with
+   * its claims intact, and a subcontract bill's vendor bill is cancelled. Only the latest bill on an active
+   * contract can be reopened, and only while no money has moved on it (payments, receipts, its retention).
+   */
+  async reopen(id: string, organizationId: string, userId: string, dto: RequiredBillNoteDto): Promise<RaBillDetailView> {
+    const bill = await this.bills.findBillOrThrow(id, organizationId);
+    if (bill.status !== 'CERTIFIED') throw new ConflictException('Only certified bills can be reopened.');
+    if (bill.isOpeningBalance) throw new ConflictException("Opening balances can't be reopened. Re-import the BOQ to change them.");
+    if (bill.contract.status === 'CLOSED') throw new ConflictException('This contract is closed. Reopen the contract first.');
+    const note = dto.note.trim();
+
+    await this.transition({
+      bill,
+      actorId: userId,
+      from: ['CERTIFIED'],
+      to: 'CHANGES_REQUESTED',
+      changes: { certifiedById: null, certifiedAt: null, dueDate: null, invoiceNumber: null, reviewNote: note },
+      stage: BILL_EVENTS.reopened,
+      note,
+      activity: { type: 'alert', title: 'RA bill reopened', description: `${this.label(bill)} was reopened for correction: ${note}` },
+      onTransition: async (tx) => {
+        await this.assertNothingDependsOn(tx, bill);
+        await tx.raBillLine.updateMany({ where: { billId: id }, data: { certifiedQuantity: null, rate: null, certificationNote: null } });
+        await this.totals.refresh(tx, id);
+        if (bill.contract.direction === 'SUBCONTRACT') await this.payables.cancelForReopenedBill(tx, id, userId, note);
+      },
+    });
+    return this.bills.findOne(id, organizationId);
+  }
+
+  /** Runs inside the reopening transaction after the status change, so a receipt or release recorded a moment earlier still counts. */
+  private async assertNothingDependsOn(tx: Prisma.TransactionClient, bill: DetailBill): Promise<void> {
+    // Retention releases lock the contract the same way, so neither can act on a stale balance.
+    await tx.$queryRaw`SELECT id FROM contracts WHERE id = ${bill.contractId} FOR UPDATE`;
+    const later = await tx.raBill.findFirst({
+      where: { contractId: bill.contractId, sequence: { gt: bill.sequence }, status: { not: 'CANCELLED' } },
+      orderBy: { sequence: 'asc' },
+      select: { sequence: true },
+    });
+    if (later) {
+      throw new ConflictException(`${billCode(later.sequence)} builds on this bill's quantities. Cancel it, or correct the difference on it instead.`);
+    }
+    const receipts = await tx.raBillReceipt.count({ where: { billId: bill.id, voidedAt: null } });
+    if (receipts > 0) {
+      throw new ConflictException(`Money has been recorded as received on this bill. Void its ${receipts === 1 ? 'receipt' : `${receipts} receipts`} first.`);
+    }
+    // The bill is no longer certified here, so its retention has already dropped out of what is held.
+    const retention = await contractRetention(tx, bill.contractId);
+    if (retention.balance < -0.005) {
+      throw new ConflictException(`Retention held on this bill has already been released (${formatRupees(retention.released)} so far), so it can't be reopened.`);
+    }
   }
 
   /** The preparer can withdraw their own open bill; anyone else's needs certifier rights. */

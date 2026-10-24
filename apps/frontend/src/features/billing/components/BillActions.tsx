@@ -30,6 +30,8 @@ export function BillActions({ bill }: { bill: RaBillDetail }): React.ReactElemen
   // Subcontract bills are money we owe, so their preparer can't certify them.
   const blockedAsPreparer = canReview && !toClient && preparedByMe;
   const canCancel = OPEN_STATUSES.includes(bill.status) && (preparedByMe ? can('billing.prepare') : can('billing.certify'));
+  // The server also refuses once money has moved or a later bill builds on this one, and explains why.
+  const canReopen = can('billing.certify') && bill.status === 'CERTIFIED' && !bill.isOpeningBalance && bill.contractStatus === 'ACTIVE';
 
   async function run(action: () => Promise<unknown>, success: string, failure: string): Promise<void> {
     try {
@@ -41,10 +43,26 @@ export function BillActions({ bill }: { bill: RaBillDetail }): React.ReactElemen
     }
   }
 
-  if (!canSubmit && !canReview && !canCancel) return null;
+  if (!canSubmit && !canReview && !canCancel && !canReopen) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {canReopen && (
+        <Button
+          variant="outline"
+          onClick={() => setNoteRequest({
+            title: `Reopen ${bill.code} for correction?`,
+            description: toClient
+              ? 'The certification is withdrawn and the bill becomes editable again. Resubmit it and record the corrected certification.'
+              : 'The certification is withdrawn, its vendor bill is cancelled in Finance and the bill becomes editable again. Certifying the corrected bill raises a new vendor bill.',
+            confirmLabel: 'Reopen Bill',
+            noteRequired: true,
+            onConfirm: (note) => run(() => transition.mutateAsync({ id: bill.id, action: 'reopen', note }), `${bill.code} reopened`, "Couldn't reopen the bill."),
+          })}
+        >
+          <RotateCcw className="mr-2 h-4 w-4" /> Reopen
+        </Button>
+      )}
       {canCancel && (
         <Button
           variant="ghost"

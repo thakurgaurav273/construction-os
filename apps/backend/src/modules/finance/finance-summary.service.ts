@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { loadReceivables } from '../billing/receivables.service';
+import { RetentionBalances, retentionBalances } from '../billing/retention.service';
 import { monthKey, roundMoney, toNumber, wholeDaysBetween } from '../procurement/procurement-math';
 import { ATTENTION_LIMIT, DUE_SOON_DAYS } from './finance.constants';
 import { BudgetService } from './budget.service';
+import { ForecastBucket, cashForecast } from './cash-forecast';
 import { InvoicesService } from './invoices.service';
 
 /** Budget lines at or above this utilization are called out as overrun risks. */
@@ -10,7 +13,12 @@ const BUDGET_RISK_PERCENT = 90;
 
 export interface FinanceSummary {
   budget: { allocated: number; spent: number; committed: number; remaining: number; utilizationPercent: number };
-  payables: { outstanding: number; overdueAmount: number; overdueCount: number; dueSoonAmount: number; dueSoonCount: number };
+  payables: DueSummary;
+  /** What clients owe on certified client RA bills. */
+  receivables: DueSummary;
+  retention: RetentionBalances;
+  /** Expected in and out from bills already on the books, by when they fall due. */
+  forecast: ForecastBucket[];
   approvals: {
     invoicesPending: number;
     invoicesPendingValue: number;
@@ -31,7 +39,23 @@ export interface FinanceSummary {
   };
 }
 
+interface DueSummary { outstanding: number; overdueAmount: number; overdueCount: number; dueSoonAmount: number; dueSoonCount: number }
+
 const sum = (values: number[]): number => roundMoney(values.reduce((total, value) => total + value, 0));
+
+/** Outstanding amounts split into overdue and falling due within DUE_SOON_DAYS. */
+function dueSummary(items: { outstanding: number; dueDate: Date }[], today: Date): DueSummary {
+  const daysLeft = (item: { dueDate: Date }): number => wholeDaysBetween(today, item.dueDate);
+  const overdue = items.filter((item) => daysLeft(item) < 0);
+  const dueSoon = items.filter((item) => daysLeft(item) >= 0 && daysLeft(item) <= DUE_SOON_DAYS);
+  return {
+    outstanding: sum(items.map((item) => item.outstanding)),
+    overdueAmount: sum(overdue.map((item) => item.outstanding)),
+    overdueCount: overdue.length,
+    dueSoonAmount: sum(dueSoon.map((item) => item.outstanding)),
+    dueSoonCount: dueSoon.length,
+  };
+}
 
 @Injectable()
 export class FinanceSummaryService {
@@ -43,8 +67,10 @@ export class FinanceSummaryService {
 
   async getSummary(organizationId: string): Promise<FinanceSummary> {
     const today = new Date();
-    const [invoices, payments, budgetLines, latestCashFlow] = await Promise.all([
+    const [invoices, receivables, retention, payments, budgetLines, latestCashFlow] = await Promise.all([
       this.invoices.findAll(organizationId, {}),
+      loadReceivables(this.prisma, organizationId),
+      retentionBalances(this.prisma, organizationId),
       this.prisma.payment.findMany({ where: { organizationId }, select: { amount: true, status: true, paidDate: true } }),
       this.budgets.lines(organizationId),
       this.prisma.cashFlowEntry.findFirst({ where: { organizationId }, orderBy: [{ year: 'desc' }, { month: 'desc' }] }),
@@ -52,10 +78,9 @@ export class FinanceSummaryService {
 
     const payable = invoices.filter((invoice) => invoice.balanceDue > 0);
     const overdue = payable.filter((invoice) => invoice.isOverdue).sort((a, b) => b.daysOverdue - a.daysOverdue);
-    const dueSoon = payable.filter((invoice) => {
-      const daysLeft = wholeDaysBetween(today, invoice.dueDate);
-      return daysLeft >= 0 && daysLeft <= DUE_SOON_DAYS;
-    });
+    const payableDue = payable.map((invoice) => ({ outstanding: invoice.balanceDue, dueDate: invoice.dueDate }));
+    // Certified bills always get a due date; one without is treated as due today.
+    const receivableDue = receivables.items.map((item) => ({ outstanding: item.outstanding, dueDate: item.dueDate ?? today }));
     const pendingInvoices = invoices.filter((invoice) => invoice.status === 'PENDING_APPROVAL');
     const varianceInvoices = pendingInvoices.filter((invoice) => invoice.matchStatus === 'VARIANCE');
 
@@ -78,13 +103,14 @@ export class FinanceSummaryService {
         remaining: roundMoney(allocated - spent - committed),
         utilizationPercent: allocated > 0 ? Math.round((spent / allocated) * 100) : 0,
       },
-      payables: {
-        outstanding: sum(payable.map((invoice) => invoice.balanceDue)),
-        overdueAmount: sum(overdue.map((invoice) => invoice.balanceDue)),
-        overdueCount: overdue.length,
-        dueSoonAmount: sum(dueSoon.map((invoice) => invoice.balanceDue)),
-        dueSoonCount: dueSoon.length,
-      },
+      payables: dueSummary(payableDue, today),
+      receivables: dueSummary(receivableDue, today),
+      retention,
+      forecast: cashForecast(
+        receivableDue.map((item) => ({ amount: item.outstanding, dueDate: item.dueDate })),
+        payableDue.map((item) => ({ amount: item.outstanding, dueDate: item.dueDate })),
+        today,
+      ),
       approvals: {
         invoicesPending: pendingInvoices.length,
         invoicesPendingValue: sum(pendingInvoices.map((invoice) => invoice.totalAmount)),

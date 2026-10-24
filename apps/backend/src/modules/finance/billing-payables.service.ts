@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { formatRupees } from '../procurement/purchase-order-history.service';
 import { FinanceHistoryService } from './finance-history.service';
@@ -51,16 +51,44 @@ export class BillingPayablesService {
     return this.create(tx, { ...rest, activityTitle: 'Retention release ready for payment' }, { retentionReleaseId });
   }
 
+  /**
+   * A certified subcontract bill was reopened for correction. Its vendor bill is cancelled and unlinked, so
+   * certifying the corrected bill raises a fresh one. Refused once any payment has been requested against it:
+   * money already in motion has to be rejected or cancelled in Finance first.
+   */
+  async cancelForReopenedBill(tx: Prisma.TransactionClient, raBillId: string, actorId: string, reason: string): Promise<void> {
+    // Payment requests lock the invoice the same way, so one can't slip in between this check and the cancel.
+    await tx.$queryRaw`SELECT id FROM invoices WHERE "raBillId" = ${raBillId} FOR UPDATE`;
+    const invoice = await tx.invoice.findUnique({
+      where: { raBillId },
+      include: { payments: { where: { status: { in: ['PENDING', 'APPROVED', 'PAID'] } }, select: { paymentNumber: true, status: true } } },
+    });
+    if (!invoice || invoice.status === 'CANCELLED') return;
+    const [payment] = invoice.payments;
+    if (payment) {
+      throw new ConflictException(payment.status === 'PAID'
+        ? `${payment.paymentNumber} has already been paid against vendor bill ${invoice.invoiceNumber}, so this bill can't be reopened.`
+        : `${payment.paymentNumber} is waiting against vendor bill ${invoice.invoiceNumber}. Reject or cancel it in Finance first.`);
+    }
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: { status: 'CANCELLED', raBillId: null, reviewNote: `Withdrawn: the RA bill was reopened for correction. ${reason}` },
+    });
+    await this.history.record(tx, {
+      invoice,
+      actorId,
+      type: 'alert',
+      title: 'Subcontractor bill withdrawn',
+      description: `${invoice.invoiceNumber} from ${invoice.vendorName} was cancelled because its RA bill was reopened: ${reason}`,
+    });
+  }
+
   private async create(
     tx: Prisma.TransactionClient,
     payable: BillingPayable,
     source: { raBillId?: string; retentionReleaseId?: string },
   ): Promise<{ id: string; invoiceNumber: string }> {
-    const taken = await tx.invoice.findFirst({
-      where: { organizationId: payable.organizationId, vendorName: payable.vendor.name, invoiceNumber: payable.invoiceNumber },
-      select: { id: true },
-    });
-    const invoiceNumber = taken ? payable.fallbackNumber : payable.invoiceNumber;
+    const invoiceNumber = await this.freeInvoiceNumber(tx, payable);
     const items = payable.lines.map((line) => ({ ...line, taxPercent: 0 }));
     const totals = invoiceTotals(items);
     const now = new Date();
@@ -95,5 +123,17 @@ export class BillingPayablesService {
       description: `${invoiceNumber} from ${payable.vendor.name} for ${formatRupees(totals.totalAmount)}: ${payable.approvalNote}`,
     });
     return { id: invoice.id, invoiceNumber };
+  }
+
+  /** The preferred number, else the fallback, else the fallback with a revision (a reopened bill certified again). */
+  private async freeInvoiceNumber(tx: Prisma.TransactionClient, payable: BillingPayable): Promise<string> {
+    const isTaken = async (invoiceNumber: string): Promise<boolean> => Boolean(await tx.invoice.findFirst({
+      where: { organizationId: payable.organizationId, vendorName: payable.vendor.name, invoiceNumber },
+      select: { id: true },
+    }));
+    if (!(await isTaken(payable.invoiceNumber))) return payable.invoiceNumber;
+    let candidate = payable.fallbackNumber;
+    for (let revision = 2; await isTaken(candidate); revision += 1) candidate = `${payable.fallbackNumber}-R${revision}`;
+    return candidate;
   }
 }

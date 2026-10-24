@@ -311,7 +311,6 @@ model Project {
   status             ProjectStatus   @default(PLANNING)
   priority           ProjectPriority @default(MEDIUM)
   budget             Decimal?        @db.Decimal(15, 2)
-  spent              Decimal         @default(0) @db.Decimal(15, 2)
   progress           Int             @default(0)
   startDate          DateTime?
   expectedCompletion DateTime?

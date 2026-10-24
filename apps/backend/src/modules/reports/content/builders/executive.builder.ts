@@ -1,3 +1,4 @@
+import { projectSpend } from '../../../finance/project-spend';
 import { roundMoney, toNumber } from '../../../procurement/procurement-math';
 import { ReportBuilder, col, inPeriod, isoDay, projectIds, share, table } from '../report-document';
 import { readIssues } from './safety.builder';
@@ -10,12 +11,13 @@ const STATUS_LABELS: Record<string, string> = {
 /** One page for leadership: portfolio health, money, people and the risks worth a conversation. */
 export const buildExecutiveReport: ReportBuilder = async (scope) => {
   const ids = projectIds(scope);
-  const [projects, attendance, pendingOrders, reports] = await Promise.all([
+  const [projects, spend, attendance, pendingOrders, reports] = await Promise.all([
     scope.prisma.project.findMany({
       where: { organizationId: scope.organizationId, id: { in: ids } },
-      select: { id: true, name: true, code: true, status: true, progress: true, budget: true, spent: true, startDate: true, expectedCompletion: true },
+      select: { id: true, name: true, code: true, status: true, progress: true, budget: true, startDate: true, expectedCompletion: true },
       orderBy: { name: 'asc' },
     }),
+    projectSpend(scope.prisma, scope.organizationId, ids),
     scope.prisma.attendance.findMany({
       where: { organizationId: scope.organizationId, projectId: { in: ids }, date: inPeriod(scope) },
       select: { status: true },
@@ -30,7 +32,7 @@ export const buildExecutiveReport: ReportBuilder = async (scope) => {
   const asOf = scope.to < new Date() ? scope.to : new Date();
   const rows = projects.map((project) => {
     const budget = toNumber(project.budget);
-    const spent = toNumber(project.spent);
+    const spent = spend.get(project.id) ?? 0;
     return {
       project: `${project.code} · ${project.name}`,
       status: STATUS_LABELS[project.status] ?? project.status,

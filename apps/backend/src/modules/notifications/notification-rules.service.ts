@@ -54,6 +54,10 @@ export class NotificationRulesService implements OnModuleInit {
       ...await this.raBillReadyToPay(event),
     ],
     'ra_bill.changes_requested': (event) => this.raBillDecided(event, NotificationType.WARNING, 'sent back'),
+    'ra_bill.reopened': async (event) => [
+      ...await this.raBillDecided(event, NotificationType.WARNING, 'reopened'),
+      ...await this.raBillPaymentWithdrawn(event),
+    ],
     'invoice.submitted': (event) => this.invoiceSubmitted(event),
     'invoice.approved': (event) => this.invoiceDecided(event, NotificationType.SUCCESS, 'approved'),
     'invoice.rejected': (event) => this.invoiceDecided(event, NotificationType.ERROR, 'rejected'),
@@ -205,6 +209,20 @@ export class NotificationRulesService implements OnModuleInit {
       type: NotificationType.INFO,
       title: `${code} on ${bill.contract.code} is ready for payment`,
       body: `${event.actorName} certified a subcontractor bill. Its vendor bill is approved in Finance.`,
+      link: '/dashboard/finance',
+    }];
+  }
+
+  private async raBillPaymentWithdrawn(event: DomainEvent): Promise<NotificationPlan[]> {
+    const bill = await this.findRaBill(event.entityId);
+    if (!bill || bill.contract.direction !== 'SUBCONTRACT') return [];
+    const code = `RA-${String(bill.sequence).padStart(2, '0')}`;
+    return [{
+      recipients: await this.recipients.withPermission('payment.request', event.organizationId, event.actorId, bill.projectId),
+      category: 'approvals',
+      type: NotificationType.WARNING,
+      title: `${code} on ${bill.contract.code} is no longer payable`,
+      body: `${event.actorName} reopened a certified subcontractor bill, so its vendor bill was cancelled in Finance.${reviewNote(event)}`,
       link: '/dashboard/finance',
     }];
   }

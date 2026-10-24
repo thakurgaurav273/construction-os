@@ -55,6 +55,36 @@ function toRetentionView(contract: ContractRetention): RetentionView {
   };
 }
 
+/** Works with the Prisma service and inside a transaction. */
+type ContractReader = Pick<Prisma.TransactionClient, 'contract'>;
+
+export async function contractRetention(db: ContractReader, contractId: string): Promise<RetentionView> {
+  return toRetentionView(await db.contract.findUniqueOrThrow({ where: { id: contractId }, include: RETENTION_INCLUDE }));
+}
+
+export interface RetentionBalances {
+  /** Clients still hold this much of our certified bills. */
+  heldByClients: number;
+  /** We still hold this much of our subcontractors' certified bills. */
+  heldFromSubcontractors: number;
+}
+
+/** Retention not yet released, across every contract of the organization, by direction. */
+export async function retentionBalances(db: ContractReader, organizationId: string): Promise<RetentionBalances> {
+  const contracts = await db.contract.findMany({
+    where: { organizationId, project: { deletedAt: null } },
+    include: RETENTION_INCLUDE,
+  });
+  const balances: RetentionBalances = { heldByClients: 0, heldFromSubcontractors: 0 };
+  for (const contract of contracts) {
+    const { balance } = toRetentionView(contract);
+    if (balance <= 0) continue;
+    const key = contract.direction === 'CLIENT' ? 'heldByClients' : 'heldFromSubcontractors';
+    balances[key] = roundMoney(balances[key] + balance);
+  }
+  return balances;
+}
+
 /**
  * Retention is what certified bills held back under deductions marked as retention (security deposit,
  * retention money). Releasing it on a subcontract raises an approved vendor bill to pay; on a client
@@ -68,7 +98,7 @@ export class RetentionService {
   ) {}
 
   async summary(contractId: string): Promise<RetentionView> {
-    return toRetentionView(await this.prisma.contract.findUniqueOrThrow({ where: { id: contractId }, include: RETENTION_INCLUDE }));
+    return contractRetention(this.prisma, contractId);
   }
 
   async release(contractId: string, organizationId: string, userId: string, dto: ReleaseRetentionDto): Promise<void> {

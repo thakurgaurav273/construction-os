@@ -111,9 +111,29 @@ export interface BillableLine {
   taxPercent: number;
 }
 
+export interface DueSummary {
+  outstanding: number;
+  overdueAmount: number;
+  overdueCount: number;
+  dueSoonAmount: number;
+  dueSoonCount: number;
+}
+
+export interface ForecastBucket {
+  window: 'overdue' | 'next30' | 'days31to60' | 'days61to90' | 'later';
+  label: string;
+  inflow: number;
+  outflow: number;
+  net: number;
+}
+
 export interface FinanceSummary {
   budget: { allocated: number; spent: number; committed: number; remaining: number; utilizationPercent: number };
-  payables: { outstanding: number; overdueAmount: number; overdueCount: number; dueSoonAmount: number; dueSoonCount: number };
+  payables: DueSummary;
+  /** What clients owe on certified client RA bills. */
+  receivables: DueSummary;
+  retention: { heldByClients: number; heldFromSubcontractors: number };
+  forecast: ForecastBucket[];
   approvals: {
     invoicesPending: number;
     invoicesPendingValue: number;

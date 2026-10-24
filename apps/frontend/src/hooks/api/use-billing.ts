@@ -19,7 +19,7 @@ function useBillingMutation<TInput, TResult>(request: (input: TInput) => Promise
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['billing'] });
       queryClient.invalidateQueries({ queryKey: ['timeline'] });
-      // Certified subcontract bills and retention releases raise vendor bills in Finance.
+      // Certified subcontract bills and retention releases raise vendor bills in Finance; reopening cancels them.
       queryClient.invalidateQueries({ queryKey: ['finance'] });
     },
   });
@@ -129,6 +129,7 @@ export type RaBillAction =
   | { action: 'submit' }
   | { action: 'certify'; lines: CertifiedLineInput[]; note?: string; invoiceNumber?: string }
   | { action: 'request-changes'; note: string }
+  | { action: 'reopen'; note: string }
   | { action: 'cancel'; note?: string };
 
 export function useRaBillTransition() {

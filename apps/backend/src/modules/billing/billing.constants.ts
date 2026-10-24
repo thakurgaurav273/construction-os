@@ -14,6 +14,7 @@ export const BILL_EVENTS = {
   submitted: 'Submitted',
   changesRequested: 'Sent back for changes',
   certified: 'Certified',
+  reopened: 'Reopened for correction',
   cancelled: 'Cancelled',
   openingBalance: 'Opening balance imported',
   measurementsImported: 'Measurements imported',
