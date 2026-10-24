@@ -10,10 +10,28 @@ import { normalizeOptionalText } from '../../common/utils/normalize-text';
 import { MaterialPlanDto, SiteStockMovementDto } from './dto/site-stock-movement.dto';
 import { num } from './material.mapper';
 import {
-  MATERIAL_ISSUE_INCLUDE, MaterialIssueView, ProjectMaterialLine, ProjectMaterialsView, toMaterialIssueView,
+  MATERIAL_ISSUE_INCLUDE, MaterialIssueView, MaterialIssueWithRelations, ProjectMaterialLine, ProjectMaterialsView,
+  toMaterialIssueView,
 } from './project-materials.mapper';
 
 const RECENT_ISSUE_LIMIT = 15;
+
+export interface IssueNoteInput {
+  type: MaterialIssueType;
+  organizationId: string;
+  userId: string;
+  project: { id: string; name: string };
+  material: { id: string; name: string; unit: string; unitCost: Prisma.Decimal };
+  warehouse: { id: string; name: string };
+  quantity: number;
+  issuedOn: Date;
+  note: string | null;
+  /** The subcontractor the material is recovered from, with the rate per unit. */
+  subcontract?: { id: string; code: string; vendorName: string; recoveryRate: Prisma.Decimal | number } | null;
+  /** The material request line this issue fulfils, and that request's code for the timeline. */
+  requestItemId?: string | null;
+  requestCode?: string;
+}
 
 const ISSUE_DOCUMENTS: Record<MaterialIssueType, { prefix: string; verb: string; title: string }> = {
   ISSUE: { prefix: 'MIN', verb: 'issued from', title: 'Material issued' },
@@ -126,58 +144,79 @@ export class ProjectMaterialsService {
     const issuedOn = dto.issuedOn ? new Date(dto.issuedOn) : new Date();
     if (isFutureDay(issuedOn)) throw new BadRequestException("The date can't be in the future.");
 
-    const document = ISSUE_DOCUMENTS[type];
-    const note = normalizeOptionalText(dto.note);
-
-    const saved = await withDocumentNumberRetry(() => this.prisma.$transaction(async (tx) => {
-      const code = await this.nextCode(tx, organizationId, document.prefix);
-      const movement: SiteStockMovement = {
-        organizationId,
-        warehouseId: warehouse.id,
-        materialId: material.id,
-        projectId,
-        quantity: dto.quantity,
-        reference: code,
-        note: note ?? `${document.title} — ${project.name}`,
-        occurredAt: issuedOn,
-      };
-      if (type === MaterialIssueType.ISSUE) await this.ledger.issueToProject(tx, movement);
-      else await this.ledger.returnFromProject(tx, movement);
-
-      const issue = await tx.materialIssue.create({
-        data: {
-          code,
-          type,
-          quantity: dto.quantity,
-          unitCost: material.unitCost,
-          note,
-          issuedOn,
-          materialId: material.id,
-          warehouseId: warehouse.id,
-          projectId,
-          contractId: subcontract?.id ?? null,
-          recoveryRate: subcontract ? dto.recoveryRate ?? issuedRate ?? material.unitCost : null,
-          issuedById: userId,
-          organizationId,
-        },
-        include: MATERIAL_ISSUE_INCLUDE,
-      });
-      await tx.activity.create({
-        data: {
-          type: 'update',
-          title: document.title,
-          description: `${code}: ${dto.quantity} ${material.unit} of ${material.name} ${document.verb} ${warehouse.name}${subcontract ? ` (${type === MaterialIssueType.ISSUE ? 'to' : 'from'} ${subcontract.vendorName}, ${subcontract.code})` : ''}.`,
-          entityType: 'material_issue',
-          entityId: issue.id,
-          metadata: { code, materialId: material.id, quantity: dto.quantity },
-          actorId: userId,
-          projectId,
-          organizationId,
-        },
-      });
-      return issue;
-    }));
+    const note = normalizeOptionalText(dto.note) ?? null;
+    const saved = await withDocumentNumberRetry(() => this.prisma.$transaction((tx) => this.writeNote(tx, {
+      type,
+      organizationId,
+      userId,
+      project,
+      material,
+      warehouse,
+      quantity: dto.quantity,
+      issuedOn,
+      note,
+      subcontract: subcontract
+        ? { ...subcontract, recoveryRate: dto.recoveryRate ?? issuedRate ?? num(material.unitCost) }
+        : null,
+    })));
     return toMaterialIssueView(saved);
+  }
+
+  /**
+   * Writes one numbered issue or return note inside the caller's transaction: stock moves through the ledger
+   * and the project timeline records it. Callers have already checked the project, store and quantities;
+   * run it inside `withDocumentNumberRetry` so a clashing note number retries.
+   */
+  async writeNote(tx: Prisma.TransactionClient, input: IssueNoteInput): Promise<MaterialIssueWithRelations> {
+    const { type, organizationId, project, material, warehouse, subcontract } = input;
+    const document = ISSUE_DOCUMENTS[type];
+    const code = await this.nextCode(tx, organizationId, document.prefix);
+    const movement: SiteStockMovement = {
+      organizationId,
+      warehouseId: warehouse.id,
+      materialId: material.id,
+      projectId: project.id,
+      quantity: input.quantity,
+      reference: code,
+      note: input.note ?? `${document.title} — ${project.name}`,
+      occurredAt: input.issuedOn,
+    };
+    if (type === MaterialIssueType.ISSUE) await this.ledger.issueToProject(tx, movement);
+    else await this.ledger.returnFromProject(tx, movement);
+
+    const issue = await tx.materialIssue.create({
+      data: {
+        code,
+        type,
+        quantity: input.quantity,
+        unitCost: material.unitCost,
+        note: input.note,
+        issuedOn: input.issuedOn,
+        materialId: material.id,
+        warehouseId: warehouse.id,
+        projectId: project.id,
+        contractId: subcontract?.id ?? null,
+        recoveryRate: subcontract?.recoveryRate ?? null,
+        requestItemId: input.requestItemId ?? null,
+        issuedById: input.userId,
+        organizationId,
+      },
+      include: MATERIAL_ISSUE_INCLUDE,
+    });
+    await tx.activity.create({
+      data: {
+        type: 'update',
+        title: document.title,
+        description: `${code}: ${input.quantity} ${material.unit} of ${material.name} ${document.verb} ${warehouse.name}${subcontract ? ` (${type === MaterialIssueType.ISSUE ? 'to' : 'from'} ${subcontract.vendorName}, ${subcontract.code})` : ''}${input.requestCode ? ` for ${input.requestCode}` : ''}.`,
+        entityType: 'material_issue',
+        entityId: issue.id,
+        metadata: { code, materialId: material.id, quantity: input.quantity },
+        actorId: input.userId,
+        projectId: project.id,
+        organizationId,
+      },
+    });
+    return issue;
   }
 
   private async nextCode(tx: Prisma.TransactionClient, organizationId: string, prefix: string): Promise<string> {

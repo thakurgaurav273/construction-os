@@ -67,6 +67,12 @@ export const AUDIT_ACTIONS = {
   'material.issued': action('issued material to a project', 'material_issue'),
   'material.returned': action('recorded a material return', 'material_issue'),
   'material.plan_set': action('set a planned material quantity', 'material'),
+  'material_request.raised': action('requested material for a site', 'material_request'),
+  'material_request.approved': action('approved a material request', 'material_request'),
+  'material_request.rejected': action('rejected a material request', 'material_request'),
+  'material_request.cancelled': action('cancelled a material request', 'material_request'),
+  'material_request.closed': action('closed a material request', 'material_request'),
+  'material_request.issued': action('issued material against a request', 'material_request'),
 
   'inventory_item.updated': action('updated store item settings', 'inventory_item'),
   'warehouse.created': action('added a store', 'warehouse'),

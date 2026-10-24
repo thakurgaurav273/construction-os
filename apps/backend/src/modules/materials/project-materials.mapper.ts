@@ -8,7 +8,7 @@ export const MATERIAL_ISSUE_INCLUDE = {
   contract: { select: { id: true, code: true, vendor: { select: { name: true } } } },
 } satisfies Prisma.MaterialIssueInclude;
 
-type MaterialIssueWithRelations = Prisma.MaterialIssueGetPayload<{ include: typeof MATERIAL_ISSUE_INCLUDE }>;
+export type MaterialIssueWithRelations = Prisma.MaterialIssueGetPayload<{ include: typeof MATERIAL_ISSUE_INCLUDE }>;
 
 export interface MaterialIssueView {
   id: string;

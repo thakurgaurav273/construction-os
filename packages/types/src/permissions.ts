@@ -16,6 +16,7 @@ export type Permission =
   | 'attendance.mark'
   | 'material.manage'
   | 'material.issue'
+  | 'material.request'
   | 'inventory.adjust'
   | 'inventory.transfer'
   | 'warehouse.manage'

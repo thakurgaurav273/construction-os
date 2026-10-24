@@ -17,6 +17,7 @@ import { MaterialFormDialog } from './components/MaterialFormDialog';
 import { InventoryTab } from './components/InventoryTab';
 import { MovementsTab } from './components/MovementsTab';
 import { SuppliersTab } from './components/SuppliersTab';
+import { RequestsTab } from './components/RequestsTab';
 import { useMaterials } from '@/hooks/api/use-materials';
 import { Can } from '@/components/shared/Can';
 import { downloadCsv } from '@/lib/download-csv';
@@ -106,6 +107,7 @@ export default function MaterialsPage(): React.ReactElement {
           <TabsList className="mb-4 flex-wrap h-auto" data-tour="materials-tabs">
             <TabsTrigger value="materials">Materials</TabsTrigger>
             <TabsTrigger value="inventory">Inventory</TabsTrigger>
+            <TabsTrigger value="requests">Requests</TabsTrigger>
             <TabsTrigger value="movements">Movements</TabsTrigger>
             <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -117,6 +119,10 @@ export default function MaterialsPage(): React.ReactElement {
 
           <TabsContent value="inventory">
             <InventoryTab onSelect={handleSelectMaterial} />
+          </TabsContent>
+
+          <TabsContent value="requests">
+            <RequestsTab />
           </TabsContent>
 
           <TabsContent value="movements">

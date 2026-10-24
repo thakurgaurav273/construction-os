@@ -20,6 +20,7 @@ export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
   'attendance.mark': { group: 'Workforce', label: 'Mark attendance' },
   'material.manage': { group: 'Materials', label: 'Manage the material catalogue' },
   'material.issue': { group: 'Materials', label: 'Issue material to sites and take returns' },
+  'material.request': { group: 'Site', label: 'Request material from the stores' },
   'inventory.adjust': { group: 'Materials', label: 'Adjust stock' },
   'inventory.transfer': { group: 'Materials', label: 'Request, approve and receive stock transfers' },
   'warehouse.manage': { group: 'Materials', label: 'Set up stores and bin locations' },
@@ -53,11 +54,11 @@ export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
 
 export const ALL_PERMISSIONS = Object.keys(PERMISSION_CATALOGUE) as Permission[];
 
-const SITE_BASICS: Permission[] = ['dailyReport.write', 'document.upload', 'attendance.mark', 'delivery.receive', 'ai.use'];
+const SITE_BASICS: Permission[] = ['dailyReport.write', 'document.upload', 'attendance.mark', 'delivery.receive', 'material.request', 'ai.use'];
 
 /**
  * Default grants per role. Reading operational data needs no permission; every write and all financial
- * data does. Maker-checker rules (nobody approves their own PO, bill or payment) apply on top of these.
+ * data does. Maker-checker rules (nobody approves their own PO, bill, payment or material request) apply on top of these.
  */
 export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
   OWNER: ALL_PERMISSIONS,

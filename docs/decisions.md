@@ -1648,6 +1648,51 @@ A person can belong to several organizations (for example a consultant, or a sub
 
 ---
 
+# ADR-041 - Material Requests From Site to Stores
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Material could only reach a site when someone with store rights issued it directly. Sites had no way to ask for material, and the stores had no queue of what sites were waiting for.
+
+---
+
+## Decision
+
+- A **material request** (`MRQ-0001`) is raised for one project with one or more material lines and an optional needed-by date. It moves no stock. Raising needs the new `material.request` permission, given to site roles (site engineers and project managers).
+- Lifecycle: `PENDING → APPROVED → PARTLY_ISSUED → ISSUED`. The exits are `REJECTED` (stores, before approval, with a note), `CANCELLED` (the requester, while nothing is issued) and `CLOSED` (stores, when the rest won't be sent, with a note). Approving, rejecting, issuing and closing need `material.issue`. Maker-checker applies: whoever raised a request can't approve or reject it. Status changes are conditional updates, so two reviewers can't both act on the same request.
+- Issuing against a request goes through the same path as a direct issue (`ProjectMaterialsService.writeNote`). Each line becomes a normal `MIN` issue note through the stock ledger, linked to its request line by `material_issues.requestItemId`. Store availability, project consumption, the project timeline and subcontract reports therefore work unchanged. One issue call uses one store. A request can be filled in several calls from different stores.
+- The request row is locked (`SELECT … FOR UPDATE`) while issuing, and each line's `issuedQuantity` is updated in the same transaction. Concurrent issues take turns, and no line can be issued beyond what was requested.
+- Archived projects can't get new requests, approvals or issues. Rejecting and closing stay possible so the stores can clear their queue.
+- Notifications reuse the audit-driven rules: the stores on the project hear about new requests, and the requester hears approval, rejection, each issue (partly or in full) and closure. Links open the request on the project's Materials tab (`?request=<id>`).
+
+---
+
+## Alternatives
+
+- **Reserve stock on approval**: it would keep the stores honest about what they've promised. But `reserved` already belongs to purchase-order and transfer flows, and stores often fill requests from whichever store has stock on the day. Not done for now.
+- **Let stores approve a smaller quantity**: issuing in parts and then closing covers the same ground without a second quantity to keep in step.
+- **Turn requests into stock transfers to the site store**: only works for sites with their own store, and adds a receiving step that sites asking for a few bags don't need.
+
+---
+
+## Consequences
+
+- Direct issues still work for stores that don't use requests.
+- Subcontractor material recovery is set on direct issues only; issues made against a request are the project's own consumption.
+- A requested quantity can't be raised after approval; the site raises a second request for more.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

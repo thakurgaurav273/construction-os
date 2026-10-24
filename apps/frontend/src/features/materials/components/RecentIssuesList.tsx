@@ -6,10 +6,10 @@ import type { MaterialIssue } from '@/hooks/api/use-materials';
 import { formatNumber } from '@/lib/utils';
 
 /** Latest issue (MIN) and return (MRN) notes for a project, newest first. */
-export function RecentIssuesList({ issues }: { issues: MaterialIssue[] }): React.ReactElement {
+export function RecentIssuesList({ issues, title = 'Recent Issues & Returns' }: { issues: MaterialIssue[]; title?: string }): React.ReactElement {
   return (
     <div className="rounded-xl border bg-card p-4">
-      <h3 className="text-sm font-semibold mb-3">Recent Issues &amp; Returns</h3>
+      <h3 className="text-sm font-semibold mb-3">{title}</h3>
       {issues.length === 0 ? (
         <p className="text-xs text-muted-foreground">No material has been issued to this project yet.</p>
       ) : (

@@ -281,7 +281,7 @@ export interface SiteStockMovementInput {
 }
 
 /** Stock changes ripple into material totals, store inventory, the project tab and its timeline. */
-function invalidateStock(queryClient: ReturnType<typeof useQueryClient>, projectId?: string): void {
+export function invalidateStock(queryClient: ReturnType<typeof useQueryClient>, projectId?: string): void {
   queryClient.invalidateQueries({ queryKey: ['materials'] });
   queryClient.invalidateQueries({ queryKey: ['material'] });
   queryClient.invalidateQueries({ queryKey: ['inventory'] });

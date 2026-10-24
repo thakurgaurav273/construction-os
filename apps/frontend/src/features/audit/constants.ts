@@ -9,6 +9,7 @@ export const AUDIT_ENTITY_FILTERS: { value: string; label: string }[] = [
   { value: 'stock_transfer', label: 'Stock transfers' },
   { value: 'stock_adjustment', label: 'Stock adjustments' },
   { value: 'material_issue', label: 'Material issues' },
+  { value: 'material_request', label: 'Material requests' },
   { value: 'material', label: 'Materials' },
   { value: 'warehouse', label: 'Stores' },
   { value: 'vendor', label: 'Vendors' },

@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { NotificationType } from '@prisma/client';
+import { MaterialRequestStatus, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditAction } from '../../common/audit';
 import { DomainEvent, DomainEventsService } from '../../common/events';
@@ -65,6 +65,13 @@ export class NotificationRulesService implements OnModuleInit {
     'transfer.approved': (event) => this.transferDecided(event, NotificationType.SUCCESS, 'approved'),
     'transfer.rejected': (event) => this.transferDecided(event, NotificationType.ERROR, 'rejected'),
     'transfer.received': (event) => this.transferDecided(event, NotificationType.SUCCESS, 'received'),
+    'material_request.raised': (event) => this.materialRequestRaised(event),
+    'material_request.approved': (event) => this.materialRequestDecided(event, NotificationType.SUCCESS, 'approved'),
+    'material_request.rejected': (event) => this.materialRequestDecided(event, NotificationType.ERROR, 'rejected'),
+    'material_request.issued': (event) => this.materialRequestDecided(
+      event, NotificationType.SUCCESS, 'issued material against', (status) => (status === 'ISSUED' ? 'issued in full' : 'partly issued'),
+    ),
+    'material_request.closed': (event) => this.materialRequestDecided(event, NotificationType.WARNING, 'closed'),
     'member.role_changed': (event) => this.roleChanged(event),
     'project.member_added': (event) => this.addedToProject(event),
     'ai.access_approved': (event) => this.aiAccessDecided(event, true),
@@ -314,6 +321,45 @@ export class NotificationRulesService implements OnModuleInit {
       title: `${transfer.code} ${verb}`,
       body: `${event.actorName} ${verb} your transfer to ${transfer.toWarehouse.name}.${reviewNote(event)}`,
       link: '/dashboard/inventory',
+    }];
+  }
+
+  private async materialRequestRaised(event: DomainEvent): Promise<NotificationPlan[]> {
+    const request = await this.prisma.materialRequest.findUnique({
+      where: { id: event.entityId ?? '' },
+      select: { code: true, projectId: true, project: { select: { name: true } }, _count: { select: { items: true } } },
+    });
+    if (!request) return [];
+    const materials = request._count.items === 1 ? '1 material' : `${request._count.items} materials`;
+    return [{
+      recipients: await this.recipients.withPermission('material.issue', event.organizationId, event.actorId, request.projectId),
+      category: 'approvals',
+      type: NotificationType.INFO,
+      title: `${request.code} needs approval`,
+      body: `${event.actorName} requested ${materials} for ${request.project.name}.`,
+      link: `/dashboard/projects/${request.projectId}/materials?request=${event.entityId}`,
+    }];
+  }
+
+  private async materialRequestDecided(
+    event: DomainEvent,
+    type: NotificationType,
+    verb: string,
+    outcome: (status: MaterialRequestStatus) => string = () => verb,
+  ): Promise<NotificationPlan[]> {
+    const request = await this.prisma.materialRequest.findUnique({
+      where: { id: event.entityId ?? '' },
+      select: { code: true, status: true, projectId: true, requestedById: true },
+    });
+    if (!request) return [];
+    const progress = request.status === 'PARTLY_ISSUED' ? ' The rest is still to come.' : '';
+    return [{
+      recipients: this.recipients.only(request.requestedById, event.actorId),
+      category: 'decisions',
+      type,
+      title: `${request.code} ${outcome(request.status)}`,
+      body: `${event.actorName} ${verb} your material request ${request.code}.${progress}${reviewNote(event)}`,
+      link: `/dashboard/projects/${request.projectId}/materials?request=${event.entityId}`,
     }];
   }
 
