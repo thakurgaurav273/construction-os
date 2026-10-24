@@ -537,6 +537,13 @@ model Worker {
   @@map("workers")
 }
 
+/// Renewal reminders go out at most once per stage, in this order.
+enum CertificationReminderStage {
+  EXPIRING_SOON
+  EXPIRING_THIS_WEEK
+  EXPIRED
+}
+
 /// A certificate a worker holds (safety induction, medical fitness, licence…). Valid, expiring or expired
 /// is derived from `expiresOn` and the organization's today, never stored, so it can't go stale.
 model WorkerCertification {
@@ -549,6 +556,8 @@ model WorkerCertification {
   issuedOn          DateTime? @db.Date
   /// Null for certificates that don't expire. Valid through the end of this day.
   expiresOn         DateTime? @db.Date
+  /// The latest renewal reminder sent for the current expiry date; cleared when the expiry date changes.
+  remindedStage     CertificationReminderStage?
   createdById       String?
   updatedById       String?
   createdAt         DateTime  @default(now())

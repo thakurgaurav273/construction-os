@@ -212,7 +212,8 @@ export class AttendanceInsightsService {
   }
 }
 
-function resolveTimeZone(timeZone: string | null | undefined): string {
+/** The organization's time zone, or the default when it is missing or unknown to this runtime. */
+export function resolveTimeZone(timeZone: string | null | undefined): string {
   if (!timeZone) return DEFAULT_TIME_ZONE;
   try {
     new Intl.DateTimeFormat('en-US', { timeZone });

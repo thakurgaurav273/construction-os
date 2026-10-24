@@ -43,11 +43,15 @@ export class WorkerCertificationsService {
     const existing = await this.findCertificationOrThrow(workerId, certificationId, organizationId);
     const issuedOn = dto.issuedOn === undefined ? keyOrNull(existing.issuedOn) : dto.issuedOn;
     const expiresOn = dto.expiresOn === undefined ? keyOrNull(existing.expiresOn) : dto.expiresOn;
+    const dates = toDates(issuedOn, expiresOn);
+    const expiryChanged = dates.expiresOn?.getTime() !== existing.expiresOn?.getTime();
     const data: Prisma.WorkerCertificationUpdateInput = {
       name: dto.name?.trim(),
       issuer: normalizeOptionalText(dto.issuer),
       certificateNumber: normalizeOptionalText(dto.certificateNumber),
-      ...toDates(issuedOn, expiresOn),
+      ...dates,
+      // A new expiry date (a renewal) starts its reminders over.
+      ...(expiryChanged && { remindedStage: null }),
       updatedById: userId,
     };
     await this.prisma.workerCertification.update({ where: { id: existing.id }, data });

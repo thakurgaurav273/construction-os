@@ -1602,7 +1602,7 @@ Certifications were a JSON list on each worker with a typed-in `status`. Nothing
 ## Consequences
 
 - The migration copies the old entries (name and a well-formed expiry date) and drops the JSON column.
-- Expiry reminders by notification are a follow-up; the data now supports a daily query on `(organizationId, expiresOn)`.
+- Renewal reminders (added the same day): the stage last reminded about is stored on the certificate (`remindedStage`: EXPIRING_SOON, EXPIRING_THIS_WEEK, EXPIRED) and claimed with a conditional update before sending, so each stage is sent once even across instances; a new expiry date clears it. Digests go per project to members with `workforce.manage`, preferring the project team, after 08:00 local time, in a new "Reminders" notification category.
 
 ---
 

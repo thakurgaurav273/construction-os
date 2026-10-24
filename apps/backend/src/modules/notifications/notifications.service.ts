@@ -32,6 +32,15 @@ export interface CategoryPreferenceView {
 
 interface Channels { inApp: boolean; email: boolean }
 
+/** What a notification is about: a user's action, or something the system noticed (e.g. a certificate expiring). */
+export interface NotificationSource {
+  organizationId: string;
+  /** Stored on the notification, e.g. `po.approved` or `workforce.certification_reminder`. */
+  event: string;
+  entityType: string | null;
+  entityId: string | null;
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -44,11 +53,16 @@ export class NotificationsService {
     private readonly config: ConfigService,
   ) {}
 
-  /** Sends one plan to each recipient on the channels they've chosen for its category. */
+  /** Sends the notification planned for a user's action. */
   async deliver(event: DomainEvent, plan: NotificationPlan): Promise<void> {
+    await this.send({ organizationId: event.organizationId, event: event.action, entityType: event.entityType, entityId: event.entityId }, plan);
+  }
+
+  /** Sends one plan to each recipient on the channels they've chosen for its category. */
+  async send(source: NotificationSource, plan: NotificationPlan): Promise<void> {
     const recipients = [...new Set(plan.recipients)];
     if (recipients.length === 0) return;
-    const channels = await this.channelsFor(recipients, event.organizationId, plan.category);
+    const channels = await this.channelsFor(recipients, source.organizationId, plan.category);
     const users = await this.prisma.user.findMany({
       where: { id: { in: recipients }, status: 'ACTIVE' },
       select: { id: true, email: true, name: true },
@@ -59,19 +73,19 @@ export class NotificationsService {
       if (choice.inApp) {
         const notification = await this.prisma.notification.create({
           data: {
-            organizationId: event.organizationId,
+            organizationId: source.organizationId,
             userId: user.id,
             type: plan.type,
             category: plan.category,
-            event: event.action,
+            event: source.event,
             title: plan.title,
             message: plan.body,
             link: plan.link,
-            entityType: event.entityType,
-            entityId: event.entityId,
+            entityType: source.entityType,
+            entityId: source.entityId,
           },
         });
-        this.gateway.emitToUser(event.organizationId, user.id, 'notification:new', notification);
+        this.gateway.emitToUser(source.organizationId, user.id, 'notification:new', notification);
         this.push.sendToUser(user.id, { title: plan.title, body: plan.body }).catch((error: unknown) => {
           this.logger.warn(`Push failed for user ${user.id}: ${error instanceof Error ? error.message : String(error)}`);
         });

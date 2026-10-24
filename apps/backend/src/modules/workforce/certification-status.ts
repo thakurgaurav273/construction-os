@@ -1,3 +1,4 @@
+import type { CertificationReminderStage } from '@prisma/client';
 import { dateKeyToDbDate, dbDateToKey } from './attendance-dates';
 
 export type CertificationStatus = 'valid' | 'expiring' | 'expired';
@@ -52,3 +53,31 @@ export function reportReferenceDay(periodEnd: Date, now: Date = new Date()): str
   return dbDateToKey(periodEnd < now ? periodEnd : now);
 }
 
+/** The last week before expiry gets its own, more urgent reminder. */
+export const CERTIFICATION_FINAL_WEEK_DAYS = 7;
+
+const REMINDER_ORDER: CertificationReminderStage[] = ['EXPIRING_SOON', 'EXPIRING_THIS_WEEK', 'EXPIRED'];
+
+/** Which reminder a certificate has reached on `today`, if any. */
+export function reminderStage(expiresOn: Date | null, today: string): CertificationReminderStage | null {
+  const { status, daysToExpiry } = certificationState(expiresOn, today);
+  if (status === 'expired') return 'EXPIRED';
+  if (daysToExpiry !== null && daysToExpiry <= CERTIFICATION_FINAL_WEEK_DAYS) return 'EXPIRING_THIS_WEEK';
+  if (status === 'expiring') return 'EXPIRING_SOON';
+  return null;
+}
+
+/**
+ * The reminder to send now: the stage reached, if it is past the one already sent. A certificate added
+ * three days before expiry goes straight to the final-week reminder; nothing is ever sent twice.
+ */
+export function reminderDue(
+  expiresOn: Date | null,
+  alreadySent: CertificationReminderStage | null,
+  today: string,
+): CertificationReminderStage | null {
+  const reached = reminderStage(expiresOn, today);
+  if (!reached) return null;
+  if (alreadySent && REMINDER_ORDER.indexOf(reached) <= REMINDER_ORDER.indexOf(alreadySent)) return null;
+  return reached;
+}

@@ -43,6 +43,7 @@ export const workforceHelp: HelpModule = {
         'Enter the certificate name, who issued it, and its issue and expiry dates. Leave expiry empty if it never expires.',
         'Status updates itself: expiring within 30 days, then expired the day after its expiry date.',
         'To renew, choose Edit or renew on the certificate and set the new dates.',
+        'Workforce managers get a reminder (in the bell, and by email unless turned off) 30 days before expiry, in the final week, and once it has expired.',
       ],
       tip: 'The Compliance tab, the Workforce alerts and the Safety and Workforce reports list every certificate that needs renewal.',
     },

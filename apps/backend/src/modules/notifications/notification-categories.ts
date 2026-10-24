@@ -14,6 +14,11 @@ export const NOTIFICATION_CATEGORIES = {
     description: 'When your role changes or you are added to a project.',
     defaults: { inApp: true, email: false },
   },
+  reminders: {
+    label: 'Reminders',
+    description: 'Worker certificates that are about to expire or have expired.',
+    defaults: { inApp: true, email: true },
+  },
   general: {
     label: 'General updates',
     description: 'Other announcements about your organization.',

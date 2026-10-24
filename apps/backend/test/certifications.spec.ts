@@ -1,8 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  certificationState, countCertificationIssues, describeCertificationIssues, reportReferenceDay,
+  certificationState, countCertificationIssues, describeCertificationIssues, reminderDue, reminderStage, reportReferenceDay,
 } from '../src/modules/workforce/certification-status';
+import { expiryPhrase } from '../src/modules/workforce/certification-reminders.service';
 
 const day = (key: string): Date => new Date(`${key}T00:00:00.000Z`);
 
@@ -54,5 +55,35 @@ describe('certification status', () => {
     const now = new Date('2026-10-24T09:00:00.000Z');
     assert.equal(reportReferenceDay(new Date('2026-09-30T23:59:59.999Z'), now), '2026-09-30');
     assert.equal(reportReferenceDay(new Date('2026-10-31T23:59:59.999Z'), now), '2026-10-24');
+  });
+});
+
+describe('certification reminders', () => {
+  const today = '2026-10-24';
+
+  it('reaches a stage at 30 days, in the final week, and once expired', () => {
+    assert.equal(reminderStage(day('2026-12-01'), today), null);
+    assert.equal(reminderStage(day('2026-11-23'), today), 'EXPIRING_SOON');
+    assert.equal(reminderStage(day('2026-10-31'), today), 'EXPIRING_THIS_WEEK');
+    assert.equal(reminderStage(day('2026-10-24'), today), 'EXPIRING_THIS_WEEK');
+    assert.equal(reminderStage(day('2026-10-23'), today), 'EXPIRED');
+    assert.equal(reminderStage(null, today), null);
+  });
+
+  it('sends each stage once, skipping stages already passed', () => {
+    assert.equal(reminderDue(day('2026-11-20'), null, today), 'EXPIRING_SOON');
+    assert.equal(reminderDue(day('2026-11-20'), 'EXPIRING_SOON', today), null);
+    assert.equal(reminderDue(day('2026-10-27'), null, today), 'EXPIRING_THIS_WEEK');
+    assert.equal(reminderDue(day('2026-10-27'), 'EXPIRING_SOON', today), 'EXPIRING_THIS_WEEK');
+    assert.equal(reminderDue(day('2026-10-01'), 'EXPIRING_THIS_WEEK', today), 'EXPIRED');
+    assert.equal(reminderDue(day('2026-10-01'), 'EXPIRED', today), null);
+  });
+
+  it('words the reminder', () => {
+    assert.equal(expiryPhrase(0), 'expires today');
+    assert.equal(expiryPhrase(1), 'expires in 1 day');
+    assert.equal(expiryPhrase(6), 'expires in 6 days');
+    assert.equal(expiryPhrase(-1), 'expired 1 day ago');
+    assert.equal(expiryPhrase(-3), 'expired 3 days ago');
   });
 });
