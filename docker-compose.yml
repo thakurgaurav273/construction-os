@@ -1,25 +1,25 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: sitepilot-postgres
+    container_name: siteplot-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: sitepilot
-      POSTGRES_PASSWORD: sitepilot
-      POSTGRES_DB: sitepilot
+      POSTGRES_USER: siteplot
+      POSTGRES_PASSWORD: siteplot
+      POSTGRES_DB: siteplot
     ports:
       - '5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U sitepilot']
+      test: ['CMD-SHELL', 'pg_isready -U siteplot']
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: sitepilot-redis
+    container_name: siteplot-redis
     restart: unless-stopped
     ports:
       - '6379:6379'
@@ -35,13 +35,13 @@ services:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
-    container_name: sitepilot-backend
+    container_name: siteplot-backend
     restart: unless-stopped
     ports:
       - '5174:5174'
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-sitepilot}:${POSTGRES_PASSWORD:-sitepilot}@postgres:5432/${POSTGRES_DB:-sitepilot}?schema=public
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-siteplot}:${POSTGRES_PASSWORD:-siteplot}@postgres:5432/${POSTGRES_DB:-siteplot}?schema=public
       - REDIS_URL=redis://redis:6379
       - FRONTEND_URL=${FRONTEND_URL:-https://constructions.grovyn.in}
       - CORS_ORIGINS=${CORS_ORIGINS:-}
@@ -84,15 +84,15 @@ services:
       dockerfile: apps/frontend/Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.constructions.grovyn.in/api}
-        - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-SitePilot}
-    container_name: sitepilot-frontend
+        - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-siteplot}
+    container_name: siteplot-frontend
     restart: unless-stopped
     ports:
       - '5173:5173'
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.constructions.grovyn.in/api}
-      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-SitePilot}
+      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-siteplot}
       - PORT=5173
     depends_on:
       - backend
