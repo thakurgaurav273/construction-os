@@ -12,12 +12,13 @@ import {
   User, AlertTriangle, CheckCircle2,
   UserPlus, X, Star, Building2, Pencil, MoreHorizontal, UserX, UserCheck,
 } from 'lucide-react';
-import { useSetWorkerActive, type CertStatus, type Worker } from '@/hooks/api/use-workforce';
+import { useSetWorkerActive, type Worker } from '@/hooks/api/use-workforce';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { ATTENDANCE_STATUS_STYLES, SHIFT_LABELS, WORKER_TYPE_LABELS } from '@/features/workforce/constants';
 import { attendanceRateTone, toDisplayStatus } from '@/features/workforce/utils/attendance';
 import { AssignProjectDialog } from '@/features/workforce/components/AssignProjectDialog';
 import { WorkerFormDialog } from '@/features/workforce/components/WorkerFormDialog';
+import { WorkerCertificationsCard } from '@/features/workforce/components/WorkerCertificationsCard';
 import { WorkerAttendanceCard } from './WorkerAttendanceCard';
 import { Can } from '@/components/shared/Can';
 
@@ -26,27 +27,6 @@ interface WorkerDrawerProps {
   open: boolean;
   onClose: () => void;
 }
-
-const CERT_STATUS_CONFIG: Record<CertStatus, { label: string; bar: string; text: string; icon: React.ReactNode }> = {
-  valid: {
-    label: 'Valid',
-    bar: 'bg-emerald-500',
-    text: 'text-emerald-600 dark:text-emerald-400',
-    icon: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />,
-  },
-  expiring: {
-    label: 'Expiring',
-    bar: 'bg-amber-500',
-    text: 'text-amber-600 dark:text-amber-400',
-    icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />,
-  },
-  expired: {
-    label: 'Expired',
-    bar: 'bg-red-500',
-    text: 'text-red-600 dark:text-red-400',
-    icon: <AlertTriangle className="h-3.5 w-3.5 text-red-500" />,
-  },
-};
 
 const AVATAR_PALETTE = [
   { bg: 'bg-blue-500',   gradient: 'from-blue-500/20 via-blue-500/5 to-transparent',    ring: 'ring-blue-500/30' },
@@ -145,7 +125,8 @@ export function WorkerDrawer({ worker, open, onClose }: WorkerDrawerProps): Reac
         </div>
 
         {/* ── Scrollable Body ── */}
-        <ScrollArea className="flex-1 min-h-0">
+        {/* Radix lays scroll content out as a table, which lets wide rows stretch the drawer past the screen. */}
+        <ScrollArea className="flex-1 min-h-0 [&_[data-radix-scroll-area-viewport]>div]:!block">
           <div className="p-5 space-y-5">
             {/* Contact & Assignment */}
             <div className="grid grid-cols-2 gap-2.5">
@@ -209,43 +190,7 @@ export function WorkerDrawer({ worker, open, onClose }: WorkerDrawerProps): Reac
               </div>
             </div>
 
-            {/* Certifications */}
-            <div className="rounded-xl border bg-card p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-semibold flex items-center gap-1.5">
-                  <Award className="h-4 w-4 text-muted-foreground" />
-                  Certifications
-                </h4>
-                {worker.ppeCompliant ? (
-                  <span className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                    <ShieldCheck className="h-3.5 w-3.5" /> PPE OK
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 font-medium">
-                    <ShieldAlert className="h-3.5 w-3.5" /> PPE Flag
-                  </span>
-                )}
-              </div>
-              <div className="space-y-2">
-                {worker.certifications.length === 0 && <p className="text-xs text-muted-foreground">No certifications on file.</p>}
-                {worker.certifications.map((cert, i) => {
-                  const cfg = CERT_STATUS_CONFIG[cert.status];
-                  return (
-                    <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/40">
-                      <div className={`w-1 self-stretch rounded-full ${cfg.bar}`} />
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        {cfg.icon}
-                        <span className="text-xs font-medium truncate">{cert.name}</span>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className={`text-[10px] font-semibold ${cfg.text}`}>{cfg.label.toUpperCase()}</p>
-                        <p className="text-[10px] text-muted-foreground">{cert.expiryDate.slice(0, 7)}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <WorkerCertificationsCard worker={worker} />
 
             {/* Emergency Contact */}
             <div className="rounded-xl border bg-card p-4">

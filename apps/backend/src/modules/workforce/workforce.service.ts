@@ -9,6 +9,7 @@ import { WorkforceQueryDto } from './dto/attendance.dto';
 import { CreateWorkerDto } from './dto/create-worker.dto';
 import { UpdateWorkerDto } from './dto/update-worker.dto';
 import { WEEK_DAYS } from './workforce.constants';
+import { countCertificationIssues } from './certification-status';
 import {
   EMPTY_ATTENDANCE_SUMMARY, WORKER_INCLUDE, WorkerDetailView, WorkerView, deriveInitials, toWorkerView,
 } from './worker.mapper';
@@ -22,7 +23,10 @@ export interface WorkforceStats {
   notMarkedToday: number;
   subcontractors: number;
   safetyCompliance: number;
+  /** Workers with a certificate expiring within the warning window. */
   expiringCerts: number;
+  /** Workers with at least one expired certificate. */
+  expiredCerts: number;
   attendanceRate7d: number | null;
 }
 
@@ -59,7 +63,7 @@ export class WorkforceService {
     const workerIds = query.projectId ? workers.map((worker) => worker.id) : undefined;
     const summaries = await this.insights.summarizeWorkers(organizationId, today, workerIds);
 
-    return workers.map((worker) => toWorkerView(worker, summaries.get(worker.id) ?? EMPTY_ATTENDANCE_SUMMARY));
+    return workers.map((worker) => toWorkerView(worker, summaries.get(worker.id) ?? EMPTY_ATTENDANCE_SUMMARY, today));
   }
 
   async findOne(id: string, organizationId: string): Promise<WorkerDetailView> {
@@ -71,7 +75,7 @@ export class WorkforceService {
       this.insights.summarizeWorkers(organizationId, today, [id]),
       this.insights.getWorkerHistory(organizationId, id, today),
     ]);
-    return { ...toWorkerView(worker, summaries.get(id) ?? EMPTY_ATTENDANCE_SUMMARY), ...history };
+    return { ...toWorkerView(worker, summaries.get(id) ?? EMPTY_ATTENDANCE_SUMMARY, today), ...history };
   }
 
   async create(organizationId: string, userId: string, dto: CreateWorkerDto): Promise<WorkerDetailView> {
@@ -124,7 +128,7 @@ export class WorkforceService {
     const [workers, todayCounts, weekCounts] = await Promise.all([
       this.prisma.worker.findMany({
         where: { organizationId, projectId, deactivatedAt: null },
-        select: { type: true, ppeCompliant: true, certifications: true },
+        select: { type: true, ppeCompliant: true, certifications: { select: { expiresOn: true } } },
       }),
       this.insights.getCountsBetween(organizationId, today, today, projectId),
       this.insights.getCountsBetween(organizationId, shiftDateKey(today, -(WEEK_DAYS - 1)), today, projectId),
@@ -134,6 +138,7 @@ export class WorkforceService {
     const markedToday = todayCounts.present + todayCounts.late + todayCounts.halfDay
       + todayCounts.absent + todayCounts.onLeave;
     const ppeCompliant = workers.filter((worker) => worker.ppeCompliant).length;
+    const certificationIssues = countCertificationIssues(workers, today);
 
     return {
       total,
@@ -144,7 +149,8 @@ export class WorkforceService {
       notMarkedToday: Math.max(0, total - markedToday),
       subcontractors: workers.filter((worker) => worker.type === 'SUBCONTRACTOR').length,
       safetyCompliance: total ? Math.round((ppeCompliant / total) * 100) : 0,
-      expiringCerts: workers.filter((worker) => hasExpiringCertification(worker.certifications)).length,
+      expiringCerts: certificationIssues.expiring,
+      expiredCerts: certificationIssues.expired,
       attendanceRate7d: computeAttendanceRate(weekCounts),
     };
   }
@@ -196,13 +202,4 @@ function toWorkerData(dto: UpdateWorkerDto): WorkerData {
       ? Prisma.DbNull
       : contact && { name: contact.name.trim(), phone: contact.phone.trim(), relation: contact.relation.trim() },
   };
-}
-
-export function hasExpiringCertification(certifications: Prisma.JsonValue): boolean {
-  return Array.isArray(certifications) && certifications.some(
-    (certification) => typeof certification === 'object'
-      && certification !== null
-      && !Array.isArray(certification)
-      && certification.status === 'expiring',
-  );
 }

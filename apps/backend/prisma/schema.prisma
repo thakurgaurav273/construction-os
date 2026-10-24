@@ -188,6 +188,7 @@ model Organization {
   contracts               Contract[]
   raBills                 RaBill[]
   helpProgress            HelpProgress[]
+  workerCertifications    WorkerCertification[]
 
   @@map("organizations")
 }
@@ -519,7 +520,6 @@ model Worker {
   projectId         String?
   emergencyContact  Json?
   skills            String[]
-  certifications    Json?
   ppeCompliant      Boolean      @default(true)
   deactivatedAt     DateTime?
   organizationId    String
@@ -527,13 +527,39 @@ model Worker {
   updatedAt         DateTime     @updatedAt
 
   project      Project?     @relation(fields: [projectId], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id])
-  attendance   Attendance[]
+  organization   Organization          @relation(fields: [organizationId], references: [id])
+  attendance     Attendance[]
+  certifications WorkerCertification[]
 
   @@index([organizationId])
   @@index([projectId])
   @@index([organizationId, deactivatedAt])
   @@map("workers")
+}
+
+/// A certificate a worker holds (safety induction, medical fitness, licence…). Valid, expiring or expired
+/// is derived from `expiresOn` and the organization's today, never stored, so it can't go stale.
+model WorkerCertification {
+  id                String    @id @default(uuid())
+  workerId          String
+  organizationId    String
+  name              String
+  issuer            String?
+  certificateNumber String?
+  issuedOn          DateTime? @db.Date
+  /// Null for certificates that don't expire. Valid through the end of this day.
+  expiresOn         DateTime? @db.Date
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  worker       Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([workerId])
+  @@index([organizationId, expiresOn])
+  @@map("worker_certifications")
 }
 
 /// One row per worker per calendar day (in the organization's timezone), recorded at the site they worked.

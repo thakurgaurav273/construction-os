@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { ISSUE_SEVERITIES } from '../../../daily-reports/daily-reports.constants';
-import { hasExpiringCertification } from '../../../workforce/workforce.service';
+import { describeCertificationIssues, reportReferenceDay } from '../../../workforce/certification-status';
 import { ReportBuilder, col, inPeriod, isoDay, projectIds, projectLabel, share, table } from '../report-document';
 
 type Severity = (typeof ISSUE_SEVERITIES)[number];
@@ -45,7 +45,8 @@ export const buildSafetyReport: ReportBuilder = async (scope) => {
   })));
   const high = issues.filter((issue) => issue.severity === 'high');
   const compliant = workers.filter((worker) => worker.ppeCompliant).length;
-  const expiring = workers.filter((worker) => hasExpiringCertification(worker.certifications));
+  const asOf = reportReferenceDay(scope.to);
+  const certificateIssues = workers.flatMap((worker) => describeCertificationIssues(worker.certifications, asOf).map((issue) => ({ worker, issue })));
 
   return {
     subtitle: 'Site issues, PPE compliance and certification status.',
@@ -53,7 +54,7 @@ export const buildSafetyReport: ReportBuilder = async (scope) => {
       { label: 'Issues reported', value: issues.length, kind: 'number' },
       { label: 'High severity', value: high.length, kind: 'number', tone: high.length > 0 ? 'bad' : 'good' },
       { label: 'PPE compliance', value: share(compliant, workers.length), kind: 'percent' },
-      { label: 'Certifications expiring', value: expiring.length, kind: 'number', tone: expiring.length > 0 ? 'bad' : undefined },
+      { label: 'Certificates needing renewal', value: certificateIssues.length, kind: 'number', tone: certificateIssues.length > 0 ? 'bad' : undefined, hint: 'Expired or expiring within 30 days' },
       { label: 'Reports with issues', value: reports.filter((report) => readIssues(report.issues).length > 0).length, kind: 'number', hint: `of ${reports.length} daily reports` },
     ],
     sections: [
@@ -86,9 +87,9 @@ export const buildSafetyReport: ReportBuilder = async (scope) => {
           [col('name', 'Worker'), col('trade', 'Trade'), col('project', 'Project'), col('issue', 'Issue')],
           [
             ...workers.filter((worker) => !worker.ppeCompliant).map((worker) => ({ name: worker.name, trade: worker.trade, project: projectLabel(scope, worker.projectId), issue: 'PPE not compliant' })),
-            ...expiring.map((worker) => ({ name: worker.name, trade: worker.trade, project: projectLabel(scope, worker.projectId), issue: 'Certification expiring' })),
+            ...certificateIssues.map(({ worker, issue }) => ({ name: worker.name, trade: worker.trade, project: projectLabel(scope, worker.projectId), issue })),
           ],
-          'Every worker is PPE compliant and no certifications are expiring.',
+          'Every worker is PPE compliant and every certificate is in date.',
         ),
       },
     ],

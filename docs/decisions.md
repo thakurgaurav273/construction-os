@@ -1565,6 +1565,47 @@ New members had no guidance inside the product: workflows such as RA billing (BO
 
 ---
 
+# ADR-039 - Worker Certifications Derive Their Status
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Certifications were a JSON list on each worker with a typed-in `status`. Nothing updated it as dates passed, so certificates that expired months ago still showed as "expiring", and they couldn't be added or edited in the app.
+
+---
+
+## Decision
+
+- Certificates live in their own table, `worker_certifications` (name, issuer, certificate number, issue and expiry dates, who added and last changed them), scoped by organization.
+- Status is never stored. `certificationState(expiresOn, today)` returns valid, expiring (30 days or fewer left, including the expiry day itself) or expired (from the day after), with the days left. "Today" is the organization's calendar day in its time zone, the same rule attendance uses.
+- Reports judge certificates at the end of their period, or today if the period is still running.
+- Add, edit/renew and remove need `workforce.manage` and are audited against the worker.
+
+---
+
+## Alternatives
+
+- **Keep the JSON and recompute status on read**: avoids a migration, but can't be queried or indexed and has no per-certificate audit trail.
+- **A nightly job updating a stored status**: stays wrong between runs and adds a moving part for no gain.
+
+---
+
+## Consequences
+
+- The migration copies the old entries (name and a well-formed expiry date) and drops the JSON column.
+- Expiry reminders by notification are a follow-up; the data now supports a daily query on `(organizationId, expiresOn)`.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

@@ -1,5 +1,5 @@
 import { AttendanceStatus } from '@prisma/client';
-import { hasExpiringCertification } from '../../../workforce/workforce.service';
+import { describeCertificationIssues, reportReferenceDay } from '../../../workforce/certification-status';
 import { ReportBuilder, col, inPeriod, projectIds, share, table } from '../report-document';
 
 /** Beyond a standard shift, hours count as overtime. */
@@ -47,7 +47,7 @@ export const buildWorkforceReport: ReportBuilder = async (scope) => {
   const [workers, attendance] = await Promise.all([
     scope.prisma.worker.findMany({
       where: { organizationId: scope.organizationId, projectId: { in: ids }, deactivatedAt: null },
-      select: { id: true, name: true, trade: true, type: true, ppeCompliant: true, certifications: true, projectId: true },
+      select: { id: true, name: true, trade: true, type: true, ppeCompliant: true, certifications: { select: { name: true, expiresOn: true } }, projectId: true },
       orderBy: { name: 'asc' },
     }),
     scope.prisma.attendance.findMany({
@@ -59,7 +59,8 @@ export const buildWorkforceReport: ReportBuilder = async (scope) => {
   const overall = tally(attendance);
   const trades = [...new Set([...workers.map((worker) => worker.trade), ...attendance.map((record) => record.worker.trade)])].sort();
   const nonCompliant = workers.filter((worker) => !worker.ppeCompliant);
-  const expiring = workers.filter((worker) => hasExpiringCertification(worker.certifications));
+  const asOf = reportReferenceDay(scope.to);
+  const certificateIssues = workers.flatMap((worker) => describeCertificationIssues(worker.certifications, asOf).map((issue) => ({ worker, issue })));
 
   return {
     subtitle: 'Headcount, attendance, overtime and compliance across the crew.',
@@ -102,9 +103,9 @@ export const buildWorkforceReport: ReportBuilder = async (scope) => {
           [col('name', 'Worker'), col('trade', 'Trade'), col('issue', 'Issue')],
           [
             ...nonCompliant.map((worker) => ({ name: worker.name, trade: worker.trade, issue: 'PPE not compliant' })),
-            ...expiring.map((worker) => ({ name: worker.name, trade: worker.trade, issue: 'Certification expiring' })),
+            ...certificateIssues.map(({ worker, issue }) => ({ name: worker.name, trade: worker.trade, issue })),
           ],
-          'Every worker is PPE compliant and no certifications are expiring.',
+          'Every worker is PPE compliant and every certificate is in date.',
         ),
       },
     ],

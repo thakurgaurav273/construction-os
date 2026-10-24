@@ -231,23 +231,26 @@ async function seedOrg(orgId: string, ownerId: string) {
 
 // ─── Workforce Seed Data ────────────────────────────────────────────────────
 
-const CV_C = { name: 'Safety Induction Certificate',  expiryDate: '2027-01-15', status: 'valid'    };
-const CV_E = { name: 'Safety Induction Certificate',  expiryDate: '2026-08-05', status: 'expiring' };
-const CV_X = { name: 'Safety Induction Certificate',  expiryDate: '2026-06-10', status: 'expired'  };
-const FA_C = { name: 'First Aid & CPR',               expiryDate: '2027-03-20', status: 'valid'    };
-const FA_E = { name: 'First Aid & CPR',               expiryDate: '2026-07-28', status: 'expiring' };
-const HS_C = { name: 'Height Safety Training',        expiryDate: '2027-06-30', status: 'valid'    };
-const HS_E = { name: 'Height Safety Training',        expiryDate: '2026-08-12', status: 'expiring' };
-const EL_C = { name: 'Electrical Safety Certificate', expiryDate: '2027-02-28', status: 'valid'    };
-const EL_E = { name: 'Electrical Safety Certificate', expiryDate: '2026-08-01', status: 'expiring' };
-const EL_X = { name: 'Electrical Safety Certificate', expiryDate: '2026-05-14', status: 'expired'  };
-const EQ_C = { name: 'Equipment Operation License',   expiryDate: '2027-09-30', status: 'valid'    };
-const OS_C = { name: 'OSHA 10-Hour Safety',           expiryDate: '2027-12-31', status: 'valid'    };
-const MF_C = { name: 'Medical Fitness Certificate',   expiryDate: '2027-07-01', status: 'valid'    };
-const MF_E = { name: 'Medical Fitness Certificate',   expiryDate: '2026-07-22', status: 'expiring' };
-const MF_X = { name: 'Medical Fitness Certificate',   expiryDate: '2026-04-10', status: 'expired'  };
-const PP_C = { name: 'PPE Compliance Certificate',    expiryDate: '2027-05-15', status: 'valid'    };
-const PP_X = { name: 'PPE Compliance Certificate',    expiryDate: '2026-03-30', status: 'expired'  };
+// Expiry is relative to the day the seed runs, so demo data always has valid, expiring and expired certificates.
+type CertificationSeed = { name: string; expiresInDays: number };
+
+const CV_C: CertificationSeed = { name: 'Safety Induction Certificate', expiresInDays: 180 };
+const CV_E: CertificationSeed = { name: 'Safety Induction Certificate', expiresInDays: 12 };
+const CV_X: CertificationSeed = { name: 'Safety Induction Certificate', expiresInDays: -40 };
+const FA_C: CertificationSeed = { name: 'First Aid & CPR', expiresInDays: 240 };
+const FA_E: CertificationSeed = { name: 'First Aid & CPR', expiresInDays: 5 };
+const HS_C: CertificationSeed = { name: 'Height Safety Training', expiresInDays: 300 };
+const HS_E: CertificationSeed = { name: 'Height Safety Training', expiresInDays: 21 };
+const EL_C: CertificationSeed = { name: 'Electrical Safety Certificate', expiresInDays: 150 };
+const EL_E: CertificationSeed = { name: 'Electrical Safety Certificate', expiresInDays: 27 };
+const EL_X: CertificationSeed = { name: 'Electrical Safety Certificate', expiresInDays: -95 };
+const EQ_C: CertificationSeed = { name: 'Equipment Operation License', expiresInDays: 400 };
+const OS_C: CertificationSeed = { name: 'OSHA 10-Hour Safety', expiresInDays: 500 };
+const MF_C: CertificationSeed = { name: 'Medical Fitness Certificate', expiresInDays: 260 };
+const MF_E: CertificationSeed = { name: 'Medical Fitness Certificate', expiresInDays: 9 };
+const MF_X: CertificationSeed = { name: 'Medical Fitness Certificate', expiresInDays: -160 };
+const PP_C: CertificationSeed = { name: 'PPE Compliance Certificate', expiresInDays: 210 };
+const PP_X: CertificationSeed = { name: 'PPE Compliance Certificate', expiresInDays: -210 };
 
 const W_CIVIL     = ['Foundation Work', 'Excavation', 'Formwork', 'Concrete Pouring', 'Survey Reading'];
 const W_ELEC      = ['Wiring & Cabling', 'Panel Installation', 'Testing & Commissioning', 'Cable Management', 'Electrical Safety'];
@@ -266,7 +269,7 @@ type WorkerSeedEntry = {
   name: string; initials: string; role: string; trade: string; type: 'EMPLOYEE' | 'SUBCONTRACTOR';
   projectCode: string; phone: string; email: string; status: 'ACTIVE' | 'LATE' | 'ABSENT' | 'ON_LEAVE';
   experienceYears: number; shift: 'DAY' | 'NIGHT'; attendancePercent: number; lastCheckIn: string;
-  supervisor: string; emergencyContact: object; skills: string[]; certifications: object[];
+  supervisor: string; emergencyContact: object; skills: string[]; certifications: CertificationSeed[];
   ppeCompliant: boolean;
 };
 
@@ -333,6 +336,12 @@ const WORKER_SEEDS: WorkerSeedEntry[] = [
   { name: 'Prakash Yadav', initials: 'PrY', role: 'Painter Helper', trade: 'Painting', type: 'SUBCONTRACTOR', projectCode: 'GRV-004', phone: '+91 98765 43269', email: 'prakash.yadav@sitepilot.in', status: 'ACTIVE', experienceYears: 5, shift: 'DAY', attendancePercent: 81, lastCheckIn: 'Today, 08:12 AM', supervisor: 'Lalit Gupta', emergencyContact: { name: 'Sarita Yadav', phone: '+91 98766 00060', relation: 'Wife' }, skills: W_PAINTING, certifications: [CV_C, MF_C], ppeCompliant: true },
 ];
 
+/** A calendar day (UTC midnight, as @db.Date stores it) the given number of days from today. */
+function daysFromToday(days: number): Date {
+  const today = new Date();
+  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + days));
+}
+
 async function seedWorkers(orgId: string) {
   const workerCount = await prisma.worker.count({ where: { organizationId: orgId } });
   if (workerCount > 0) {
@@ -364,9 +373,15 @@ async function seedWorkers(orgId: string) {
         projectId,
         emergencyContact: w.emergencyContact,
         skills:           w.skills,
-        certifications:   w.certifications,
         ppeCompliant:     w.ppeCompliant,
         organizationId:   orgId,
+        certifications: {
+          create: w.certifications.map((certification) => ({
+            name: certification.name,
+            expiresOn: daysFromToday(certification.expiresInDays),
+            organizationId: orgId,
+          })),
+        },
       },
     });
   }

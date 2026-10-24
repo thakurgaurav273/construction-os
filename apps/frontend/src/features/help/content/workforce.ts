@@ -32,5 +32,19 @@ export const workforceHelp: HelpModule = {
       ],
       tip: 'Attendance feeds the dashboard’s Workforce Today and the Workforce report.',
     },
+    {
+      id: 'workforce.certifications',
+      title: 'Track certificates and renewals',
+      summary: 'Safety induction, medical fitness and licences, with expiry alerts.',
+      permission: 'workforce.manage',
+      keywords: ['compliance', 'expiry', 'expired', 'licence', 'license', 'renew'],
+      steps: [
+        'Open a worker from the Directory and click Add under Certifications.',
+        'Enter the certificate name, who issued it, and its issue and expiry dates. Leave expiry empty if it never expires.',
+        'Status updates itself: expiring within 30 days, then expired the day after its expiry date.',
+        'To renew, choose Edit or renew on the certificate and set the new dates.',
+      ],
+      tip: 'The Compliance tab, the Workforce alerts and the Safety and Workforce reports list every certificate that needs renewal.',
+    },
   ],
 };

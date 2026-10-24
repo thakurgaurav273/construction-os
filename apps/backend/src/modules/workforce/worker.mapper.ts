@@ -1,7 +1,10 @@
-import { AttendanceStatus, Prisma, WorkerShift, WorkerType } from '@prisma/client';
+import { AttendanceStatus, Prisma, WorkerCertification, WorkerShift, WorkerType } from '@prisma/client';
+import { dbDateToKey } from './attendance-dates';
+import { CertificationStatus, certificationState } from './certification-status';
 
 export const WORKER_INCLUDE = {
   project: { select: { id: true, name: true } },
+  certifications: { orderBy: [{ expiresOn: { sort: 'asc', nulls: 'last' } }, { name: 'asc' }] },
 } satisfies Prisma.WorkerInclude;
 
 type WorkerRecord = Prisma.WorkerGetPayload<{ include: typeof WORKER_INCLUDE }>;
@@ -19,6 +22,18 @@ export const EMPTY_ATTENDANCE_SUMMARY: WorkerAttendanceSummary = {
   lastCheckInAt: null,
 };
 
+export interface CertificationView {
+  id: string;
+  name: string;
+  issuer: string | null;
+  certificateNumber: string | null;
+  /** Calendar days as YYYY-MM-DD. */
+  issuedOn: string | null;
+  expiresOn: string | null;
+  status: CertificationStatus;
+  daysToExpiry: number | null;
+}
+
 export interface WorkerView extends WorkerAttendanceSummary {
   id: string;
   name: string;
@@ -34,7 +49,7 @@ export interface WorkerView extends WorkerAttendanceSummary {
   projectId: string | null;
   project: string | null;
   skills: string[];
-  certifications: Prisma.JsonValue;
+  certifications: CertificationView[];
   ppeCompliant: boolean;
   emergencyContact: Prisma.JsonValue;
   isActive: boolean;
@@ -54,7 +69,8 @@ export interface WorkerDetailView extends WorkerView {
   recentAttendance: AttendanceHistoryItem[];
 }
 
-export function toWorkerView(worker: WorkerRecord, summary: WorkerAttendanceSummary): WorkerView {
+/** `today` is the organization's calendar day, which decides each certificate's status. */
+export function toWorkerView(worker: WorkerRecord, summary: WorkerAttendanceSummary, today: string): WorkerView {
   return {
     id: worker.id,
     name: worker.name,
@@ -70,11 +86,23 @@ export function toWorkerView(worker: WorkerRecord, summary: WorkerAttendanceSumm
     projectId: worker.projectId,
     project: worker.project?.name ?? null,
     skills: worker.skills,
-    certifications: worker.certifications ?? [],
+    certifications: worker.certifications.map((certification) => toCertificationView(certification, today)),
     ppeCompliant: worker.ppeCompliant,
     emergencyContact: worker.emergencyContact,
     isActive: worker.deactivatedAt === null,
     ...summary,
+  };
+}
+
+export function toCertificationView(certification: WorkerCertification, today: string): CertificationView {
+  return {
+    id: certification.id,
+    name: certification.name,
+    issuer: certification.issuer,
+    certificateNumber: certification.certificateNumber,
+    issuedOn: certification.issuedOn ? dbDateToKey(certification.issuedOn) : null,
+    expiresOn: certification.expiresOn ? dbDateToKey(certification.expiresOn) : null,
+    ...certificationState(certification.expiresOn, today),
   };
 }
 
