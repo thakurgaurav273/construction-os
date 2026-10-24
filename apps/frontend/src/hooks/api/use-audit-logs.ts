@@ -27,6 +27,8 @@ export interface AuditLogPage {
 export interface AuditLogFilters {
   search?: string;
   entityType?: string;
+  /** With entityType: one record's history. */
+  entityId?: string;
   from?: string;
   to?: string;
   page?: number;

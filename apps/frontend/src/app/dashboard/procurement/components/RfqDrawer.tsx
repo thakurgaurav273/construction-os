@@ -14,6 +14,7 @@ import { RecordQuoteDialog, type RecordQuoteRequest } from '@/features/procureme
 import { RfqQuoteComparison } from './RfqQuoteComparison';
 import { StatusBadge } from './StatusBadge';
 import { formatCurrency } from './procurement-format';
+import { RecordHistory } from '@/features/audit/components/RecordHistory';
 
 interface RfqDrawerProps {
   rfqId: string | null;
@@ -134,6 +135,7 @@ export function RfqDrawer({ rfqId, open, onClose, onOpenOrder }: RfqDrawerProps)
                   </h4>
                   <RfqQuoteComparison rfq={rfq} onRecordQuote={(invitation) => setQuoteRequest({ rfq, invitation })} />
                 </section>
+                <RecordHistory entityType="rfq" entityId={rfq.id} />
               </div>
             </ScrollArea>
 

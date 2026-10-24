@@ -20,6 +20,18 @@ export const gettingStartedHelp: HelpModule = {
       ],
     },
     {
+      id: 'getting-started.switch-organization',
+      title: 'Work in more than one organization',
+      summary: 'Move between companies you belong to without signing out.',
+      keywords: ['switch', 'company', 'workspace', 'tenant', 'organisation'],
+      steps: [
+        'Accept the invitation from the other organization with the same email; your account joins it.',
+        'Click your organization’s name at the top of the sidebar (or open the account menu on a phone) and pick another organization.',
+        'Everything you see, and what your role allows, follows the organization you’re in.',
+        'Next time you sign in, SitePilot opens the organization you used last.',
+      ],
+    },
+    {
       id: 'getting-started.set-up-organization',
       title: 'Set up your organization',
       summary: 'Company details, branding and your team.',

@@ -21,6 +21,7 @@ import { WorkerFormDialog } from '@/features/workforce/components/WorkerFormDial
 import { WorkerCertificationsCard } from '@/features/workforce/components/WorkerCertificationsCard';
 import { WorkerAttendanceCard } from './WorkerAttendanceCard';
 import { Can } from '@/components/shared/Can';
+import { RecordHistory } from '@/features/audit/components/RecordHistory';
 
 interface WorkerDrawerProps {
   worker: Worker | null;
@@ -213,6 +214,7 @@ export function WorkerDrawer({ worker, open, onClose }: WorkerDrawerProps): Reac
                 </div>
               </div>
             </div>
+            <RecordHistory entityType="worker" entityId={worker.id} />
           </div>
         </ScrollArea>
 

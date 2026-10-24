@@ -26,6 +26,7 @@ import { Skeleton, cn } from '@sitepilot/ui';
 import type { Permission } from '@sitepilot/types';
 import { useAuthHydrated, useAuthStore } from '@/store/auth.store';
 import { UserMenu } from '@/features/auth/components/UserMenu';
+import { OrganizationSwitcher } from '@/features/auth/components/OrganizationSwitcher';
 import { useOrganizationSettings } from '@/hooks/api/use-settings';
 import { useCan, useCurrentAccess } from '@/hooks/api/use-access';
 
@@ -120,40 +121,42 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="flex h-16 items-center px-4 border-b border-sidebar-border shrink-0">
-        <div className="flex items-center gap-3 overflow-hidden">
-          {!hydrated || settingsLoading ? (
-            <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
-          ) : organizationSettings?.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, not a static asset
-            <img src={organizationSettings.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded-md border bg-background object-contain" />
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-xs shrink-0">
-              {orgInitials}
-            </div>
-          )}
-          <AnimatePresence initial={false}>
-            {!isCollapsed && (
-              <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                {hydrated ? (
-                  <span className="block font-semibold text-sm text-sidebar-foreground whitespace-nowrap truncate leading-tight">
-                    {organizationSettings?.name ?? organization?.name ?? 'SitePilot'}
-                  </span>
-                ) : (
-                  <Skeleton className="mb-1 h-3.5 w-28" />
-                )}
-                <span className="block text-[10px] text-muted-foreground whitespace-nowrap leading-tight">
-                  Construction ERP
-                </span>
-              </motion.div>
+        <OrganizationSwitcher showIndicator={!isCollapsed}>
+          <div className="flex items-center gap-3 overflow-hidden">
+            {!hydrated || settingsLoading ? (
+              <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
+            ) : organizationSettings?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, not a static asset
+              <img src={organizationSettings.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded-md border bg-background object-contain" />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-xs shrink-0">
+                {orgInitials}
+              </div>
             )}
-          </AnimatePresence>
-        </div>
+            <AnimatePresence initial={false}>
+              {!isCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  {hydrated ? (
+                    <span className="block font-semibold text-sm text-sidebar-foreground whitespace-nowrap truncate leading-tight">
+                      {organizationSettings?.name ?? organization?.name ?? 'SitePilot'}
+                    </span>
+                  ) : (
+                    <Skeleton className="mb-1 h-3.5 w-28" />
+                  )}
+                  <span className="block text-[10px] text-muted-foreground whitespace-nowrap leading-tight">
+                    Construction ERP
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </OrganizationSwitcher>
       </div>
 
       {/* Collapse toggle: straddles the sidebar's edge on the line under the logo, so the container must not clip. */}

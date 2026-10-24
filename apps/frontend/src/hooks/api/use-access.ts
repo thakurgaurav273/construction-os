@@ -15,12 +15,14 @@ interface MeResponse {
 
 /**
  * The signed-in member's role and permissions, read from the server so role changes apply without a
- * re-login. Keyed by user so a different login never sees the previous user's access.
+ * re-login. Keyed by user and organization so neither a different login nor another of their organizations
+ * ever sees the wrong access.
  */
 export function useCurrentAccess() {
   const userId = useAuthStore((state) => state.user?.id);
+  const organizationId = useAuthStore((state) => state.organization?.id);
   return useQuery<CurrentAccess>({
-    queryKey: ['auth', 'access', userId],
+    queryKey: ['auth', 'access', userId, organizationId],
     queryFn: async () => {
       const res = await apiClient.get('/auth/me');
       const me: MeResponse = res.data.data ?? res.data;
@@ -31,11 +33,11 @@ export function useCurrentAccess() {
         permissions: me.permissions,
         isPlatformAdmin: me.isPlatformAdmin ?? false,
       };
-      writeDeviceCache(DEVICE_CACHE_KEYS.access(me.id), access);
+      writeDeviceCache(DEVICE_CACHE_KEYS.access(me.id, me.organizationId), access);
       return access;
     },
     // Last-known access paints the navigation correctly at once; it is treated as stale and re-checked.
-    initialData: () => (userId ? readDeviceCache<CurrentAccess>(DEVICE_CACHE_KEYS.access(userId)) : undefined),
+    initialData: () => (userId && organizationId ? readDeviceCache<CurrentAccess>(DEVICE_CACHE_KEYS.access(userId, organizationId)) : undefined),
     initialDataUpdatedAt: 0,
     enabled: !!userId,
     staleTime: 60_000,

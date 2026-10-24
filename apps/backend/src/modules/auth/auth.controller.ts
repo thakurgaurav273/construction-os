@@ -10,6 +10,8 @@ import { AuthService, SessionView } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password.dto';
 import { RegisterDto } from './dto/register.dto';
+import { SwitchOrganizationDto } from './dto/switch-organization.dto';
+import { MembershipView, OrganizationSwitchService } from './organization-switch.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PasswordResetService } from './password-reset.service';
 import { sessionClientOf } from './session-client';
@@ -28,6 +30,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly passwordReset: PasswordResetService,
+    private readonly organizationSwitch: OrganizationSwitchService,
     private readonly config: ConfigService,
   ) {}
 
@@ -100,5 +103,27 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   getMe(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
     return user;
+  }
+
+  /** Every organization the signed-in person belongs to, for the organization switcher. */
+  @Get('organizations')
+  @UseGuards(JwtAuthGuard)
+  listOrganizations(@CurrentUser() user: AuthenticatedUser): Promise<MembershipView[]> {
+    return this.organizationSwitch.listMemberships(user.id, user.organizationId);
+  }
+
+  /** Moves this session to another of their organizations; recorded in that organization's audit log by the service. */
+  @HttpCode(HttpStatus.OK)
+  @Post('switch-organization')
+  @UseGuards(JwtAuthGuard)
+  async switchOrganization(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: SwitchOrganizationDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<SessionView> {
+    const { session, tokens } = await this.organizationSwitch.switchTo(user.id, readCookie(req, AUTH_COOKIES.refresh), dto.organizationId, sessionClientOf(req));
+    setAuthCookies(res, this.config, tokens);
+    return session;
   }
 }

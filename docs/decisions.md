@@ -1606,6 +1606,48 @@ Certifications were a JSON list on each worker with a typed-in `status`. Nothing
 
 ---
 
+# ADR-040 - Switching Organizations Within a Session
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+A person can belong to several organizations (for example a consultant, or a subcontractor's engineer working for two contractors), but sign-in always opened the one they joined first and there was no way to move between them.
+
+---
+
+## Decision
+
+- Tokens keep carrying a single `organizationId`. Switching re-issues them for the chosen organization by rotating the current refresh token on the **same session**: the session list stays accurate, and the old organization's refresh token can't be replayed.
+- The server checks membership and account status, and that the refresh cookie belongs to the person making the request, before touching the session.
+- `users.lastOrganizationId` remembers the organization last used; sign-in reopens it while they're still a member, otherwise the earliest-joined one.
+- The switch is audited in the organization being entered (`auth.switched_organization`), like a sign-in there.
+- The frontend reloads into the new organization's dashboard after switching, rather than patching state in place: cached queries, the notification socket's rooms and the brand colour all belong to the previous organization. Cached permissions are keyed by user and organization.
+
+---
+
+## Alternatives
+
+- **Several organizations in one token**: every query would need to pick one, and a bug could read across tenants.
+- **Sign out and back in**: works, but loses the session and is clumsy for people who move between organizations daily.
+
+---
+
+## Consequences
+
+- An access token for the previous organization stays valid until it expires (15 minutes), but the browser no longer holds it.
+- Organization logos aren't shown in the switcher yet (names and roles only).
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

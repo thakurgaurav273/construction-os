@@ -18,6 +18,7 @@ import { ContractOverview } from '@/features/billing/components/ContractOverview
 import { NewRaBillDialog } from '@/features/billing/components/NewRaBillDialog';
 import { RetentionCard } from '@/features/billing/components/RetentionCard';
 import type { ContractDetail } from '@/features/billing/types';
+import { RecordHistory } from '@/features/audit/components/RecordHistory';
 
 function newBillBlockedReason(contract: ContractDetail): string | null {
   if (contract.status === 'CLOSED') return 'This contract is closed.';
@@ -108,6 +109,7 @@ export default function ContractPage(): React.ReactElement {
       />
       <RetentionCard contract={contract} />
       <ContractBoqCard contract={contract} canEdit={editable} />
+      <RecordHistory entityType="contract" entityId={contract.id} />
 
       <ContractFormDialog open={editOpen} onOpenChange={setEditOpen} contract={contract} />
       <NewRaBillDialog

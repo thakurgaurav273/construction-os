@@ -22,6 +22,8 @@ const OPEN_WRITES = new Set([
   // Signed-out flows: the reset link itself is the credential.
   'AuthController.forgotPassword',
   'AuthController.resetPassword',
+  // Personal: moves the member's own session to another organization they belong to.
+  'AuthController.switchOrganization',
   'InvitationsController.accept',
   // Personal: a member manages only their own devices and notifications.
   'NotificationsController.registerDevice',

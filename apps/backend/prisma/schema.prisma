@@ -89,6 +89,8 @@ model User {
   password      String
   emailVerified Boolean    @default(false)
   status        UserStatus @default(ACTIVE)
+  /// The organization this person last signed in to or switched to; sign-in opens it again while they're still a member.
+  lastOrganizationId String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

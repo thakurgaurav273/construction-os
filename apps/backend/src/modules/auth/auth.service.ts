@@ -9,7 +9,7 @@ import { SessionClient, TokenPair, TokenService, UNKNOWN_CLIENT } from './token.
 
 export const PASSWORD_HASH_ROUNDS = 12;
 
-export type PublicUser = Omit<User, 'password'>;
+export type PublicUser = Omit<User, 'password' | 'lastOrganizationId'>;
 
 export interface SessionView {
   user: PublicUser;
@@ -41,11 +41,11 @@ export class AuthService {
     const finalSlug = slugExists ? `${slug}-${Date.now()}` : slug;
 
     const { user, organization } = await this.prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: { name: dto.name.trim(), email: dto.email, password: hashedPassword, status: 'ACTIVE' },
-      });
       const newOrg = await tx.organization.create({
         data: { name: dto.organizationName.trim(), slug: finalSlug, currency: 'INR', timezone: 'Asia/Kolkata' },
+      });
+      const newUser = await tx.user.create({
+        data: { name: dto.name.trim(), email: dto.email, password: hashedPassword, status: 'ACTIVE', lastOrganizationId: newOrg.id },
       });
       await tx.userOrganization.create({ data: { userId: newUser.id, organizationId: newOrg.id, role: 'OWNER' } });
       return { user: newUser, organization: newOrg };
@@ -64,12 +64,17 @@ export class AuthService {
     if (!user || !passwordMatches) throw new UnauthorizedException(INVALID_CREDENTIALS);
     if (user.status !== 'ACTIVE') throw new UnauthorizedException('This account is inactive. Ask your administrator to reactivate it.');
 
-    const membership = await this.prisma.userOrganization.findFirst({
+    // Reopen the organization they last used; if they've since left it, the one they joined first.
+    const memberships = await this.prisma.userOrganization.findMany({
       where: { userId: user.id },
       orderBy: { joinedAt: 'asc' },
       include: { organization: true },
     });
+    const membership = memberships.find((candidate) => candidate.organizationId === user.lastOrganizationId) ?? memberships[0];
     if (!membership) throw new UnauthorizedException('This account is not a member of any organization.');
+    if (membership.organizationId !== user.lastOrganizationId) {
+      await this.prisma.user.update({ where: { id: user.id }, data: { lastOrganizationId: membership.organizationId } });
+    }
 
     return {
       session: { user: toPublicUser(user), organization: membership.organization },

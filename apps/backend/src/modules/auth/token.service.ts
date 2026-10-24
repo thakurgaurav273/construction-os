@@ -93,16 +93,21 @@ export class TokenService {
 
   /**
    * Swaps a refresh token for a new pair; the old one can't be used again. Presenting a refresh token
-   * that was already rotated means it was copied, so every session of that user is ended.
+   * that was already rotated means it was copied, so every session of that user is ended. Passing an
+   * organization moves the session there (the caller checks membership first); it stays the same session.
    */
-  async rotate(refreshToken: string, client: SessionClient = UNKNOWN_CLIENT): Promise<{ payload: TokenPayload; tokens: TokenPair }> {
+  async rotate(
+    refreshToken: string,
+    client: SessionClient = UNKNOWN_CLIENT,
+    organizationId?: string,
+  ): Promise<{ payload: TokenPayload; tokens: TokenPair }> {
     const payload = this.verify(refreshToken, 'refresh');
     const stored = await this.prisma.refreshToken.findUnique({ where: { token: hashToken(refreshToken) } });
     if (!stored || stored.userId !== payload.sub || stored.expiresAt < new Date()) {
       throw new UnauthorizedException('Your session has expired. Sign in again.');
     }
 
-    const tokens = this.pair(payload.sub, payload.organizationId, stored.sessionId);
+    const tokens = this.pair(payload.sub, organizationId ?? payload.organizationId, stored.sessionId);
     const deviceNow: SessionClient = {
       userAgent: client.userAgent ?? stored.userAgent,
       ipAddress: client.ipAddress ?? stored.ipAddress,

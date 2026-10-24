@@ -18,6 +18,7 @@ import { SettlementCard } from '@/features/billing/components/SettlementCard';
 import { MaterialRecoveryCard } from '@/features/billing/components/margin/MaterialRecoveryCard';
 import { DIRECTION_LABELS } from '@/features/billing/constants';
 import { formatPeriod } from '@/features/billing/utils/format';
+import { RecordHistory } from '@/features/audit/components/RecordHistory';
 
 export default function RaBillPage(): React.ReactElement {
   const { id } = useParams<{ id: string }>();
@@ -114,6 +115,7 @@ export default function RaBillPage(): React.ReactElement {
           <BillTotalsCard bill={bill} editable={editable} />
           <MaterialRecoveryCard bill={bill} editable={editable} />
           <BillTimeline events={bill.events} />
+          <RecordHistory entityType="ra_bill" entityId={bill.id} />
         </div>
       </div>
 

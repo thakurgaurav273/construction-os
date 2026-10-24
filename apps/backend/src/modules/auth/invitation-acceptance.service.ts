@@ -76,6 +76,8 @@ export class InvitationAcceptanceService {
     });
 
     const organization = await this.prisma.organization.findUniqueOrThrow({ where: { id: invitation.organizationId } });
+    // Accepting signs them in to the inviting organization, so that's the one to reopen next time.
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastOrganizationId: invitation.organizationId } });
     return {
       session: { user: toPublicUser(user), organization },
       tokens: await this.tokens.issue(user.id, invitation.organizationId, client),

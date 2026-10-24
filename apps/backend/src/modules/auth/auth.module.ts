@@ -13,13 +13,15 @@ import { InvitationsController } from './invitations.controller';
 import { AccountController } from './account.controller';
 import { AccountService } from './account.service';
 import { SessionsService } from './sessions.service';
+import { OrganizationSwitchService } from './organization-switch.service';
 
 @Module({
   // Secrets are passed per call by TokenService, so access and refresh tokens never share one.
   imports: [DatabaseModule, PassportModule, JwtModule.register({})],
   controllers: [AuthController, InvitationsController, AccountController],
   providers: [
-    AuthService, TokenService, SessionsService, AccountService, PasswordResetService, InvitationAcceptanceService, JwtStrategy, MailService,
+    AuthService, TokenService, SessionsService, AccountService, PasswordResetService, InvitationAcceptanceService, OrganizationSwitchService,
+    JwtStrategy, MailService,
   ],
   exports: [AuthService, TokenService],
 })

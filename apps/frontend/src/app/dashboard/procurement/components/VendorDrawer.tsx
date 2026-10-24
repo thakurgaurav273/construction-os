@@ -16,6 +16,7 @@ import { VendorFormDialog } from '@/features/procurement/components/VendorFormDi
 import { formatCurrency } from './procurement-format';
 import { getVendorAvatarColor, getVendorInitials } from './VendorCard';
 import { StatusBadge } from './StatusBadge';
+import { RecordHistory } from '@/features/audit/components/RecordHistory';
 
 const RECENT_ORDER_LIMIT = 5;
 
@@ -226,6 +227,7 @@ export function VendorDrawer({ vendor, open, onClose, onOpenOrder }: VendorDrawe
                     <p className="text-xs text-muted-foreground leading-relaxed">{vendor.aiRecommendation}</p>
                   </div>
                 )}
+                <RecordHistory entityType="vendor" entityId={vendor.id} />
               </div>
             </ScrollArea>
 

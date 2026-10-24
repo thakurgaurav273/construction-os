@@ -10,6 +10,7 @@ import { useTransfer, type TransferDetail } from '@/hooks/api/use-inventory';
 import { formatDate, formatNumber } from '@/lib/utils';
 import { getTransferStatusMeta } from './inventory-format';
 import { TransferActions } from './TransferActions';
+import { RecordHistory } from '@/features/audit/components/RecordHistory';
 
 interface TransferDrawerProps {
   transferId: string | null;
@@ -94,6 +95,7 @@ function TransferDrawerBody({ transfer }: { transfer: TransferDetail }): React.R
               ))}
             </div>
           </div>
+          <RecordHistory entityType="stock_transfer" entityId={transfer.id} />
         </div>
       </ScrollArea>
 

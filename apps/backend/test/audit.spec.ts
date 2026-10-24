@@ -11,6 +11,8 @@ const UNAUDITED_WRITES = new Set([
   // No organization or actor yet; the reset itself is recorded by PasswordResetService.
   'AuthController.forgotPassword',
   'AuthController.resetPassword',
+  // Recorded by OrganizationSwitchService in the organization switched into, not the one left.
+  'AuthController.switchOrganization',
   'NotificationsController.registerDevice',
   'NotificationsController.unregisterDevice',
   'NotificationsController.markAllRead',

@@ -11,6 +11,7 @@ import { FinanceStatusBadge } from '@/features/finance/components/FinanceStatusB
 import { InvoiceActions } from './InvoiceActions';
 import { InvoiceMatchTable } from './InvoiceMatchTable';
 import { PaymentRowActions } from './PaymentRowActions';
+import { RecordHistory } from '@/features/audit/components/RecordHistory';
 
 interface InvoiceDrawerProps {
   invoiceId: string | null;
@@ -183,6 +184,7 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps): React
                     </div>
                   ))}
                 </Section>
+                <RecordHistory entityType="invoice" entityId={invoice.id} />
               </div>
             </ScrollArea>
 

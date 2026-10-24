@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { User } from '@sitepilot/types';
+import type { Organization, User } from '@sitepilot/types';
+import { DEVICE_CACHE_KEYS, removeDeviceCache } from '@/lib/device-cache';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -78,6 +79,47 @@ export function useEndOtherSessions() {
     },
     onSuccess: () => {
       queryClient.setQueryData<AccountSession[]>(SESSIONS_KEY, (sessions) => sessions?.filter((session) => session.current));
+    },
+  });
+}
+
+/** An organization the signed-in person belongs to. */
+export interface Membership {
+  organizationId: string;
+  name: string;
+  brandColor: string | null;
+  role: string;
+  isCurrent: boolean;
+}
+
+export function useMyOrganizations() {
+  const userId = useAuthStore((state) => state.user?.id);
+  const organizationId = useAuthStore((state) => state.organization?.id);
+  return useQuery<Membership[]>({
+    queryKey: ['account', 'organizations', userId, organizationId],
+    queryFn: async () => {
+      const res = await apiClient.get('/auth/organizations');
+      return res.data.data ?? res.data;
+    },
+    enabled: !!userId,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Moves the session to another organization, then reloads into its dashboard: every cached query, the live
+ * notification connection and the brand colour belong to the organization being left.
+ */
+export function useSwitchOrganization() {
+  return useMutation({
+    mutationFn: async (organizationId: string): Promise<{ user: User; organization: Organization }> => {
+      const res = await apiClient.post('/auth/switch-organization', { organizationId });
+      return res.data.data ?? res.data;
+    },
+    onSuccess: ({ user, organization }) => {
+      removeDeviceCache(DEVICE_CACHE_KEYS.brandCss);
+      useAuthStore.getState().setAuth(user, organization);
+      window.location.assign('/dashboard');
     },
   });
 }

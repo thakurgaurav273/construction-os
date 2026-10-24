@@ -19,6 +19,7 @@ import {
 import { MaterialStatusBadge } from './MaterialStatusBadge';
 import { MaterialDrawerActions } from './MaterialDrawerActions';
 import { MaterialStoresCard } from './MaterialStoresCard';
+import { RecordHistory } from '@/features/audit/components/RecordHistory';
 
 interface MaterialDrawerProps {
   materialId: string | null;
@@ -243,6 +244,7 @@ function MaterialDrawerBody({ material, onClose }: { material: MaterialDetail; o
               </div>
             </div>
           )}
+          <RecordHistory entityType="material" entityId={material.id} />
         </div>
       </ScrollArea>
 
