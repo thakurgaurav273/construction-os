@@ -7,7 +7,7 @@ import {
   AnalyzeSheetDto, RunImportDto, SaveImportTemplateDto, UpdateImportTemplateDto,
 } from './dto/data-import.dto';
 import { IMPORT_DEFINITIONS, ImportEntityDefinition, MAX_IMPORT_ROWS } from './import-definitions';
-import { applyMapping, toSheetRow } from './import-mapping';
+import { MappedRow, applyMapping, toSheetRow } from './import-mapping';
 import { ImportTemplateView, ImportTemplatesService } from './import-templates.service';
 import { EntityImporter, RowAction, RowOutcome } from './importers/entity-importer';
 import { MaterialImporter } from './importers/material.importer';
@@ -63,6 +63,13 @@ export interface ImportEntityView extends ImportEntityDefinition {
 
 export type ImportSummary = Record<RowAction, number>;
 
+export interface MappedSheet {
+  template: ImportTemplateView;
+  definition: ImportEntityDefinition;
+  sheetName: string;
+  rows: MappedRow[];
+}
+
 export interface ImportRunView {
   /** The template used; also the audited record. */
   id: string;
@@ -86,7 +93,8 @@ function summarize(rows: RowOutcome[]): ImportSummary {
 
 @Injectable()
 export class DataImportService {
-  private readonly importers: Record<ImportEntity, EntityImporter>;
+  /** Entities imported into one record (BOQ, measurement book) are handled by Billing instead. */
+  private readonly importers: Partial<Record<ImportEntity, EntityImporter>>;
 
   constructor(
     private readonly templates: ImportTemplatesService,
@@ -142,6 +150,10 @@ export class DataImportService {
     return this.run(actor, templateId, file, dto, 'preview');
   }
 
+  markTemplateUsed(templateId: string): Promise<void> {
+    return this.templates.markUsed(templateId);
+  }
+
   async commit(actor: ImportActor, templateId: string, file: UploadedSheet | undefined, dto: RunImportDto): Promise<ImportRunView> {
     const result = await this.run(actor, templateId, file, dto, 'commit');
     await this.templates.markUsed(templateId);
@@ -152,7 +164,7 @@ export class DataImportService {
   async exportData(actor: ImportActor, templateId: string): Promise<ImportExportView> {
     const template = await this.templates.findOne(templateId, actor.organizationId);
     const definition = this.allowedDefinition(actor, template.entity);
-    const records = await this.importers[template.entity].exportRecords(actor.organizationId);
+    const records = await this.importerFor(template.entity).exportRecords(actor.organizationId);
     return {
       fileName: `${definition.label.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`,
       headers: template.headers,
@@ -177,6 +189,28 @@ export class DataImportService {
     return this.templates.remove(id, actor.organizationId);
   }
 
+  /**
+   * Reads an upload with a saved layout: checks the member may import it, that the headings still match,
+   * and returns every data row keyed by SitePilot field. Shared with Billing's BOQ and measurement imports.
+   */
+  async readWithTemplate(
+    actor: ImportActor,
+    templateId: string,
+    file: UploadedSheet | undefined,
+    sheetName: string | undefined,
+    expectedEntity?: ImportEntity,
+  ): Promise<MappedSheet> {
+    const template = await this.templates.findOne(templateId, actor.organizationId);
+    if (expectedEntity && template.entity !== expectedEntity) {
+      throw new BadRequestException(`“${template.name}” is a ${IMPORT_DEFINITIONS[template.entity].label.toLowerCase()} layout.`);
+    }
+    const definition = this.allowedDefinition(actor, template.entity);
+    const upload = this.requireFile(file);
+    const sheet = await readSpreadsheet(upload.buffer, upload.originalname, sheetName);
+    const rows = this.templateRows(template, sheet).map((row) => applyMapping(definition, template.mapping, template.headers, row));
+    return { template, definition, sheetName: sheet.sheetName, rows };
+  }
+
   private async run(
     actor: ImportActor,
     templateId: string,
@@ -184,21 +218,15 @@ export class DataImportService {
     dto: RunImportDto,
     mode: 'preview' | 'commit',
   ): Promise<ImportRunView> {
-    const template = await this.templates.findOne(templateId, actor.organizationId);
-    const definition = this.allowedDefinition(actor, template.entity);
-    const upload = this.requireFile(file);
-    const sheet = await readSpreadsheet(upload.buffer, upload.originalname, dto.sheetName);
-    const rows = this.templateRows(template, sheet);
-
-    const importer = this.importers[template.entity];
+    const { template, definition, sheetName, rows } = await this.readWithTemplate(actor, templateId, file, dto.sheetName);
+    const importer = this.importerFor(template.entity);
     const context = {
       organizationId: actor.organizationId,
       userId: actor.id,
       onExisting: definition.canUpdateExisting ? dto.onExisting ?? 'skip' : 'skip',
     };
-    const mapped = rows.map((row) => applyMapping(definition, template.mapping, template.headers, row));
-    const outcomes = mode === 'preview' ? await importer.preview(context, mapped) : await importer.commit(context, mapped);
-    return { id: template.id, entity: template.entity, sheetName: sheet.sheetName, summary: summarize(outcomes), rows: outcomes };
+    const outcomes = mode === 'preview' ? await importer.preview(context, rows) : await importer.commit(context, rows);
+    return { id: template.id, entity: template.entity, sheetName, summary: summarize(outcomes), rows: outcomes };
   }
 
   private templateRows(template: ImportTemplateView, sheet: Spreadsheet): SheetRow[] {
@@ -216,7 +244,16 @@ export class DataImportService {
     return rows;
   }
 
-  private allowedDefinition(actor: ImportActor, entity: ImportEntity): ImportEntityDefinition {
+  private importerFor(entity: ImportEntity): EntityImporter {
+    const importer = this.importers[entity];
+    if (!importer) {
+      const where = IMPORT_DEFINITIONS[entity].context === 'contract' ? 'the contract page' : 'the RA bill page';
+      throw new BadRequestException(`${IMPORT_DEFINITIONS[entity].label} sheets are imported from ${where} in Billing.`);
+    }
+    return importer;
+  }
+
+  allowedDefinition(actor: ImportActor, entity: ImportEntity): ImportEntityDefinition {
     const definition = IMPORT_DEFINITIONS[entity];
     if (!actor.permissions.includes(definition.permission)) {
       throw new ForbiddenException(

@@ -74,7 +74,7 @@ export default function DailyReportsPage() {
           </p>
         </div>
         <Can permission="dailyReport.write">
-          <Button onClick={() => setSelectProjectOpen(true)}>
+          <Button onClick={() => setSelectProjectOpen(true)} data-tour="daily-reports-new">
             <Plus className="mr-2 h-4 w-4" /> New Report
           </Button>
         </Can>
@@ -117,7 +117,7 @@ export default function DailyReportsPage() {
       </motion.div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3" data-tour="daily-reports-filters">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input

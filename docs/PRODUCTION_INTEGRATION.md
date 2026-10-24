@@ -2,10 +2,9 @@
 
 To connect SitePilot to the real backend, follow these steps:
 
-1. **Disable Demo Mode**
-   In your `.env.local` file, set:
+1. **Point the frontend at the API**
+   In your `.env.local` file, set (there is no demo mode; see `DEMO_MODE.md` for demo data):
    ```env
-   NEXT_PUBLIC_DEMO_MODE=false
    NEXT_PUBLIC_API_URL=https://api.sitepilot.io/v1
    ```
 

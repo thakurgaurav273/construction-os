@@ -1,0 +1,146 @@
+import { Receipt } from 'lucide-react';
+import type { HelpModule } from '../types';
+
+export const billingHelp: HelpModule = {
+  key: 'billing',
+  title: 'Billing',
+  icon: Receipt,
+  routes: ['/dashboard/billing'],
+  permission: 'billing.view',
+  tour: 'billing',
+  guides: [
+    {
+      id: 'billing.contracts',
+      title: 'Set up a contract and its BOQ',
+      summary: 'A client contract or a subcontract, with its bill of quantities.',
+      permission: 'contract.manage',
+      keywords: ['work order', 'subcontract', 'client', 'gst', 'tds', 'retention'],
+      steps: [
+        'Open Billing and click New Contract. Choose whether you bill a client or a subcontractor bills you.',
+        'Enter the party’s WO/PO number and the project.',
+        'On the contract page, add BOQ lines (item no, code, unit, quantity, rate). You can paste rows straight from Excel.',
+        'Add the taxes and deductions that apply: GST, TDS, BOCW, retention, security deposit and so on.',
+      ],
+    },
+    {
+      id: 'billing.import-boq',
+      title: 'Import a BOQ',
+      summary: 'Bring a BOQ from your own spreadsheet layout.',
+      permission: 'contract.manage',
+      keywords: ['excel', 'abstract', 'opening balance'],
+      steps: [
+        'On the contract page, click Import BOQ and upload the workbook.',
+        'Match your columns once. The layout is saved and recognised next time.',
+        'Review which lines will be added, updated or skipped.',
+        'If the sheet has quantities certified before SitePilot, they become one opening bill so the next RA bill is numbered correctly.',
+      ],
+    },
+    {
+      id: 'billing.raise-ra-bill',
+      title: 'Raise your first RA bill',
+      summary: 'Start a running account bill against the contract.',
+      permission: 'billing.prepare',
+      keywords: ['running account', 'ra'],
+      steps: [
+        'Open the contract and click New RA Bill. Bills are numbered in sequence and only one can be open at a time.',
+        'Record measurements for each BOQ line you are claiming.',
+        'Check the abstract and the totals, then submit.',
+      ],
+    },
+    {
+      id: 'billing.measurement-book',
+      title: 'Record the measurement book',
+      summary: 'Nos × L × B × H, steel weights and deductions.',
+      permission: 'billing.prepare',
+      keywords: ['mb', 'measurement', 'steel', 'deduction'],
+      steps: [
+        'On a draft bill, open a BOQ line’s measurements.',
+        'Add rows as Nos × L × B × H, steel (nos × cut length × kg/m) or a direct quantity.',
+        'Add deduction rows for openings and the like; they subtract from the total.',
+        'The claimed quantity is always the measurement total.',
+      ],
+      tip: 'Already keep your MB in Excel? Use Import MB on the draft bill instead.',
+    },
+    {
+      id: 'billing.import-measurements',
+      title: 'Import a measurement book',
+      summary: 'Load your existing MB sheet into a draft bill.',
+      permission: 'billing.prepare',
+      steps: [
+        'On a draft bill, click Import MB and upload the workbook. The MB tab is picked automatically.',
+        'Pick the sections (for example “RA Bill 4th”) to bring in.',
+        'The preview checks each item against the sheet’s own totals and flags holds or mismatches.',
+        'Importing replaces the measurements of the items it contains.',
+      ],
+    },
+    {
+      id: 'billing.abstract',
+      title: 'Read the bill abstract',
+      summary: 'Previous, this bill and up-to-date quantities and amounts.',
+      keywords: ['abstract', 'over boq', 'net payable'],
+      steps: [
+        'Previous is what was certified on earlier bills; This bill is what you claim now; Up to date is the sum.',
+        'Lines past their BOQ quantity are flagged Over BOQ.',
+        'Below the lines: gross amount, then taxes and deductions, then net payable.',
+      ],
+    },
+    {
+      id: 'billing.certify',
+      title: 'Certify or send back a bill',
+      summary: 'Record what is certified, and hold the rest with a reason.',
+      permission: 'billing.certify',
+      steps: [
+        'Open a submitted bill and click Certify.',
+        'Enter the certified quantity per line. Anything less than claimed is held; give a reason.',
+        'Or send the bill back with a note so it can be corrected.',
+        'Certifying freezes the rates. A subcontract bill becomes an approved vendor bill in Finance; a client bill becomes a receivable.',
+      ],
+      tip: 'Subcontract bills need a second person to certify them.',
+    },
+    {
+      id: 'billing.receivables',
+      title: 'Track receivables and record receipts',
+      summary: 'What clients owe you, by age.',
+      permission: 'billing.receipts',
+      keywords: ['ageing', 'payment received'],
+      steps: [
+        'Open Billing → Receivables to see certified client bills by age.',
+        'Record a receipt when the client pays; part payments are fine.',
+        'A receipt recorded by mistake can be voided with a reason.',
+      ],
+    },
+    {
+      id: 'billing.retention',
+      title: 'Hold and release retention',
+      summary: 'Retention held on each bill and released later.',
+      permission: 'contract.manage',
+      steps: [
+        'Mark a deduction as retention in the contract’s taxes and deductions.',
+        'The contract page shows retention held, released and the balance per bill.',
+        'Release retention when it falls due. On a subcontract this raises a vendor bill for payment.',
+      ],
+    },
+    {
+      id: 'billing.material-recovery',
+      title: 'Recover material from a subcontractor',
+      summary: 'Deduct material you issued to them from their bill.',
+      permission: 'billing.prepare',
+      steps: [
+        'Issue material to the project and name the subcontract it went to, with a recovery rate.',
+        'On that subcontractor’s draft bill, find the Material recovery card and click Recover.',
+        'A deduction is added for the issued less returned quantity. Nothing is recovered twice.',
+      ],
+    },
+    {
+      id: 'billing.margin',
+      title: 'See margin per item',
+      summary: 'Client billing against subcontract cost, line by line.',
+      permission: 'finance.view',
+      steps: [
+        'Link each subcontract BOQ line to the client line it delivers; suggestions appear where the match is clear.',
+        'Open Billing → Margin to compare certified client value with certified subcontract cost.',
+        'Expand a row to see the subcontract lines behind it. Unlinked work is listed separately.',
+      ],
+    },
+  ],
+};

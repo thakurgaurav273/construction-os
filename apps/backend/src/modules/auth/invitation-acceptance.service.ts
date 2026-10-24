@@ -6,7 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../database/prisma.service';
 import { AuthService, PASSWORD_HASH_ROUNDS, StartedSession, toPublicUser } from './auth.service';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
-import { TokenService, hashToken } from './token.service';
+import { SessionClient, TokenService, UNKNOWN_CLIENT, hashToken } from './token.service';
 
 export interface InvitationPreview {
   email: string;
@@ -50,7 +50,7 @@ export class InvitationAcceptanceService {
     };
   }
 
-  async accept(token: string, dto: AcceptInvitationDto): Promise<StartedSession> {
+  async accept(token: string, dto: AcceptInvitationDto, client: SessionClient = UNKNOWN_CLIENT): Promise<StartedSession> {
     const invitation = await this.findOpenInvitation(token);
     const account = await this.resolveAccount(invitation, dto);
 
@@ -76,9 +76,11 @@ export class InvitationAcceptanceService {
     });
 
     const organization = await this.prisma.organization.findUniqueOrThrow({ where: { id: invitation.organizationId } });
+    // Accepting signs them in to the inviting organization, so that's the one to reopen next time.
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastOrganizationId: invitation.organizationId } });
     return {
       session: { user: toPublicUser(user), organization },
-      tokens: await this.tokens.issue(user.id, invitation.organizationId),
+      tokens: await this.tokens.issue(user.id, invitation.organizationId, client),
     };
   }
 

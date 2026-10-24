@@ -1,5 +1,6 @@
 'use client';
 
+import { useProjectOpenForWork } from '@/hooks/api/use-projects';
 import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { File, FileText, Image as ImageIcon, LayoutGrid, List, Search, Upload, Filter, MoreVertical, Download, Eye, Trash2, FileArchive } from 'lucide-react';
@@ -40,6 +41,7 @@ export default function DocumentsPage({ params }: { params: { id: string } }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: documents = [], isLoading } = useDocuments(params.id);
+  const isOpen = useProjectOpenForWork(params.id);
   const uploadMutation = useUploadDocument(params.id);
   const deleteMutation = useDeleteDocument(params.id);
   const downloadMutation = useDocumentDownloadUrl(params.id);
@@ -94,12 +96,12 @@ export default function DocumentsPage({ params }: { params: { id: string } }) {
           <p className="text-muted-foreground">Manage and track all project documentation.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Can permission="document.upload">
+          {isOpen && <Can permission="document.upload">
             <Button onClick={handleUploadClick} disabled={uploadMutation.isPending}>
               <Upload className="mr-2 h-4 w-4" />
               {uploadMutation.isPending ? 'Uploading…' : 'Upload'}
             </Button>
-          </Can>
+          </Can>}
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
         </div>
       </div>
@@ -150,7 +152,7 @@ export default function DocumentsPage({ params }: { params: { id: string } }) {
               <FileArchive className="h-12 w-12 mb-4 text-primary/30" />
               <h3 className="font-semibold text-lg text-foreground mb-1">No documents yet</h3>
               <p className="text-sm text-center mb-4">Upload your first document using the Upload button above.</p>
-              <Can permission="document.upload"><Button variant="outline" onClick={handleUploadClick}><Upload className="mr-2 h-4 w-4" /> Upload Document</Button></Can>
+              {isOpen && <Can permission="document.upload"><Button variant="outline" onClick={handleUploadClick}><Upload className="mr-2 h-4 w-4" /> Upload Document</Button></Can>}
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -23,8 +23,11 @@ function buildAlerts(stats: WorkforceStats): Alert[] {
   if (stats.lateToday > 0) {
     alerts.push({ icon: Clock, tone: 'text-amber-500', title: `${stats.lateToday} late arrivals`, detail: 'Checked in more than 30 minutes after shift start.' });
   }
+  if (stats.expiredCerts > 0) {
+    alerts.push({ icon: AlertTriangle, tone: 'text-red-500', title: 'Certifications expired', detail: `${stats.expiredCerts} ${stats.expiredCerts === 1 ? 'worker has' : 'workers have'} an expired certificate. Renew before they work on site.` });
+  }
   if (stats.expiringCerts > 0) {
-    alerts.push({ icon: AlertTriangle, tone: 'text-amber-500', title: 'Certifications expiring', detail: `${stats.expiringCerts} workers need renewal training soon.` });
+    alerts.push({ icon: AlertTriangle, tone: 'text-amber-500', title: 'Certifications expiring', detail: `${stats.expiringCerts} ${stats.expiringCerts === 1 ? 'worker needs' : 'workers need'} renewal within 30 days.` });
   }
   if (stats.total > 0 && stats.safetyCompliance < SAFETY_TARGET) {
     alerts.push({ icon: ShieldAlert, tone: 'text-red-500', title: `PPE compliance at ${stats.safetyCompliance}%`, detail: `Below the ${SAFETY_TARGET}% site target.` });

@@ -33,6 +33,8 @@ export interface Invoice {
   createdBy: NamedRef | null;
   matchStatus: MatchStatus;
   lineCount: number;
+  /** Set when Billing raised the bill (a certified subcontract RA bill or a retention release). */
+  source: { kind: 'ra_bill' | 'retention_release'; label: string; contractId: string; raBillId: string | null } | null;
 }
 
 export interface InvoiceLine {
@@ -109,9 +111,29 @@ export interface BillableLine {
   taxPercent: number;
 }
 
+export interface DueSummary {
+  outstanding: number;
+  overdueAmount: number;
+  overdueCount: number;
+  dueSoonAmount: number;
+  dueSoonCount: number;
+}
+
+export interface ForecastBucket {
+  window: 'overdue' | 'next30' | 'days31to60' | 'days61to90' | 'later';
+  label: string;
+  inflow: number;
+  outflow: number;
+  net: number;
+}
+
 export interface FinanceSummary {
   budget: { allocated: number; spent: number; committed: number; remaining: number; utilizationPercent: number };
-  payables: { outstanding: number; overdueAmount: number; overdueCount: number; dueSoonAmount: number; dueSoonCount: number };
+  payables: DueSummary;
+  /** What clients owe on certified client RA bills. */
+  receivables: DueSummary;
+  retention: { heldByClients: number; heldFromSubcontractors: number };
+  forecast: ForecastBucket[];
   approvals: {
     invoicesPending: number;
     invoicesPendingValue: number;
@@ -192,4 +214,30 @@ export interface MarkPaidInput {
   paidDate: string;
   reference: string;
   method: PaymentMethod;
+}
+
+export interface BudgetHead {
+  id: string;
+  projectId: string;
+  category: string;
+  allocated: number;
+  committed: number;
+  spent: number;
+  remaining: number;
+  /** Committed plus spent, as a share of the allocation. */
+  utilizationPercent: number;
+}
+
+export interface ProjectBudget {
+  projectId: string;
+  projectBudget: number | null;
+  heads: BudgetHead[];
+  /** Orders and bills in categories that match no head. */
+  unbudgeted: { committed: number; spent: number };
+  totals: { allocated: number; committed: number; spent: number; remaining: number };
+}
+
+export interface BudgetHeadInput {
+  category: string;
+  allocated: number;
 }

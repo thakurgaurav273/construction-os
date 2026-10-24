@@ -14,6 +14,7 @@ import {
   Warehouse,
   Users,
   DollarSign,
+  Receipt,
   BarChart3,
   Settings,
   ChevronLeft,
@@ -25,6 +26,7 @@ import { Skeleton, cn } from '@sitepilot/ui';
 import type { Permission } from '@sitepilot/types';
 import { useAuthHydrated, useAuthStore } from '@/store/auth.store';
 import { UserMenu } from '@/features/auth/components/UserMenu';
+import { OrganizationSwitcher } from '@/features/auth/components/OrganizationSwitcher';
 import { useOrganizationSettings } from '@/hooks/api/use-settings';
 import { useCan, useCurrentAccess } from '@/hooks/api/use-access';
 
@@ -70,6 +72,7 @@ const navigation: NavGroup[] = [
     group: 'Business',
     items: [
       { name: 'Finance', href: '/dashboard/finance',  icon: DollarSign, permission: 'finance.view' },
+      { name: 'Billing', href: '/dashboard/billing',  icon: Receipt, permission: 'billing.view' },
       { name: 'Reports', href: '/dashboard/reports',  icon: BarChart3 },
     ],
   },
@@ -114,57 +117,60 @@ export function Sidebar() {
       initial={false}
       animate={{ width: isCollapsed ? 72 : 240 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className="relative flex flex-col border-r bg-sidebar h-screen z-20 hidden md:flex shrink-0 overflow-hidden"
+      className="relative flex flex-col border-r bg-sidebar h-screen z-20 hidden md:flex shrink-0"
     >
       {/* Logo */}
       <div className="flex h-16 items-center px-4 border-b border-sidebar-border shrink-0">
-        <div className="flex items-center gap-3 overflow-hidden">
-          {!hydrated || settingsLoading ? (
-            <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
-          ) : organizationSettings?.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, not a static asset
-            <img src={organizationSettings.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded-md border bg-background object-contain" />
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-xs shrink-0">
-              {orgInitials}
-            </div>
-          )}
-          <AnimatePresence initial={false}>
-            {!isCollapsed && (
-              <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                {hydrated ? (
-                  <span className="block font-semibold text-sm text-sidebar-foreground whitespace-nowrap truncate leading-tight">
-                    {organizationSettings?.name ?? organization?.name ?? 'SitePilot'}
-                  </span>
-                ) : (
-                  <Skeleton className="mb-1 h-3.5 w-28" />
-                )}
-                <span className="block text-[10px] text-muted-foreground whitespace-nowrap leading-tight">
-                  Construction ERP
-                </span>
-              </motion.div>
+        <OrganizationSwitcher showIndicator={!isCollapsed}>
+          <div className="flex items-center gap-3 overflow-hidden">
+            {!hydrated || settingsLoading ? (
+              <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
+            ) : organizationSettings?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, not a static asset
+              <img src={organizationSettings.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded-md border bg-background object-contain" />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-xs shrink-0">
+                {orgInitials}
+              </div>
             )}
-          </AnimatePresence>
-        </div>
+            <AnimatePresence initial={false}>
+              {!isCollapsed && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  {hydrated ? (
+                    <span className="block font-semibold text-sm text-sidebar-foreground whitespace-nowrap truncate leading-tight">
+                      {organizationSettings?.name ?? organization?.name ?? 'SitePilot'}
+                    </span>
+                  ) : (
+                    <Skeleton className="mb-1 h-3.5 w-28" />
+                  )}
+                  <span className="block text-[10px] text-muted-foreground whitespace-nowrap leading-tight">
+                    Construction ERP
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </OrganizationSwitcher>
       </div>
 
-      {/* Collapse toggle */}
+      {/* Collapse toggle: straddles the sidebar's edge on the line under the logo, so the container must not clip. */}
       <button
+        type="button"
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-[4.5rem] flex h-6 w-6 items-center justify-center rounded-full border bg-background shadow-sm hover:bg-accent text-muted-foreground z-30 shrink-0"
+        className="absolute -right-3 top-16 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full border bg-background shadow-sm hover:bg-accent hover:text-foreground text-muted-foreground z-30 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
       </button>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-5">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-5" data-tour="sidebar-nav">
         {visibleNavigation.map((group) => (
           <div key={group.group}>
             <AnimatePresence initial={false}>
@@ -204,6 +210,7 @@ export function Sidebar() {
                       isCollapsed && 'justify-center px-0',
                     )}
                     title={isCollapsed ? item.name : undefined}
+                    data-tour={`nav-${item.href.split('/').pop()}`}
                   >
                     {active && (
                       <motion.div

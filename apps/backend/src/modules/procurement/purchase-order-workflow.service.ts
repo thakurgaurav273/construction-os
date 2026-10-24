@@ -2,6 +2,7 @@ import {
   BadRequestException, ConflictException, ForbiddenException, Injectable,
 } from '@nestjs/common';
 import { Prisma, PurchaseOrderStatus } from '@prisma/client';
+import { findOpenProject } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
 import { OptionalNoteDto, RequiredNoteDto } from './dto/review-note.dto';
 import { CANCELLABLE_PO_STATUSES, EDITABLE_PO_STATUSES, PO_EVENTS } from './procurement.constants';
@@ -44,6 +45,7 @@ export class PurchaseOrderWorkflowService {
       throw new ConflictException('Only drafts and orders sent back for changes can be submitted.');
     }
     if (!order.projectId || !order.vendorId) throw new BadRequestException('Choose a project and vendor before submitting.');
+    await findOpenProject(this.prisma, order.projectId, organizationId, 'order for it');
     if (order.items.length === 0) throw new BadRequestException('Add at least one line item before submitting.');
     await this.vendors.findActiveVendor(order.vendorId, organizationId);
 
@@ -67,6 +69,8 @@ export class PurchaseOrderWorkflowService {
 
   async approve(id: string, organizationId: string, userId: string, dto: OptionalNoteDto): Promise<PurchaseOrderDetailView> {
     const order = await this.findReviewableOrder(id, organizationId, userId);
+    // Approving commits new spend; rejecting or cancelling an order on an archived project stays possible.
+    if (order.projectId) await findOpenProject(this.prisma, order.projectId, organizationId, 'approve orders for it');
     await this.transition({
       order,
       actorId: userId,

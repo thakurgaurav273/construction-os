@@ -58,13 +58,6 @@ export class UpdateProjectDto {
   @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  spent?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @Type(() => Number)
   @IsInt()
   @Min(0)
   @Max(100)

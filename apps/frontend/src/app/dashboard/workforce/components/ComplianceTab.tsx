@@ -7,6 +7,7 @@ import {
   CheckCircle2, XCircle, AlertCircle,
 } from 'lucide-react';
 import type { Worker } from '@/hooks/api/use-workforce';
+import { describeExpiry } from '@/features/workforce/components/WorkerCertificationsCard';
 
 interface ComplianceItem {
   workerId: string;
@@ -14,7 +15,8 @@ interface ComplianceItem {
   role: string;
   project: string;
   certName: string;
-  expiryDate: string;
+  expiryLabel: string;
+  daysToExpiry: number;
   severity: 'critical' | 'high' | 'medium';
   type: 'expired' | 'expiring';
 }
@@ -41,47 +43,33 @@ export function ComplianceTab({ workers }: ComplianceTabProps): React.ReactEleme
     [workers],
   );
 
-  const certIssues = useMemo((): ComplianceItem[] => {
-    const issues: ComplianceItem[] = [];
-    workers.forEach((w: Worker) => {
-      w.certifications.forEach((cert) => {
-        if (cert.status === 'expired') {
-          issues.push({
-            workerId: w.id,
-            workerName: w.name,
-            role: w.role,
-            project: w.project ?? '',
-            certName: cert.name,
-            expiryDate: cert.expiryDate,
-            severity: !w.ppeCompliant ? 'critical' : 'high',
-            type: 'expired',
-          });
-        } else if (cert.status === 'expiring') {
-          issues.push({
-            workerId: w.id,
-            workerName: w.name,
-            role: w.role,
-            project: w.project ?? '',
-            certName: cert.name,
-            expiryDate: cert.expiryDate,
-            severity: 'medium',
-            type: 'expiring',
-          });
-        }
-      });
-    });
-    // sort: expired first, then by severity
-    return issues.sort((a, b) => {
-      if (a.type === 'expired' && b.type !== 'expired') return -1;
-      if (a.type !== 'expired' && b.type === 'expired') return 1;
-      return 0;
-    });
-  }, [workers]);
+  const certIssues = useMemo((): ComplianceItem[] => workers
+    .flatMap((worker) => worker.certifications
+      .filter((cert) => cert.status !== 'valid' && cert.daysToExpiry !== null)
+      .map((cert): ComplianceItem => {
+        const expired = cert.status === 'expired';
+        return {
+          workerId: worker.id,
+          workerName: worker.name,
+          role: worker.role,
+          project: worker.project ?? '',
+          certName: cert.name,
+          expiryLabel: describeExpiry(cert),
+          daysToExpiry: cert.daysToExpiry ?? 0,
+          severity: expired ? (worker.ppeCompliant ? 'high' : 'critical') : 'medium',
+          type: expired ? 'expired' : 'expiring',
+        };
+      }))
+    // Most overdue first, then whatever expires soonest.
+    .sort((a, b) => a.daysToExpiry - b.daysToExpiry), [workers]);
 
   const expiredCount  = certIssues.filter((c) => c.type === 'expired').length;
   const expiringCount = certIssues.filter((c) => c.type === 'expiring').length;
   const totalWorkers  = workers.length;
-  const compliantPct  = Math.round(((totalWorkers - nonPpeWorkers.length) / totalWorkers) * 100);
+  const compliantPct  = totalWorkers ? Math.round(((totalWorkers - nonPpeWorkers.length) / totalWorkers) * 100) : 0;
+  const workersWithExpiring = workers.filter((w) => w.certifications.some((c) => c.status === 'expiring')).length;
+  const workersWithProblems = workers.filter((w) => !w.ppeCompliant || w.certifications.some((c) => c.status === 'expired')).length;
+  const fullyCompliant = workers.filter((w) => w.ppeCompliant && w.certifications.every((c) => c.status === 'valid')).length;
 
   return (
     <div className="space-y-6">
@@ -144,6 +132,11 @@ export function ComplianceTab({ workers }: ComplianceTabProps): React.ReactEleme
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {certIssues.length === 0 && (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Every certificate on file is in date for the next 30 days.
+            </p>
+          )}
           <div className="space-y-2">
             {certIssues.map((issue, idx) => (
               <div
@@ -167,7 +160,7 @@ export function ComplianceTab({ workers }: ComplianceTabProps): React.ReactEleme
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${SEVERITY_BADGE_COLORS[issue.severity]}`}>
                     {issue.type === 'expired' ? 'EXPIRED' : 'EXPIRING'}
                   </span>
-                  <span className="text-xs text-muted-foreground">{issue.expiryDate}</span>
+                  <span className="text-xs text-muted-foreground">{issue.expiryLabel}</span>
                 </div>
               </div>
             ))}
@@ -224,21 +217,21 @@ export function ComplianceTab({ workers }: ComplianceTabProps): React.ReactEleme
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
                 <span className="text-sm">Fully compliant</span>
               </div>
-              <span className="text-sm font-semibold">{totalWorkers - nonPpeWorkers.length} workers</span>
+              <span className="text-sm font-semibold">{fullyCompliant} workers</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
                 <span className="text-sm">Certifications expiring</span>
               </div>
-              <span className="text-sm font-semibold">{workers.filter((w) => w.certifications.some((c) => c.status === 'expiring')).length} workers</span>
+              <span className="text-sm font-semibold">{workersWithExpiring} workers</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
                 <span className="text-sm">PPE non-compliant / expired certs</span>
               </div>
-              <span className="text-sm font-semibold">{nonPpeWorkers.length} workers</span>
+              <span className="text-sm font-semibold">{workersWithProblems} workers</span>
             </div>
           </div>
         </CardContent>

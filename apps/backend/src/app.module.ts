@@ -14,10 +14,13 @@ import { MaterialsModule } from './modules/materials/materials.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { ProcurementModule } from './modules/procurement/procurement.module';
 import { StorageModule } from './common/storage/storage.module';
+import { JobsModule } from './common/jobs';
 import { DailyReportsModule } from './modules/daily-reports/daily-reports.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { FinanceModule } from './modules/finance/finance.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { HelpModule } from './modules/help/help.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SettingsModule } from './modules/settings/settings.module';
 
@@ -42,10 +45,13 @@ import { SettingsModule } from './modules/settings/settings.module';
     InventoryModule,
     ProcurementModule,
     StorageModule,
+    JobsModule,
     DailyReportsModule,
     DocumentsModule,
     FinanceModule,
+    BillingModule,
     NotificationsModule,
+    HelpModule,
     ReportsModule,
     SettingsModule,
     DataImportModule,

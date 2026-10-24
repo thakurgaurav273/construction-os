@@ -8,6 +8,8 @@ import {
   Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Textarea,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@sitepilot/ui';
+import { PROCUREMENT_CATEGORIES } from '@/features/procurement/constants';
+import { CategorySelect } from './CategorySelect';
 import { FormField } from '@/components/shared/FormField';
 import { useProjects } from '@/hooks/api/use-projects';
 import { usePurchaseOrders, useVendors } from '@/hooks/api/use-procurement';
@@ -30,6 +32,9 @@ interface InvoiceFormDialogProps {
   onSaved?: (invoiceId: string) => void;
 }
 
+/** Direct bills (no PO) are often services, so the usual heads plus the ones bills tend to carry. */
+const BILL_CATEGORIES = [...PROCUREMENT_CATEGORIES, 'Labour', 'Subcontract', 'General'];
+
 export function InvoiceFormDialog({ open, onOpenChange, invoice, defaults, onSaved }: InvoiceFormDialogProps): React.ReactElement {
   const { data: vendors = [] } = useVendors();
   const { data: projects = [] } = useProjects();
@@ -42,7 +47,7 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice, defaults, onSav
     resolver: zodResolver(invoiceSchema),
     defaultValues: toInvoiceFormValues(invoice, defaults),
   });
-  const [vendorId, purchaseOrderId, issuedDate] = useWatch({ control, name: ['vendorId', 'purchaseOrderId', 'issuedDate'] });
+  const [vendorId, purchaseOrderId, issuedDate, projectId] = useWatch({ control, name: ['vendorId', 'purchaseOrderId', 'issuedDate', 'projectId'] });
   const hasPurchaseOrder = purchaseOrderId !== NO_PURCHASE_ORDER;
   const { data: billableLines } = useBillableLines(open && hasPurchaseOrder ? purchaseOrderId : null);
 
@@ -152,6 +157,13 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice, defaults, onSav
                       {projects.map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                )} />
+              </FormField>
+            )}
+            {!hasPurchaseOrder && (
+              <FormField label="Category" error={errors.category?.message} hint="Counts against the project's budget head with this name.">
+                <Controller control={control} name="category" render={({ field }) => (
+                  <CategorySelect projectId={projectId || undefined} value={field.value} onChange={field.onChange} fallbackCategories={BILL_CATEGORIES} />
                 )} />
               </FormField>
             )}

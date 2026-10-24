@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoLineItem, Prisma, ProcurementPriority, PurchaseOrder } from '@prisma/client';
+import { findOpenProject } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
 import { sameUnit } from '../inventory/units';
 import { nextDocumentNumber, withDocumentNumberRetry } from './document-numbers';
@@ -78,7 +79,7 @@ export class PurchaseOrdersService {
     dto: CreatePurchaseOrderDto,
     options: { externalReference?: string } = {},
   ): Promise<PurchaseOrderDetailView> {
-    await this.assertProjectInOrganization(dto.projectId, organizationId);
+    await findOpenProject(this.prisma, dto.projectId, organizationId, 'order for it');
     await this.vendors.findActiveVendor(dto.vendorId, organizationId);
     await assertMaterialLinks(this.prisma, organizationId, dto.items);
     const category = dto.category.trim();
@@ -106,7 +107,8 @@ export class PurchaseOrdersService {
   async update(id: string, organizationId: string, dto: UpdatePurchaseOrderDto): Promise<PurchaseOrderDetailView> {
     const existing = await this.findOrderOrThrow(id, organizationId);
     assertEditable(existing);
-    if (dto.projectId) await this.assertProjectInOrganization(dto.projectId, organizationId);
+    const projectId = dto.projectId ?? existing.projectId;
+    if (projectId) await findOpenProject(this.prisma, projectId, organizationId, 'order for it');
     if (dto.vendorId) await this.vendors.findActiveVendor(dto.vendorId, organizationId);
     if (dto.items) await assertMaterialLinks(this.prisma, organizationId, dto.items);
     const category = dto.category?.trim() ?? existing.category;
@@ -209,13 +211,6 @@ export class PurchaseOrdersService {
     return order;
   }
 
-  async assertProjectInOrganization(projectId: string, organizationId: string): Promise<void> {
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, organizationId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!project) throw new NotFoundException('Project not found.');
-  }
 
   private async nextPoNumber(tx: Prisma.TransactionClient, organizationId: string): Promise<string> {
     const orders = await tx.purchaseOrder.findMany({

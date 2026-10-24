@@ -1,13 +1,14 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { AUTH_RATE_LIMIT } from './auth.constants';
 import { setAuthCookies } from './auth-cookies';
 import { SessionView } from './auth.service';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { InvitationAcceptanceService, InvitationPreview } from './invitation-acceptance.service';
 import { Audit } from '../../common/audit';
+import { sessionClientOf } from './session-client';
 
 /** Public: the invitation token in the link is the credential. Sending and managing invitations lives in Settings. */
 @Controller('invitations')
@@ -30,9 +31,10 @@ export class InvitationsController {
   async accept(
     @Param('token') token: string,
     @Body() dto: AcceptInvitationDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<SessionView> {
-    const { session, tokens } = await this.invitations.accept(token, dto);
+    const { session, tokens } = await this.invitations.accept(token, dto, sessionClientOf(req));
     setAuthCookies(res, this.config, tokens);
     return session;
   }

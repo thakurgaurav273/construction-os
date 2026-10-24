@@ -105,12 +105,12 @@ export default function WorkforcePage(): React.ReactElement {
             <Download className="mr-2 h-4 w-4" /> Export
           </Button>
           <Can permission="attendance.mark">
-            <Button variant="outline" onClick={() => setAttendanceOpen(true)}>
+            <Button variant="outline" onClick={() => setAttendanceOpen(true)} data-tour="workforce-attendance">
               <ClipboardCheck className="mr-2 h-4 w-4" /> Mark Attendance
             </Button>
           </Can>
           <Can permission="workforce.manage">
-            <Button onClick={() => setAddOpen(true)}>
+            <Button onClick={() => setAddOpen(true)} data-tour="workforce-new">
               <UserPlus className="mr-2 h-4 w-4" /> Add Worker
             </Button>
           </Can>
@@ -159,11 +159,11 @@ export default function WorkforcePage(): React.ReactElement {
         </motion.div>
         <motion.div variants={itemVariants}>
           <KpiCard
-            title="Expiring Certifications"
-            value={stats?.expiringCerts}
-            description="Workers with a cert expiring soon"
+            title="Certifications to Renew"
+            value={stats ? stats.expiringCerts + stats.expiredCerts : undefined}
+            description={stats?.expiredCerts ? `${stats.expiredCerts} with an expired cert` : 'Expiring within 30 days'}
             icon={<Award className="h-4 w-4" />}
-            accentClass="border-amber-200 dark:border-amber-800/30"
+            accentClass={stats?.expiredCerts ? 'border-red-200 dark:border-red-800/30' : 'border-amber-200 dark:border-amber-800/30'}
           />
         </motion.div>
       </motion.div>
@@ -190,11 +190,12 @@ export default function WorkforcePage(): React.ReactElement {
               title="No workers yet"
               description="Add your site crew to start tracking daily attendance, trades and compliance."
               action={<Can permission="workforce.manage"><Button onClick={() => setAddOpen(true)}><UserPlus className="mr-2 h-4 w-4" /> Add Worker</Button></Can>}
+              guide={{ id: 'workforce.add-worker', label: 'Learn how to build your crew' }}
             />
           )}
           {!isLoading && !isError && workers.length > 0 && (
             <Tabs defaultValue="directory">
-              <TabsList className="mb-4">
+              <TabsList className="mb-4" data-tour="workforce-tabs">
                 <TabsTrigger value="directory">Directory</TabsTrigger>
                 <TabsTrigger value="attendance">Attendance</TabsTrigger>
                 <TabsTrigger value="trades">Trades</TabsTrigger>

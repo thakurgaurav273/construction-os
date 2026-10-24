@@ -1,7 +1,8 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { BudgetLineView, CashFlowView, FinanceService } from './finance.service';
+import { BudgetLineView, BudgetService } from './budget.service';
+import { CashFlowView, FinanceService } from './finance.service';
 import { FinanceSummary, FinanceSummaryService } from './finance-summary.service';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
@@ -14,6 +15,7 @@ export class FinanceController {
   constructor(
     private readonly finance: FinanceService,
     private readonly summary: FinanceSummaryService,
+    private readonly budgets: BudgetService,
   ) {}
 
   @Get('summary')
@@ -23,7 +25,7 @@ export class FinanceController {
 
   @Get('budget')
   getBudget(@CurrentUser() user: AuthUser): Promise<BudgetLineView[]> {
-    return this.finance.getBudget(user.organizationId);
+    return this.budgets.lines(user.organizationId);
   }
 
   @Get('cash-flow')

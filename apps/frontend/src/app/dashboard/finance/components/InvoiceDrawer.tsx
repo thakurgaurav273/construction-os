@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import React from 'react';
 import { format } from 'date-fns';
 import { Button, Progress, ScrollArea, Sheet, SheetContent, SheetTitle, Skeleton } from '@sitepilot/ui';
@@ -10,6 +11,7 @@ import { FinanceStatusBadge } from '@/features/finance/components/FinanceStatusB
 import { InvoiceActions } from './InvoiceActions';
 import { InvoiceMatchTable } from './InvoiceMatchTable';
 import { PaymentRowActions } from './PaymentRowActions';
+import { RecordHistory } from '@/features/audit/components/RecordHistory';
 
 interface InvoiceDrawerProps {
   invoiceId: string | null;
@@ -80,6 +82,14 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps): React
                 {invoice.vendorName} · {invoice.project?.name ?? 'No project'}
                 {invoice.purchaseOrder && ` · ${invoice.purchaseOrder.poNumber}`}
               </p>
+              {invoice.source && (
+                <Link
+                  href={invoice.source.raBillId ? `/dashboard/billing/ra-bills/${invoice.source.raBillId}` : `/dashboard/billing/contracts/${invoice.source.contractId}`}
+                  className="mt-1 inline-block text-xs font-medium text-primary hover:underline"
+                >
+                  Raised from {invoice.source.label} in Billing
+                </Link>
+              )}
               <div className="flex flex-wrap items-center gap-2 mt-3">
                 <FinanceStatusBadge kind="invoice" value={invoice.status} />
                 {invoice.isOverdue && <FinanceStatusBadge kind="invoice" value="OVERDUE" />}
@@ -174,6 +184,7 @@ export function InvoiceDrawer({ invoiceId, onClose }: InvoiceDrawerProps): React
                     </div>
                   ))}
                 </Section>
+                <RecordHistory entityType="invoice" entityId={invoice.id} />
               </div>
             </ScrollArea>
 

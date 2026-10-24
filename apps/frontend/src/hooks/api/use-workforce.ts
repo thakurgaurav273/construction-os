@@ -7,10 +7,26 @@ export type WorkerType = 'EMPLOYEE' | 'SUBCONTRACTOR';
 export type WorkerShift = 'DAY' | 'NIGHT';
 export type CertStatus = 'valid' | 'expiring' | 'expired';
 
+/** Status is worked out by the API from the expiry date and the organization's today. */
 export interface Certification {
+  id: string;
   name: string;
-  expiryDate: string;
+  issuer: string | null;
+  certificateNumber: string | null;
+  /** Calendar days as YYYY-MM-DD. */
+  issuedOn: string | null;
+  expiresOn: string | null;
   status: CertStatus;
+  /** Days left (0 on the last valid day, negative once expired); null when it never expires. */
+  daysToExpiry: number | null;
+}
+
+export interface CertificationInput {
+  name: string;
+  issuer: string | null;
+  certificateNumber: string | null;
+  issuedOn: string | null;
+  expiresOn: string | null;
 }
 
 export interface EmergencyContact {
@@ -66,7 +82,10 @@ export interface WorkforceStats {
   notMarkedToday: number;
   subcontractors: number;
   safetyCompliance: number;
+  /** Workers with a certificate expiring within 30 days. */
   expiringCerts: number;
+  /** Workers with at least one expired certificate. */
+  expiredCerts: number;
   attendanceRate7d: number | null;
 }
 
@@ -241,6 +260,33 @@ export function useSetWorkerActive() {
   return useMutation({
     mutationFn: async ({ workerId, active }: { workerId: string; active: boolean }): Promise<WorkerDetail> =>
       unwrap(await apiClient.post(`/workforce/${workerId}/${active ? 'reactivate' : 'deactivate'}`)),
+    onSuccess: () => invalidateWorkforce(qc),
+  });
+}
+
+export function useAddCertification(workerId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CertificationInput): Promise<WorkerDetail> =>
+      unwrap(await apiClient.post(`/workforce/${workerId}/certifications`, input)),
+    onSuccess: () => invalidateWorkforce(qc),
+  });
+}
+
+export function useUpdateCertification(workerId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ certificationId, input }: { certificationId: string; input: CertificationInput }): Promise<WorkerDetail> =>
+      unwrap(await apiClient.patch(`/workforce/${workerId}/certifications/${certificationId}`, input)),
+    onSuccess: () => invalidateWorkforce(qc),
+  });
+}
+
+export function useRemoveCertification(workerId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (certificationId: string): Promise<WorkerDetail> =>
+      unwrap(await apiClient.delete(`/workforce/${workerId}/certifications/${certificationId}`)),
     onSuccess: () => invalidateWorkforce(qc),
   });
 }

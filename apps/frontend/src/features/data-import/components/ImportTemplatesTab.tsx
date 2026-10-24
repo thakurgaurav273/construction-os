@@ -107,9 +107,12 @@ export function ImportTemplatesTab(): React.ReactElement {
                       <Badge variant="secondary" className="shrink-0">{entities.find((entity) => entity.entity === template.entity)?.label}</Badge>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" disabled={exportData.isPending} onClick={() => { void handleExport(template); }}>
-                        <Download className="mr-1.5 h-4 w-4" /> Export data
-                      </Button>
+                      {/* BOQ and measurement book layouts export per bill, from the bill page. */}
+                      {!entities.find((entity) => entity.entity === template.entity)?.context && (
+                        <Button variant="outline" size="sm" disabled={exportData.isPending} onClick={() => { void handleExport(template); }}>
+                          <Download className="mr-1.5 h-4 w-4" /> Export data
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

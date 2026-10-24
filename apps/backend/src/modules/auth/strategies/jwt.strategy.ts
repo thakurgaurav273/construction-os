@@ -50,22 +50,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   /**
    * The role is read from the membership on every request rather than trusted from the token, so a role
    * change or removal from the organization takes effect immediately instead of when the token expires.
+   * The same goes for the session: signing out, or ending a session from another device, cuts off its
+   * access token at once.
    */
   async validate(payload: TokenPayload): Promise<AuthenticatedUser> {
     // A refresh token is signed with a different secret, but check the claim too so the two can never be swapped.
     if (payload.type !== 'access') throw new UnauthorizedException('Your session has expired. Sign in again.');
-    const membership = await this.prisma.userOrganization.findUnique({
-      where: { userId_organizationId: { userId: payload.sub, organizationId: payload.organizationId } },
-      select: {
-        role: true,
-        user: {
-          select: {
-            id: true, email: true, name: true, status: true, avatar: true, emailVerified: true, createdAt: true, updatedAt: true,
-          },
-        },
-      },
-    });
+    const [membership, sessionActive] = await Promise.all([this.findMembership(payload), this.isSessionActive(payload)]);
 
+    if (!sessionActive) throw new UnauthorizedException('Your session has ended. Sign in again.');
     if (!membership) throw new UnauthorizedException('You are no longer a member of this organization.');
     if (membership.user.status !== 'ACTIVE') throw new UnauthorizedException('User is inactive');
 
@@ -76,5 +69,29 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       permissions: permissionsForRole(membership.role),
       isPlatformAdmin: isPlatformAdmin(this.config, membership.user.email),
     };
+  }
+
+  private findMembership(payload: TokenPayload) {
+    return this.prisma.userOrganization.findUnique({
+      where: { userId_organizationId: { userId: payload.sub, organizationId: payload.organizationId } },
+      select: {
+        role: true,
+        user: {
+          select: {
+            id: true, email: true, name: true, status: true, avatar: true, emailVerified: true, createdAt: true, updatedAt: true,
+          },
+        },
+      },
+    });
+  }
+
+  /** Tokens issued before sessions were tracked carry no `sid` and run out on their own within minutes. */
+  private async isSessionActive({ sub, sid }: TokenPayload): Promise<boolean> {
+    if (!sid) return true;
+    const liveToken = await this.prisma.refreshToken.findFirst({
+      where: { userId: sub, sessionId: sid, revoked: false, expiresAt: { gt: new Date() } },
+      select: { id: true },
+    });
+    return liveToken !== null;
   }
 }

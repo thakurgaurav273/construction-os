@@ -29,7 +29,8 @@ export function InvoiceActions({ invoice }: { invoice: InvoiceDetail }): React.R
   const hasOpenPayments = invoice.payments.some((payment) => ['PENDING', 'APPROVED', 'PAID'].includes(payment.status));
   // Whoever entered a bill withdraws it until approval; anyone else's, or an approved bill, needs approver rights.
   const canWithdraw = can('invoice.approve') || (isOwnInvoice && invoice.status !== 'APPROVED' && can('invoice.create'));
-  const canCancel = CANCELLABLE.includes(invoice.status) && !hasOpenPayments && canWithdraw;
+  // Bills raised by Billing are changed there, never cancelled here.
+  const canCancel = CANCELLABLE.includes(invoice.status) && !hasOpenPayments && canWithdraw && !invoice.source;
   const busy = transition.isPending;
 
   async function run(kind: InvoiceTransition, message: string, note?: string): Promise<void> {

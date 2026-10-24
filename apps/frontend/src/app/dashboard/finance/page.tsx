@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -56,6 +56,12 @@ function FinanceWorkspace({ canRecordInvoice }: { canRecordInvoice: boolean }): 
   const [tab, setTab] = useState('invoices');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+
+  // Other screens open a bill directly, e.g. Billing links to /dashboard/finance?invoice=<id>.
+  useEffect(() => {
+    const linkedInvoice = new URLSearchParams(window.location.search).get('invoice');
+    if (linkedInvoice) setSelectedInvoiceId(linkedInvoice);
+  }, []);
 
   const invoicesQuery = useInvoices();
   const { data: payments = [] } = usePayments();
@@ -123,7 +129,7 @@ function FinanceWorkspace({ canRecordInvoice }: { canRecordInvoice: boolean }): 
             <Download className="mr-1.5 h-4 w-4" /> Export
           </Button>
           {canRecordInvoice && (
-            <Button onClick={() => setCreateOpen(true)}>
+            <Button onClick={() => setCreateOpen(true)} data-tour="finance-new">
               <Plus className="mr-1.5 h-4 w-4" /> Record Invoice
             </Button>
           )}
@@ -139,7 +145,7 @@ function FinanceWorkspace({ canRecordInvoice }: { canRecordInvoice: boolean }): 
           className="xl:col-span-3 min-w-0"
         >
           <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="mb-4 flex-wrap h-auto">
+            <TabsList className="mb-4 flex-wrap h-auto" data-tour="finance-tabs">
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
               <TabsTrigger value="payments" className="gap-1.5">
                 Payments
@@ -156,6 +162,7 @@ function FinanceWorkspace({ canRecordInvoice }: { canRecordInvoice: boolean }): 
                   title="No vendor invoices yet"
                   description="Record a bill when it arrives. Bills against purchase orders are checked against what was ordered and received."
                   action={canRecordInvoice ? <Button onClick={() => setCreateOpen(true)}>Record Invoice</Button> : undefined}
+                  guide={{ id: 'finance.vendor-bill', label: 'Learn how vendor bills work' }}
                 />
               ) : (
                 <InvoicesTab invoices={invoices} onSelect={(invoice) => setSelectedInvoiceId(invoice.id)} />
@@ -171,7 +178,7 @@ function FinanceWorkspace({ canRecordInvoice }: { canRecordInvoice: boolean }): 
             </TabsContent>
 
             <TabsContent value="cashflow">
-              <CashFlowTab cashFlow={cashFlow} remainingBudget={summary?.budget.remaining ?? 0} />
+              <CashFlowTab cashFlow={cashFlow} summary={summary} />
             </TabsContent>
           </Tabs>
         </motion.div>

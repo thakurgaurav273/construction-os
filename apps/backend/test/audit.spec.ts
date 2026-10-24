@@ -11,12 +11,19 @@ const UNAUDITED_WRITES = new Set([
   // No organization or actor yet; the reset itself is recorded by PasswordResetService.
   'AuthController.forgotPassword',
   'AuthController.resetPassword',
+  // Recorded by OrganizationSwitchService in the organization switched into, not the one left.
+  'AuthController.switchOrganization',
   'NotificationsController.registerDevice',
   'NotificationsController.unregisterDevice',
   'NotificationsController.markAllRead',
   'NotificationsController.markRead',
   'NotificationsController.remove',
   'NotificationsController.updatePreferences',
+  // A member's own tour progress and checklist dismissal.
+  'HelpController.updateTour',
+  'HelpController.restartTour',
+  'HelpController.restartAllTours',
+  'HelpController.updateChecklist',
   // AI calls are logged per call in ai_usage instead.
   'AiController.organizationChat',
   'AiController.projectChat',
@@ -24,6 +31,10 @@ const UNAUDITED_WRITES = new Set([
   // Reading an upload and dry-running it write nothing; the mapping AI call is logged in ai_usage.
   'DataImportController.analyze',
   'DataImportController.preview',
+  'BillingImportController.analyzeBoq',
+  'BillingImportController.previewBoq',
+  'BillingImportController.analyzeMeasurements',
+  'BillingImportController.previewMeasurements',
   // Platform console: decisions are recorded in the tenant's audit log by the service; platform keys belong to no tenant.
   'PlatformController.approve',
   'PlatformController.reject',

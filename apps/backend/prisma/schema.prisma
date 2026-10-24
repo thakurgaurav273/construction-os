@@ -89,6 +89,8 @@ model User {
   password      String
   emailVerified Boolean    @default(false)
   status        UserStatus @default(ACTIVE)
+  /// The organization this person last signed in to or switched to; sign-in opens it again while they're still a member.
+  lastOrganizationId String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -112,6 +114,9 @@ model User {
   passwordResetTokens  PasswordResetToken[]
   invitations          Invitation[]       @relation("InvitedBy")
   materialIssues       MaterialIssue[]
+  materialRequestsRaised   MaterialRequest[]  @relation("MaterialRequestRequestedBy")
+  materialRequestsReviewed MaterialRequest[]  @relation("MaterialRequestReviewedBy")
+  materialRequestsClosed   MaterialRequest[]  @relation("MaterialRequestClosedBy")
   transfersRequested   StockTransfer[]    @relation("TransferRequestedBy")
   transfersApproved    StockTransfer[]    @relation("TransferApprovedBy")
   transfersCompleted   StockTransfer[]    @relation("TransferCompletedBy")
@@ -119,6 +124,9 @@ model User {
   notificationPreferences NotificationPreference[]
   aiAccessRequests        AiAccessRequest[]   @relation("AiAccessRequester")
   aiConversations         AiConversation[]
+  preparedRaBills         RaBill[]            @relation("RaBillPreparer")
+  certifiedRaBills        RaBill[]            @relation("RaBillCertifier")
+  helpProgress            HelpProgress[]
 
   @@map("users")
 }
@@ -172,6 +180,8 @@ model Organization {
   generatedReports      GeneratedReport[]
   reportSchedules       ReportSchedule[]
   materialIssues        MaterialIssue[]
+  materialRequests      MaterialRequest[]
+  materialRequestItems  MaterialRequestItem[]
   auditLogs             AuditLog[]
   notificationPreferences NotificationPreference[]
   aiCredentials           AiCredential[]
@@ -181,6 +191,11 @@ model Organization {
   aiInsightSnapshots      AiInsightSnapshot[]
   aiConversations         AiConversation[]
   importTemplates         ImportTemplate[]
+  clients                 Client[]
+  contracts               Contract[]
+  raBills                 RaBill[]
+  helpProgress            HelpProgress[]
+  workerCertifications    WorkerCertification[]
 
   @@map("organizations")
 }
@@ -203,18 +218,26 @@ model UserOrganization {
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
+/// One row per issued refresh token. Rotation revokes the row and issues the next one with the same
+/// `sessionId`, so a sign-in on one device stays a single session that the member can see and end.
 model RefreshToken {
-  id        String   @id @default(uuid())
-  token     String   @unique
-  userId    String
-  expiresAt DateTime
-  revoked   Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id               String   @id @default(uuid())
+  token            String   @unique
+  userId           String
+  sessionId        String
+  sessionStartedAt DateTime @default(now())
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revoked          Boolean  @default(false)
+  /// When this token was issued, i.e. the session's last refresh.
+  createdAt        DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
+  @@index([sessionId])
   @@map("refresh_tokens")
 }
 
@@ -288,7 +311,6 @@ model Project {
   status             ProjectStatus   @default(PLANNING)
   priority           ProjectPriority @default(MEDIUM)
   budget             Decimal?        @db.Decimal(15, 2)
-  spent              Decimal         @default(0) @db.Decimal(15, 2)
   progress           Int             @default(0)
   startDate          DateTime?
   expectedCompletion DateTime?
@@ -323,7 +345,10 @@ model Project {
   cashFlowEntries       CashFlowEntry[]
   generatedReports      GeneratedReport[]
   materialIssues        MaterialIssue[]
+  materialRequests      MaterialRequest[]
   aiConversations       AiConversation[]
+  contracts             Contract[]
+  raBills               RaBill[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -502,7 +527,6 @@ model Worker {
   projectId         String?
   emergencyContact  Json?
   skills            String[]
-  certifications    Json?
   ppeCompliant      Boolean      @default(true)
   deactivatedAt     DateTime?
   organizationId    String
@@ -510,13 +534,48 @@ model Worker {
   updatedAt         DateTime     @updatedAt
 
   project      Project?     @relation(fields: [projectId], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id])
-  attendance   Attendance[]
+  organization   Organization          @relation(fields: [organizationId], references: [id])
+  attendance     Attendance[]
+  certifications WorkerCertification[]
 
   @@index([organizationId])
   @@index([projectId])
   @@index([organizationId, deactivatedAt])
   @@map("workers")
+}
+
+/// Renewal reminders go out at most once per stage, in this order.
+enum CertificationReminderStage {
+  EXPIRING_SOON
+  EXPIRING_THIS_WEEK
+  EXPIRED
+}
+
+/// A certificate a worker holds (safety induction, medical fitness, licence…). Valid, expiring or expired
+/// is derived from `expiresOn` and the organization's today, never stored, so it can't go stale.
+model WorkerCertification {
+  id                String    @id @default(uuid())
+  workerId          String
+  organizationId    String
+  name              String
+  issuer            String?
+  certificateNumber String?
+  issuedOn          DateTime? @db.Date
+  /// Null for certificates that don't expire. Valid through the end of this day.
+  expiresOn         DateTime? @db.Date
+  /// The latest renewal reminder sent for the current expiry date; cleared when the expiry date changes.
+  remindedStage     CertificationReminderStage?
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  worker       Worker       @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([workerId])
+  @@index([organizationId, expiresOn])
+  @@map("worker_certifications")
 }
 
 /// One row per worker per calendar day (in the organization's timezone), recorded at the site they worked.
@@ -627,6 +686,7 @@ model Material {
   stockAdjustments      StockAdjustment[]
   poLineItems           PoLineItem[]
   materialIssues        MaterialIssue[]
+  materialRequestItems  MaterialRequestItem[]
 
   @@unique([sku, organizationId])
   @@index([organizationId])
@@ -698,21 +758,97 @@ model MaterialIssue {
   materialId     String
   warehouseId    String
   projectId      String
+  /// The subcontract the material was issued to (or returned from), when it is to be recovered from their bills.
+  contractId     String?
+  /// Rupees per unit recovered from the subcontractor; defaults to the carrying cost.
+  recoveryRate   Decimal?          @db.Decimal(15, 2)
+  /// The bill deduction that recovered it; cleared again if that bill is cancelled.
+  recoveryAdjustmentId String?
+  /// The request line this issue fulfils, when it was issued against a site's material request.
+  requestItemId  String?
   issuedById     String
   organizationId String
   createdAt      DateTime          @default(now())
 
+  contract           Contract?         @relation(fields: [contractId], references: [id])
+  recoveryAdjustment RaBillAdjustment? @relation(fields: [recoveryAdjustmentId], references: [id], onDelete: SetNull)
   material     Material     @relation(fields: [materialId], references: [id])
   warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
   project      Project      @relation(fields: [projectId], references: [id])
   issuedBy     User         @relation(fields: [issuedById], references: [id])
+  requestItem  MaterialRequestItem? @relation(fields: [requestItemId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([code, organizationId])
   @@index([organizationId])
   @@index([projectId, issuedOn])
   @@index([materialId])
+  @@index([contractId])
+  @@index([requestItemId])
   @@map("material_issues")
+}
+
+enum MaterialRequestStatus {
+  PENDING
+  APPROVED
+  PARTLY_ISSUED
+  ISSUED
+  REJECTED
+  CANCELLED
+  CLOSED
+}
+
+/// A site asking the stores for material. Someone other than the requester approves it, then stores fulfil it
+/// with one or more issue notes (possibly from different stores); a part-filled request can be closed.
+model MaterialRequest {
+  id             String                @id @default(uuid())
+  code           String
+  status         MaterialRequestStatus @default(PENDING)
+  neededBy       DateTime?             @db.Date
+  note           String?
+  /// Why it was rejected, cancelled or closed.
+  reviewNote     String?
+  projectId      String
+  requestedById  String
+  reviewedById   String?
+  reviewedAt     DateTime?
+  closedById     String?
+  closedAt       DateTime?
+  organizationId String
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  project      Project               @relation(fields: [projectId], references: [id])
+  requestedBy  User                  @relation("MaterialRequestRequestedBy", fields: [requestedById], references: [id])
+  reviewedBy   User?                 @relation("MaterialRequestReviewedBy", fields: [reviewedById], references: [id])
+  closedBy     User?                 @relation("MaterialRequestClosedBy", fields: [closedById], references: [id])
+  organization Organization          @relation(fields: [organizationId], references: [id])
+  items        MaterialRequestItem[]
+
+  @@unique([code, organizationId])
+  @@index([organizationId, status])
+  @@index([projectId, createdAt])
+  @@map("material_requests")
+}
+
+model MaterialRequestItem {
+  id             String   @id @default(uuid())
+  requestId      String
+  materialId     String
+  quantity       Decimal  @db.Decimal(15, 3)
+  /// Sum of the issue notes raised against this line, kept in step inside the issuing transaction.
+  issuedQuantity Decimal  @default(0) @db.Decimal(15, 3)
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  request      MaterialRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  material     Material        @relation(fields: [materialId], references: [id])
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  issues       MaterialIssue[]
+
+  @@unique([requestId, materialId])
+  @@index([materialId])
+  @@map("material_request_items")
 }
 
 // ─── Inventory ───────────────────────────────────────────────────────────────
@@ -1054,6 +1190,7 @@ model Vendor {
   awardedRfqs    Rfq[]           @relation("RfqAwardedVendor")
   invoices       Invoice[]
   payments       Payment[]
+  contracts      Contract[]
 
   @@unique([code, organizationId])
   @@index([organizationId])
@@ -1319,9 +1456,15 @@ model Invoice {
   reviewNote      String?
   createdById     String?
   reviewedById    String?
+  /// Set when the bill was raised from a certified subcontract RA bill.
+  raBillId        String?       @unique
+  /// Set when the bill pays out subcontract retention.
+  retentionReleaseId String?    @unique
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  raBill           RaBill?           @relation(fields: [raBillId], references: [id])
+  retentionRelease RetentionRelease? @relation(fields: [retentionReleaseId], references: [id])
   project       Project?       @relation(fields: [projectId], references: [id])
   organization  Organization   @relation(fields: [organizationId], references: [id])
   vendor        Vendor?        @relation(fields: [vendorId], references: [id])
@@ -1404,10 +1547,9 @@ model BudgetItem {
   id             String   @id @default(uuid())
   projectId      String
   organizationId String
+  /// The budget head, matched case-insensitively against purchase order and vendor bill categories.
   category       String
   allocated      Decimal  @default(0) @db.Decimal(15, 2)
-  spent          Decimal  @default(0) @db.Decimal(15, 2)
-  committed      Decimal  @default(0) @db.Decimal(15, 2)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -1486,11 +1628,24 @@ model GeneratedReport {
   organizationId String
   name           String
   type           String
-  format         String   // PDF, EXCEL, HTML
+  format         String   // PDF, EXCEL, BOTH
   status         String   // PENDING, GENERATING, COMPLETED, FAILED
   fileUrl        String?
   fileSize       Int?
+  /// The report content (metrics and tables), for the in-app preview and re-rendering.
   data           Json?
+  /// Object storage keys of the rendered files.
+  pdfKey         String?
+  excelKey       String?
+  /// Projects the report covers; empty means every project.
+  projectIds     String[] @default([])
+  periodFrom     DateTime?
+  periodTo       DateTime?
+  /// Set when a schedule produced it.
+  scheduleId     String?
+  /// Why generation failed, in words a member can act on.
+  error          String?
+  completedAt    DateTime?
   generatedBy    String
   generatedAt    DateTime @default(now())
   expiresAt      DateTime?
@@ -1521,6 +1676,9 @@ model ReportSchedule {
   includeAiSummary Boolean @default(true)
   enabled         Boolean  @default(true)
   lastRunAt       DateTime?
+  /// Outcome of the last run, shown on the schedule card.
+  lastStatus      String?
+  lastError       String?
   nextRunAt       DateTime
   organizationId  String
   createdBy       String
@@ -1711,11 +1869,38 @@ model AiChatMessage {
   @@map("ai_chat_messages")
 }
 
+enum HelpProgressStatus {
+  COMPLETED
+  SKIPPED
+}
+
+/// What a member has done with in-app help: a finished or skipped tour (`tour.billing`) or the dismissed
+/// getting-started checklist (`checklist`). Stored on the server so it follows them across devices.
+model HelpProgress {
+  id             String             @id @default(uuid())
+  userId         String
+  organizationId String
+  key            String
+  status         HelpProgressStatus
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId, key])
+  @@map("help_progress")
+}
+
 enum ImportEntity {
   MATERIAL
   VENDOR
   OPENING_STOCK
   PURCHASE_ORDER
+  /// A contract's bill of quantities, imported from the contract page.
+  BOQ
+  /// An RA bill's measurement book, imported from the bill page.
+  MEASUREMENT_BOOK
 }
 
 /// How one organization's spreadsheet layout maps onto SitePilot fields. Learned once (AI-assisted), then
@@ -1744,4 +1929,335 @@ model ImportTemplate {
   @@unique([organizationId, entity, name])
   @@index([organizationId, entity, headerSignature])
   @@map("import_templates")
+}
+
+// ─── Billing (RA bills) ──────────────────────────────────────────────────────
+
+/// Which way a contract's bills go. CLIENT: we bill the client (money in). SUBCONTRACT: a subcontractor bills us (money out).
+enum ContractDirection {
+  CLIENT
+  SUBCONTRACT
+}
+
+enum ContractStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum BillAdjustmentEffect {
+  ADD
+  DEDUCT
+}
+
+/// Manual lines come from the contract's rules or are typed on the bill; material recovery lines are managed
+/// by Billing from material issued to the subcontractor.
+enum BillAdjustmentKind {
+  MANUAL
+  MATERIAL_RECOVERY
+}
+
+enum BillAdjustmentCalculation {
+  /// Percentage of the bill's gross amount, e.g. CGST 9% or security deposit 10%.
+  PERCENT
+  /// A fixed amount on each bill, e.g. mobilisation advance recovery.
+  FIXED
+}
+
+enum RaBillStatus {
+  DRAFT
+  SUBMITTED
+  CHANGES_REQUESTED
+  CERTIFIED
+  CANCELLED
+}
+
+enum MeasurementType {
+  /// Nos × length × breadth × height; blank dimensions count as 1.
+  DIMENSIONS
+  /// Steel by weight: nos × cut length × kg per metre.
+  STEEL
+  /// The quantity is entered as is, e.g. trips or lump sums.
+  DIRECT
+}
+
+/// Someone we bill: the owner or main contractor on a client contract.
+model Client {
+  id             String   @id @default(uuid())
+  name           String
+  contactPerson  String?
+  email          String?
+  phone          String?
+  gstNumber      String?
+  address        String?
+  organizationId String
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  contracts    Contract[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("clients")
+}
+
+/// A work order or PO with an agreed BOQ, billed in running account (RA) bills. The other party is a client
+/// (direction CLIENT) or a vendor acting as subcontractor (direction SUBCONTRACT), never both.
+model Contract {
+  id             String            @id @default(uuid())
+  /// Our number, e.g. CT-0003.
+  code           String
+  direction      ContractDirection
+  /// The party's own work order / PO number, e.g. 5500044952-025-1041.
+  reference      String?
+  title          String
+  status         ContractStatus    @default(ACTIVE)
+  startDate      DateTime?
+  endDate        DateTime?
+  notes          String            @default("")
+  /// Days after certification that a bill falls due, for receivables and vendor bills alike.
+  paymentTermDays Int              @default(30)
+  projectId      String
+  clientId       String?
+  vendorId       String?
+  organizationId String
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization             @relation(fields: [organizationId], references: [id])
+  project      Project                  @relation(fields: [projectId], references: [id])
+  client       Client?                  @relation(fields: [clientId], references: [id])
+  vendor       Vendor?                  @relation(fields: [vendorId], references: [id])
+  items        ContractItem[]
+  adjustments  ContractAdjustmentRule[]
+  bills        RaBill[]
+  retentionReleases RetentionRelease[]
+  materialIssues    MaterialIssue[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, direction])
+  @@index([projectId])
+  @@map("contracts")
+}
+
+/// One BOQ line: what may be billed, in which unit, up to which quantity, at which rate.
+model ContractItem {
+  id          String   @id @default(uuid())
+  contractId  String
+  /// The party's item number, e.g. 50.1.
+  itemNo      String
+  /// Schedule of rates code, e.g. DSR 2.32 or NS-1.1.
+  rateCode    String?
+  description String
+  unit        String
+  quantity    Decimal  @db.Decimal(15, 3)
+  rate        Decimal  @db.Decimal(15, 2)
+  /// Extra / non-scheduled item added after award.
+  isExtra     Boolean  @default(false)
+  /// On a subcontract: the client BOQ line this work delivers, for margin per item.
+  clientItemId String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clientItem      ContractItem?  @relation("SubcontractItemLinks", fields: [clientItemId], references: [id], onDelete: SetNull)
+  subcontractItems ContractItem[] @relation("SubcontractItemLinks")
+  contract     Contract            @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  lines        RaBillLine[]
+  measurements RaBillMeasurement[]
+
+  @@unique([contractId, itemNo])
+  @@index([contractId])
+  @@map("contract_items")
+}
+
+/// Taxes and deductions applied to every bill of a contract; copied onto each new bill, where they can be changed.
+model ContractAdjustmentRule {
+  id          String                    @id @default(uuid())
+  contractId  String
+  label       String
+  effect      BillAdjustmentEffect
+  calculation BillAdjustmentCalculation
+  /// Percent for PERCENT, rupees for FIXED.
+  value       Decimal                   @db.Decimal(15, 2)
+  /// Held back and paid out later (security deposit, retention), as opposed to a final deduction such as TDS.
+  isRetention Boolean                   @default(false)
+  sortOrder   Int                       @default(0)
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@map("contract_adjustment_rules")
+}
+
+/// A running account bill. Quantities are claimed through the measurement book and certified per BOQ line;
+/// "previous" quantities are the certified totals of the contract's earlier bills.
+model RaBill {
+  id              String       @id @default(uuid())
+  contractId      String
+  projectId       String
+  organizationId  String
+  /// 1, 2, 3… within the contract (RA-01, RA-02…).
+  sequence        Int
+  /// The party's own bill number, if different.
+  reference       String?
+  periodFrom      DateTime
+  periodTo        DateTime
+  status          RaBillStatus @default(DRAFT)
+  /// Quantities certified before the contract came into SitePilot, imported with the BOQ. Carries "previous"
+  /// quantities forward; it moves no money and has no measurements.
+  isOpeningBalance Boolean     @default(false)
+  notes           String       @default("")
+  /// Totals as of the last change; fixed once the bill is certified.
+  grossAmount     Decimal      @default(0) @db.Decimal(15, 2)
+  netAmount       Decimal      @default(0) @db.Decimal(15, 2)
+  preparedById    String?
+  submittedAt     DateTime?
+  certifiedById   String?
+  certifiedAt     DateTime?
+  /// When the net amount falls due: certification + the contract's payment terms.
+  dueDate         DateTime?
+  /// Our tax invoice number to the client (client contracts only).
+  invoiceNumber   String?
+  reviewNote      String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  contract     Contract            @relation(fields: [contractId], references: [id])
+  project      Project             @relation(fields: [projectId], references: [id])
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  preparedBy   User?               @relation("RaBillPreparer", fields: [preparedById], references: [id], onDelete: SetNull)
+  certifiedBy  User?               @relation("RaBillCertifier", fields: [certifiedById], references: [id], onDelete: SetNull)
+  lines        RaBillLine[]
+  measurements RaBillMeasurement[]
+  adjustments  RaBillAdjustment[]
+  events       RaBillEvent[]
+  receipts     RaBillReceipt[]
+  /// The vendor bill raised in Finance when a subcontract bill is certified.
+  invoice      Invoice?
+
+  @@unique([contractId, sequence])
+  @@index([organizationId, status])
+  @@index([projectId])
+  @@map("ra_bills")
+}
+
+/// One BOQ line on a bill. Claimed is the measurement book total; certified is what was accepted.
+model RaBillLine {
+  id                String   @id @default(uuid())
+  billId            String
+  contractItemId    String
+  claimedQuantity   Decimal  @db.Decimal(15, 3)
+  certifiedQuantity Decimal? @db.Decimal(15, 3)
+  /// The BOQ rate, frozen at certification so later rate revisions don't change certified bills.
+  rate              Decimal? @db.Decimal(15, 2)
+  /// Why less was certified than claimed, e.g. "held due to deviation".
+  certificationNote String?
+
+  bill         RaBill       @relation(fields: [billId], references: [id], onDelete: Cascade)
+  contractItem ContractItem @relation(fields: [contractItemId], references: [id])
+
+  @@unique([billId, contractItemId])
+  @@index([contractItemId])
+  @@map("ra_bill_lines")
+}
+
+/// One row of the measurement book. Deductions (e.g. door openings) subtract from the item's total.
+model RaBillMeasurement {
+  id             String          @id @default(uuid())
+  billId         String
+  contractItemId String
+  description    String
+  type           MeasurementType
+  nos            Decimal?        @db.Decimal(15, 4)
+  length         Decimal?        @db.Decimal(15, 4)
+  breadth        Decimal?        @db.Decimal(15, 4)
+  height         Decimal?        @db.Decimal(15, 4)
+  /// kg per metre for STEEL. Inputs keep 4 decimals because widths are often averaged, e.g. (26.1 + 25.9 + 25.8 + 25.95) / 4.
+  unitWeight     Decimal?        @db.Decimal(15, 4)
+  /// Computed from the inputs (entered for DIRECT); negative for deductions.
+  quantity       Decimal         @db.Decimal(15, 3)
+  isDeduction    Boolean         @default(false)
+  sortOrder      Int             @default(0)
+
+  bill         RaBill       @relation(fields: [billId], references: [id], onDelete: Cascade)
+  contractItem ContractItem @relation(fields: [contractItemId], references: [id])
+
+  @@index([billId, contractItemId])
+  @@map("ra_bill_measurements")
+}
+
+model RaBillAdjustment {
+  id          String                    @id @default(uuid())
+  billId      String
+  label       String
+  effect      BillAdjustmentEffect
+  calculation BillAdjustmentCalculation
+  value       Decimal                   @db.Decimal(15, 2)
+  isRetention Boolean                   @default(false)
+  kind        BillAdjustmentKind        @default(MANUAL)
+  sortOrder   Int                       @default(0)
+
+  bill            RaBill          @relation(fields: [billId], references: [id], onDelete: Cascade)
+  recoveredIssues MaterialIssue[]
+
+  @@index([billId])
+  @@map("ra_bill_adjustments")
+}
+
+/// The bill's timeline: created, submitted, sent back, certified, cancelled.
+model RaBillEvent {
+  id        String   @id @default(uuid())
+  billId    String
+  stage     String
+  actorName String
+  note      String   @default("")
+  createdAt DateTime @default(now())
+
+  bill RaBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("ra_bill_events")
+}
+
+/// Money received from the client against a certified client RA bill. Voided rather than deleted.
+model RaBillReceipt {
+  id           String    @id @default(uuid())
+  billId       String
+  amount       Decimal   @db.Decimal(15, 2)
+  receivedDate DateTime
+  method       String    @default("bank_transfer")
+  reference    String    @default("")
+  notes        String    @default("")
+  recordedById String?
+  voidedAt     DateTime?
+  voidedById   String?
+  voidNote     String?
+  createdAt    DateTime  @default(now())
+
+  bill RaBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@map("ra_bill_receipts")
+}
+
+/// Retention handed back. On a subcontract it raises an approved vendor bill to pay; on a client contract it
+/// records the retention the client paid us.
+model RetentionRelease {
+  id             String   @id @default(uuid())
+  contractId     String
+  amount         Decimal  @db.Decimal(15, 2)
+  releasedOn     DateTime
+  reference      String   @default("")
+  note           String   @default("")
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id])
+  invoice  Invoice?
+
+  @@index([contractId])
+  @@map("retention_releases")
 }

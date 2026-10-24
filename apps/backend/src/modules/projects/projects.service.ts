@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, ProjectStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { projectSpend } from '../finance/project-spend';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { ProjectQueryDto } from './dto/project-query.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -56,7 +57,9 @@ export class ProjectsService {
       }),
       this.prisma.project.count({ where }),
     ]);
-    return { items: rows.map(toProjectSummary), total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) };
+    const spend = await projectSpend(this.prisma, organizationId, rows.map((row) => row.id));
+    const items = rows.map((row) => toProjectSummary(row, spend.get(row.id) ?? 0));
+    return { items, total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) };
   }
 
   /** Every project that can still take new work, for pickers and filters. Archived projects are excluded. */
@@ -90,6 +93,7 @@ export class ProjectsService {
     });
 
     if (!project) throw new NotFoundException('Project not found');
+    const spend = await projectSpend(this.prisma, organizationId, [project.id]);
 
     return {
       id: project.id,
@@ -102,7 +106,7 @@ export class ProjectsService {
       priority: project.priority,
       progress: project.progress,
       budget: project.budget ? Number(project.budget) : null,
-      spent: Number(project.spent),
+      spent: spend.get(project.id) ?? 0,
       startDate: project.startDate,
       expectedCompletion: project.expectedCompletion,
       archivedAt: project.archivedAt,
@@ -186,7 +190,6 @@ export class ProjectsService {
           status: dto.status,
           priority: dto.priority,
           budget: dto.budget,
-          spent: dto.spent,
           progress: dto.progress,
           startDate: dto.startDate ? new Date(dto.startDate) : undefined,
           expectedCompletion: dto.expectedCompletion ? new Date(dto.expectedCompletion) : undefined,

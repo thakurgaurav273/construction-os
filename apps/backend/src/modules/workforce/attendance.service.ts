@@ -2,6 +2,7 @@ import {
   BadRequestException, ConflictException, Injectable, NotFoundException,
 } from '@nestjs/common';
 import { AttendanceStatus, Prisma } from '@prisma/client';
+import { findOpenProject, findProjectInOrganization } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
 import { dateKeyToDbDate, toLocalMinutes } from './attendance-dates';
 import {
@@ -49,7 +50,7 @@ export class AttendanceService {
 
   /** Workers currently assigned to the site, plus anyone already recorded there that day. */
   async getRoster(organizationId: string, projectId: string, dateKey?: string): Promise<AttendanceRoster> {
-    await this.assertProjectInOrganization(projectId, organizationId);
+    await findProjectInOrganization(this.prisma, projectId, organizationId);
     const { today } = await this.insights.getOrganizationToday(organizationId);
     const date = dateKey ?? today;
     this.assertNotFuture(date, today);
@@ -92,7 +93,7 @@ export class AttendanceService {
     userId: string,
     dto: MarkAttendanceDto,
   ): Promise<AttendanceRoster> {
-    await this.assertProjectInOrganization(projectId, organizationId);
+    await findOpenProject(this.prisma, projectId, organizationId, 'mark attendance on it');
     const { today } = await this.insights.getOrganizationToday(organizationId);
     this.assertNotFuture(dto.date, today);
 
@@ -102,17 +103,47 @@ export class AttendanceService {
     }
     await this.assertWorkersCanBeMarked(organizationId, projectId, dto.date, workerIds);
 
-    const date = dateKeyToDbDate(dto.date);
     const counts = emptyAttendanceCounts();
     dto.entries.forEach((entry) => addToCounts(counts, entry.status));
 
-    await this.prisma.$transaction([
-      ...dto.entries.map((entry) => this.prisma.attendance.upsert({
-        where: { workerId_date: { workerId: entry.workerId, date } },
-        create: { ...toEntryData(entry), workerId: entry.workerId, projectId, organizationId, date, markedById: userId },
-        update: { ...toEntryData(entry), markedById: userId },
-      })),
-      this.prisma.activity.create({
+    try {
+      await this.saveMarks(organizationId, projectId, userId, dto, counts);
+    } catch (error) {
+      // Two people saving the same worker's first record of the day at once: the second insert clashes.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Someone else just recorded attendance for one of these workers. Refresh and try again.');
+      }
+      throw error;
+    }
+
+    return this.getRoster(organizationId, projectId, dto.date);
+  }
+
+  private async saveMarks(
+    organizationId: string,
+    projectId: string,
+    userId: string,
+    dto: MarkAttendanceDto,
+    counts: AttendanceCounts,
+  ): Promise<void> {
+    const date = dateKeyToDbDate(dto.date);
+    await this.prisma.$transaction(async (tx) => {
+      const written = [];
+      for (const entry of dto.entries) {
+        written.push(await tx.attendance.upsert({
+          where: { workerId_date: { workerId: entry.workerId, date } },
+          create: { ...toEntryData(entry), workerId: entry.workerId, projectId, organizationId, date, markedById: userId },
+          update: { ...toEntryData(entry), markedById: userId },
+          select: { projectId: true, worker: { select: { name: true } } },
+        }));
+      }
+      // Another site may have recorded the same worker since the check above; the day stays with that site.
+      const elsewhere = written.filter((record) => record.projectId !== projectId);
+      if (elsewhere.length > 0) {
+        const names = elsewhere.map((record) => record.worker.name).join(', ');
+        throw new ConflictException(`Already recorded at another site that day: ${names}.`);
+      }
+      await tx.activity.create({
         data: {
           type: 'update',
           title: 'Attendance marked',
@@ -124,10 +155,8 @@ export class AttendanceService {
           projectId,
           organizationId,
         },
-      }),
-    ]);
-
-    return this.getRoster(organizationId, projectId, dto.date);
+      });
+    });
   }
 
   /**
@@ -135,7 +164,7 @@ export class AttendanceService {
    * Night-shift arrivals after midnight are recorded on the following calendar day.
    */
   async checkIn(organizationId: string, projectId: string, userId: string, workerId: string): Promise<AttendanceRecordView> {
-    await this.assertProjectInOrganization(projectId, organizationId);
+    await findOpenProject(this.prisma, projectId, organizationId, 'mark attendance on it');
     const worker = await this.findActiveWorker(workerId, organizationId);
     const { timeZone, today } = await this.insights.getOrganizationToday(organizationId);
     const now = new Date();
@@ -160,7 +189,7 @@ export class AttendanceService {
   }
 
   async checkOut(organizationId: string, projectId: string, userId: string, workerId: string): Promise<AttendanceRecordView> {
-    await this.assertProjectInOrganization(projectId, organizationId);
+    await findOpenProject(this.prisma, projectId, organizationId, 'mark attendance on it');
     const worker = await this.findActiveWorker(workerId, organizationId);
     const { today } = await this.insights.getOrganizationToday(organizationId);
     const date = dateKeyToDbDate(today);
@@ -220,13 +249,6 @@ export class AttendanceService {
     if (dateKey > today) throw new BadRequestException("Attendance can't be recorded for a future date.");
   }
 
-  private async assertProjectInOrganization(projectId: string, organizationId: string): Promise<void> {
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, organizationId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!project) throw new NotFoundException('Project not found.');
-  }
 }
 
 function toEntryData(entry: AttendanceEntryDto): Pick<Prisma.AttendanceUncheckedCreateInput, 'status' | 'notes'> & {

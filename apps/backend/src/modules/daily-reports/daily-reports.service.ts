@@ -2,6 +2,7 @@ import {
   BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException,
 } from '@nestjs/common';
 import { DailyReport, DailyReportStatus, Prisma } from '@prisma/client';
+import { assertProjectOpen, findOpenProject } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
 import { DocumentsService } from '../documents/documents.service';
 import { ALLOWED_ATTACHMENT_MIME_TYPES } from './daily-reports.constants';
@@ -13,7 +14,7 @@ import { CreateDailyReportDto } from './dto/create-daily-report.dto';
 import { DailyReportQueryDto } from './dto/daily-report-query.dto';
 import { UpdateDailyReportDto } from './dto/update-daily-report.dto';
 
-const EDITABLE_STATUSES: DailyReportStatus[] = ['DRAFT', 'REJECTED'];
+export const EDITABLE_STATUSES: DailyReportStatus[] = ['DRAFT', 'REJECTED'];
 const SORTABLE_FIELDS = ['date', 'createdAt', 'submittedAt'] as const;
 
 export interface PaginatedDailyReports {
@@ -107,7 +108,7 @@ export class DailyReportsService {
     userId: string,
     dto: CreateDailyReportDto,
   ): Promise<DailyReportDetailView> {
-    await this.assertProjectInOrganization(projectId, organizationId);
+    await findOpenProject(this.prisma, projectId, organizationId, 'add daily reports to it');
 
     const report = await this.prisma.dailyReport.create({
       data: {
@@ -130,10 +131,12 @@ export class DailyReportsService {
     dto: UpdateDailyReportDto,
   ): Promise<DailyReportDetailView> {
     await this.findEditableReport(projectId, reportId, organizationId, userId);
-    await this.prisma.dailyReport.update({
-      where: { id: reportId },
+    // Guarding on status inside the write keeps an edit from landing after a concurrent submit.
+    const { count } = await this.prisma.dailyReport.updateMany({
+      where: { id: reportId, status: { in: EDITABLE_STATUSES } },
       data: toDailyReportContentData(dto),
     });
+    if (count === 0) throw new ConflictException('Submitted reports are locked and can no longer be edited.');
     return this.findOne(projectId, reportId, organizationId);
   }
 
@@ -185,8 +188,10 @@ export class DailyReportsService {
   ): Promise<DailyReport> {
     const report = await this.prisma.dailyReport.findFirst({
       where: { id: reportId, projectId, organizationId },
+      include: { project: { select: { status: true } } },
     });
     if (!report) throw new NotFoundException('Daily report not found.');
+    assertProjectOpen(report.project, 'change its daily reports');
     if (report.submittedById !== userId) {
       throw new ForbiddenException('Only the author can change this report.');
     }
@@ -196,11 +201,4 @@ export class DailyReportsService {
     return report;
   }
 
-  private async assertProjectInOrganization(projectId: string, organizationId: string): Promise<void> {
-    const project = await this.prisma.project.findFirst({
-      where: { id: projectId, organizationId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!project) throw new NotFoundException('Project not found.');
-  }
 }

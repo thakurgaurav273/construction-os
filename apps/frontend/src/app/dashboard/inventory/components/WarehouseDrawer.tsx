@@ -18,6 +18,7 @@ import { InventoryStatusBadge } from './InventoryStatusBadge';
 import { WarehouseDrawerActions } from './WarehouseDrawerActions';
 import { WarehouseLocationsCard } from '@/features/inventory/components/WarehouseLocationsCard';
 import { useCan } from '@/hooks/api/use-access';
+import { RecordHistory } from '@/features/audit/components/RecordHistory';
 
 interface WarehouseDrawerProps {
   warehouseId: string | null;
@@ -151,6 +152,7 @@ function WarehouseDrawerBody({ warehouse, onClose }: { warehouse: WarehouseDetai
             <MovementList title="Recent Inbound" icon={ArrowDownLeft} transactions={warehouse.inbound} />
             <MovementList title="Recent Outbound" icon={ArrowUpRight} transactions={warehouse.outbound} />
           </div>
+          <RecordHistory entityType="warehouse" entityId={warehouse.id} />
         </div>
       </ScrollArea>
       {canManage && <WarehouseDrawerActions warehouse={warehouse} onArchived={onClose} />}

@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'crypto';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_SECONDS } from './auth.constants';
 
@@ -12,6 +13,23 @@ export interface TokenPayload {
   organizationId: string;
   type: TokenType;
   jti: string;
+  /** The sign-in session. Absent on tokens issued before sessions were tracked. */
+  sid?: string;
+}
+
+/** The device a session was started from, shown to the member under Settings → Security. */
+export interface SessionClient {
+  userAgent: string | null;
+  ipAddress: string | null;
+}
+
+export const UNKNOWN_CLIENT: SessionClient = { userAgent: null, ipAddress: null };
+
+const MAX_USER_AGENT_LENGTH = 300;
+
+interface SessionIdentity {
+  sessionId: string;
+  sessionStartedAt: Date;
 }
 
 export interface TokenPair {
@@ -65,39 +83,48 @@ export class TokenService {
     return this.accessSecret;
   }
 
-  async issue(userId: string, organizationId: string): Promise<TokenPair> {
-    const accessToken = this.sign(userId, organizationId, 'access');
-    const refreshToken = this.sign(userId, organizationId, 'refresh');
-    await this.prisma.refreshToken.create({
-      data: {
-        token: hashToken(refreshToken),
-        userId,
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000),
-      },
-    });
-    return { accessToken, refreshToken };
+  /** Starts a new session, e.g. on sign-in. */
+  async issue(userId: string, organizationId: string, client: SessionClient = UNKNOWN_CLIENT): Promise<TokenPair> {
+    const session: SessionIdentity = { sessionId: randomUUID(), sessionStartedAt: new Date() };
+    const tokens = this.pair(userId, organizationId, session.sessionId);
+    await this.prisma.refreshToken.create({ data: this.storedToken(tokens.refreshToken, userId, session, client) });
+    return tokens;
   }
 
   /**
    * Swaps a refresh token for a new pair; the old one can't be used again. Presenting a refresh token
-   * that was already rotated means it was copied, so every session of that user is ended.
+   * that was already rotated means it was copied, so every session of that user is ended. Passing an
+   * organization moves the session there (the caller checks membership first); it stays the same session.
    */
-  async rotate(refreshToken: string): Promise<{ payload: TokenPayload; tokens: TokenPair }> {
+  async rotate(
+    refreshToken: string,
+    client: SessionClient = UNKNOWN_CLIENT,
+    organizationId?: string,
+  ): Promise<{ payload: TokenPayload; tokens: TokenPair }> {
     const payload = this.verify(refreshToken, 'refresh');
     const stored = await this.prisma.refreshToken.findUnique({ where: { token: hashToken(refreshToken) } });
     if (!stored || stored.userId !== payload.sub || stored.expiresAt < new Date()) {
       throw new UnauthorizedException('Your session has expired. Sign in again.');
     }
 
-    const { count } = await this.prisma.refreshToken.updateMany({
-      where: { id: stored.id, revoked: false },
-      data: { revoked: true },
+    const tokens = this.pair(payload.sub, organizationId ?? payload.organizationId, stored.sessionId);
+    const deviceNow: SessionClient = {
+      userAgent: client.userAgent ?? stored.userAgent,
+      ipAddress: client.ipAddress ?? stored.ipAddress,
+    };
+    // Claiming the old token and storing the next one together means the session always has exactly one
+    // live token, which is what JwtStrategy checks on every request.
+    const rotated = await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.refreshToken.updateMany({ where: { id: stored.id, revoked: false }, data: { revoked: true } });
+      if (count === 0) return false;
+      await tx.refreshToken.create({ data: this.storedToken(tokens.refreshToken, payload.sub, stored, deviceNow) });
+      return true;
     });
-    if (count === 0) {
+    if (!rotated) {
       await this.revokeAll(payload.sub);
       throw new UnauthorizedException('Your session has expired. Sign in again.');
     }
-    return { payload, tokens: await this.issue(payload.sub, payload.organizationId) };
+    return { payload, tokens };
   }
 
   async revoke(refreshToken: string): Promise<void> {
@@ -121,9 +148,28 @@ export class TokenService {
     }
   }
 
-  private sign(userId: string, organizationId: string, type: TokenType): string {
+  private pair(userId: string, organizationId: string, sessionId: string): TokenPair {
+    return {
+      accessToken: this.sign(userId, organizationId, sessionId, 'access'),
+      refreshToken: this.sign(userId, organizationId, sessionId, 'refresh'),
+    };
+  }
+
+  private storedToken(refreshToken: string, userId: string, session: SessionIdentity, client: SessionClient): Prisma.RefreshTokenUncheckedCreateInput {
+    return {
+      token: hashToken(refreshToken),
+      userId,
+      sessionId: session.sessionId,
+      sessionStartedAt: session.sessionStartedAt,
+      userAgent: client.userAgent?.slice(0, MAX_USER_AGENT_LENGTH) ?? null,
+      ipAddress: client.ipAddress,
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000),
+    };
+  }
+
+  private sign(userId: string, organizationId: string, sessionId: string, type: TokenType): string {
     return this.jwt.sign(
-      { sub: userId, organizationId, type },
+      { sub: userId, organizationId, sid: sessionId, type },
       {
         secret: type === 'access' ? this.accessSecret : this.refreshSecret,
         expiresIn: type === 'access' ? ACCESS_TOKEN_TTL_SECONDS : REFRESH_TOKEN_TTL_SECONDS,

@@ -6,7 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { PrismaService } from '../src/database/prisma.service';
 import { TokenService, hashToken } from '../src/modules/auth/token.service';
 
-interface StoredToken { id: string; token: string; userId: string; expiresAt: Date; revoked: boolean }
+interface StoredToken { id: string; token: string; userId: string; sessionId: string; expiresAt: Date; revoked: boolean }
 
 /** Just enough of Prisma's refreshToken delegate to exercise issuing and rotation. */
 function fakePrisma(): { prisma: PrismaService; rows: StoredToken[] } {
@@ -27,7 +27,9 @@ function fakePrisma(): { prisma: PrismaService; rows: StoredToken[] } {
       return { count: matched.length };
     },
   };
-  return { prisma: { refreshToken } as unknown as PrismaService, rows };
+  // Rows change in place, so the "transaction" just runs the work against the same delegate.
+  const $transaction = async <T>(work: (tx: { refreshToken: typeof refreshToken }) => Promise<T>): Promise<T> => work({ refreshToken });
+  return { prisma: { refreshToken, $transaction } as unknown as PrismaService, rows };
 }
 
 /** ConfigService reads process.env first, which other specs may have filled from .env; a stub keeps tests isolated. */
@@ -72,6 +74,16 @@ describe('session tokens', () => {
     await assert.rejects(tokens.rotate(original.refreshToken), UnauthorizedException);
     assert.ok(rows.every((row) => row.revoked), 'all sessions revoked after reuse');
     await assert.rejects(tokens.rotate(rotated.refreshToken), UnauthorizedException);
+  });
+
+  it('keeps one session across rotations, with the device it started on', async () => {
+    const { tokens, rows } = service();
+    const original = await tokens.issue('user-1', 'org-1', { userAgent: 'Firefox', ipAddress: '10.0.0.1' });
+    const { tokens: rotated } = await tokens.rotate(original.refreshToken, { userAgent: null, ipAddress: '10.0.0.2' });
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0].sessionId, rows[1].sessionId);
+    assert.equal(tokens.verify(rotated.accessToken, 'access').sid, rows[0].sessionId);
+    assert.deepEqual(rows.map((row) => row.revoked), [true, false]);
   });
 
   it('refuses to start when access and refresh secrets are the same', () => {

@@ -10,8 +10,11 @@ import { AuthService, SessionView } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password.dto';
 import { RegisterDto } from './dto/register.dto';
+import { SwitchOrganizationDto } from './dto/switch-organization.dto';
+import { MembershipView, OrganizationSwitchService } from './organization-switch.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { PasswordResetService } from './password-reset.service';
+import { sessionClientOf } from './session-client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from './strategies/jwt.strategy';
 import { Audit } from '../../common/audit';
@@ -27,6 +30,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly passwordReset: PasswordResetService,
+    private readonly organizationSwitch: OrganizationSwitchService,
     private readonly config: ConfigService,
   ) {}
 
@@ -34,8 +38,8 @@ export class AuthController {
   @Throttle(AUTH_RATE_LIMIT)
   @Audit('auth.registered')
   @Post('register')
-  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response): Promise<SessionView> {
-    const { session, tokens } = await this.authService.register(dto);
+  async register(@Body() dto: RegisterDto, @Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<SessionView> {
+    const { session, tokens } = await this.authService.register(dto, sessionClientOf(req));
     setAuthCookies(res, this.config, tokens);
     return session;
   }
@@ -45,8 +49,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Audit('auth.signed_in')
   @Post('login')
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response): Promise<SessionView> {
-    const { session, tokens } = await this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<SessionView> {
+    const { session, tokens } = await this.authService.login(dto, sessionClientOf(req));
     setAuthCookies(res, this.config, tokens);
     return session;
   }
@@ -55,7 +59,7 @@ export class AuthController {
   @Post('refresh')
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<{ success: true }> {
     try {
-      setAuthCookies(res, this.config, await this.authService.refresh(readCookie(req, AUTH_COOKIES.refresh)));
+      setAuthCookies(res, this.config, await this.authService.refresh(readCookie(req, AUTH_COOKIES.refresh), sessionClientOf(req)));
       return { success: true };
     } catch (error) {
       clearAuthCookies(res, this.config);
@@ -99,5 +103,27 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   getMe(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
     return user;
+  }
+
+  /** Every organization the signed-in person belongs to, for the organization switcher. */
+  @Get('organizations')
+  @UseGuards(JwtAuthGuard)
+  listOrganizations(@CurrentUser() user: AuthenticatedUser): Promise<MembershipView[]> {
+    return this.organizationSwitch.listMemberships(user.id, user.organizationId);
+  }
+
+  /** Moves this session to another of their organizations; recorded in that organization's audit log by the service. */
+  @HttpCode(HttpStatus.OK)
+  @Post('switch-organization')
+  @UseGuards(JwtAuthGuard)
+  async switchOrganization(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: SwitchOrganizationDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<SessionView> {
+    const { session, tokens } = await this.organizationSwitch.switchTo(user.id, readCookie(req, AUTH_COOKIES.refresh), dto.organizationId, sessionClientOf(req));
+    setAuthCookies(res, this.config, tokens);
+    return session;
   }
 }

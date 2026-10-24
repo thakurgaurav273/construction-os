@@ -107,6 +107,10 @@ export class InvoiceWorkflowService {
   ): Promise<InvoiceDetailView> {
     const invoice = await this.invoices.findInvoiceOrThrow(id, organizationId);
     if (!CANCELLABLE_INVOICE_STATUSES.includes(invoice.status)) throw new ConflictException('This invoice is already closed.');
+    // Bills raised by Billing mirror a certified RA bill or a retention release; cancelling here would orphan it.
+    if (invoice.raBillId || invoice.retentionReleaseId) {
+      throw new ConflictException('This bill was raised from Billing and can only be changed there.');
+    }
     if (invoice.status === 'APPROVED' && !isApprover) {
       throw new ForbiddenException('Only invoice approvers can cancel an approved invoice.');
     }

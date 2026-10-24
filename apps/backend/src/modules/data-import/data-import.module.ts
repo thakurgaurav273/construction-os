@@ -27,5 +27,7 @@ import { VendorImporter } from './importers/vendor.importer';
     OpeningStockImporter,
     PurchaseOrderImporter,
   ],
+  // Billing imports BOQs and measurement books with the same layouts, mapping and sheet reading.
+  exports: [DataImportService, ImportTemplatesService],
 })
 export class DataImportModule {}

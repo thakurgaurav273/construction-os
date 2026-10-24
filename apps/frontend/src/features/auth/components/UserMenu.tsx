@@ -5,10 +5,12 @@ import Link from 'next/link';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@sitepilot/ui';
-import { LogOut, Settings, ShieldCheck } from 'lucide-react';
+import { CircleHelp, LogOut, Settings, ShieldCheck, UserRound } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useSignOut } from '../hooks/use-sign-out';
 import { useCurrentAccess } from '@/hooks/api/use-access';
+import { useHelpStore } from '@/store/help.store';
+import { OrganizationMenuItems } from './OrganizationMenuItems';
 
 interface UserMenuProps {
   /** The element that opens the menu, e.g. the sidebar profile row or a header avatar. */
@@ -21,6 +23,7 @@ export function UserMenu({ children, align = 'start', side = 'top' }: UserMenuPr
   const user = useAuthStore((state) => state.user);
   const { signOut, isSigningOut } = useSignOut();
   const { data: access } = useCurrentAccess();
+  const openHelp = useHelpStore((state) => state.openHelp);
 
   return (
     <DropdownMenu>
@@ -31,10 +34,19 @@ export function UserMenu({ children, align = 'start', side = 'top' }: UserMenuPr
           {user?.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <OrganizationMenuItems separatorAfter />
+        <DropdownMenuItem asChild>
+          <Link href="/dashboard/settings#profile">
+            <UserRound className="mr-2 h-4 w-4" /> Your profile
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/dashboard/settings">
             <Settings className="mr-2 h-4 w-4" /> Settings
           </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => openHelp()}>
+          <CircleHelp className="mr-2 h-4 w-4" /> Help &amp; guides
         </DropdownMenuItem>
         {access?.isPlatformAdmin && (
           <DropdownMenuItem asChild>

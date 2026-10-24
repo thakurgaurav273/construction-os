@@ -1168,6 +1168,531 @@ Every organization keeps materials, vendors, stock and purchase orders in its ow
 
 ---
 
+# ADR-030 - Visible Sessions and Self-Service Account Security
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-26
+
+---
+
+## Context
+
+Members could sign out only the browser they were using. They had no way to see where else they were signed in, change their password without the email reset flow, or cut off a lost phone. An access token also stayed valid for up to 15 minutes after its session was revoked.
+
+---
+
+## Decision
+
+- A session is a chain of refresh tokens. Every token row carries a `sessionId` (kept through rotation), the session's start time, and the latest user agent and IP. Access and refresh tokens carry the session as the `sid` claim.
+- `JwtStrategy` checks on every request that the session still has a live refresh token, so signing out, ending a session from another device, a password change or a password reset cut off access tokens at once. Tokens issued before this change have no `sid` and expire on their own.
+- Rotation revokes the old token and stores the next one in one transaction, so a session always has exactly one live token.
+- Ending a session (one device, all other devices, or by changing the password) **deletes** its tokens instead of marking them revoked. A revoked token that comes back is treated as stolen and ends every session of that user; the ended device would otherwise do exactly that on its next refresh and sign the member out everywhere.
+- Account endpoints live under `/auth` (`PATCH /auth/profile`, `POST /auth/password`, `GET/DELETE /auth/sessions`, `DELETE /auth/sessions/:id`) because the refresh cookie is only sent to that path, and it identifies "this device".
+- A wrong current password answers 400, not 401: the client treats 401 as an expired session.
+- Roles stay fixed collections of permissions defined in code. Settings shows them read-only (`GET /settings/roles`); custom roles are out of scope until customers need them.
+- Settings → Integrations reports whether email and file storage are configured (`GET /settings/integrations`, owners and admins). It never returns keys or endpoints; the configuration itself stays in server environment variables.
+
+---
+
+## Alternatives
+
+- **A separate `Session` table**: cleaner model, but every token query and the rotation path would change; the token rows already hold everything a session needs.
+- **Revoke-and-keep for ended sessions**: preserves history, but collides with replay detection as described above.
+- **Editable roles per organization**: more flexible, but needs a permission editor, migration of existing members and guardrails against locking everyone out.
+
+---
+
+## Consequences
+
+- Each authenticated request makes one extra indexed lookup (`refresh_tokens.sessionId`), run in parallel with the membership check.
+- Members' "last active" is the time of their latest token, i.e. sign-in or refresh, accurate to the 15-minute access token lifetime.
+
+---
+
+# ADR-031 - Billing: One RA Bill Model for Both Directions
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Contractors bill their clients in running account (RA) bills against a BOQ, and certify their subcontractors' RA bills the same way. Every organization keeps these in its own spreadsheet layout (see the MIPL "RA Bill 04" sample: an abstract plus a measurement book with Nos × L × B × H rows, steel weights, deductions for openings, and quantities held back). SitePilot needs one way to hold this data regardless of layout.
+
+---
+
+## Decision
+
+- **One fixed model for everyone, with a direction per contract.** `Contract.direction` is CLIENT (we bill a `Client`, money in) or SUBCONTRACT (a `Vendor` bills us, money out). BOQ items, measurement books, bills, taxes and deductions are shared by both; only the party and the meaning of "certify" differ.
+- **Measurements are the source of the claim.** Each bill has measurement rows per BOQ line (DIMENSIONS, STEEL, DIRECT, optionally deductions). The server computes every row and the line's claimed quantity; the client never sends quantities for computed rows.
+- **Claimed vs certified per line.** Certifying records how much was accepted; the difference is held on that bill. "Previous" on a bill is the certified total of the contract's earlier certified bills, so bills run in sequence with at most one open bill per contract.
+- **Rates freeze at certification.** Lines keep the BOQ rate they were certified at, so a later rate revision re-prices only the open bill.
+- **Taxes and deductions are data, not code.** Each contract holds rules (percent of gross or fixed, add or deduct), copied onto every new bill and editable per bill. This covers GST, TDS, BOCW, security deposit, retention, safety holds and advance recovery without per-organization logic.
+- **Certification rules differ by direction.** On a subcontract, certifying approves money we owe, so the preparer can't certify (maker-checker), like purchase orders and payments. On a client contract, certifying records the client's own certificate, so whoever has `billing.certify` can enter it.
+- **Permissions:** `billing.view`, `contract.manage`, `billing.prepare`, `billing.certify`. Site engineers prepare measurement books; project managers certify; finance sets up contracts and prepares bills.
+- Stored `grossAmount` / `netAmount` on each bill are refreshed with every change, so lists never recompute bills; the detail view recomputes the abstract from lines.
+
+---
+
+## Alternatives
+
+- **Separate modules for client billing and subcontractor billing**: simpler individually, but would duplicate BOQs, measurement books and the abstract, and block the planned margin view (client rate vs subcontract rate per item).
+- **AI reading each organization's bill sheet every time**: flexible, but not deterministic or auditable for money. Spreadsheet import (phase 3) will instead learn a layout once and apply it in code, as in ADR-029.
+- **Per-organization code or "skills" for their formats**: doesn't scale and hides business rules; layouts and deduction rules are data instead.
+
+---
+
+## Consequences
+
+- Finance integration comes next (phase 2): subcontract bills will create vendor bills; client bills will become receivables. Until then, certified bills don't move money in Finance.
+- A cancelled bill keeps its sequence number, so numbering can have gaps (RA-02 cancelled, next is RA-03). This keeps the history honest.
+- Bills are capped at 300 measurement rows per BOQ line and 500 BOQ lines per contract.
+
+---
+
+# ADR-032 - Billing Settlement: Vendor Bills, Receivables and Retention
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Phase 1 (ADR-031) stopped at certification: a certified RA bill moved no money. Subcontract bills need paying through the existing Finance flow (vendor bill → payment request → approval → release), client bills need collecting, and security deposit / retention held back on bills needs tracking until it is released.
+
+---
+
+## Decision
+
+- **A certified subcontract bill raises an APPROVED vendor bill in Finance**, linked by `Invoice.raBillId`. Certification is already maker-checker (the preparer can't certify), so it stands in for invoice approval; payments still go through request → approval (maker-checker) → release. Finance exposes `BillingPayablesService` for this; Billing never writes Finance tables directly.
+- **The vendor bill total equals the RA bill net to the paisa.** Its lines are the certified work lines plus one line per tax or deduction with its signed amount (deductions negative), all at 0% tax. Payments are capped at the invoice total, so this is what stops finance paying out TDS or retention. A unit test holds the two totals equal.
+- The vendor bill uses the subcontractor's own bill number when given, falling back to `CT-0003/RA-01` if that number is already recorded for the vendor.
+- **Billing-raised vendor bills can't be cancelled in Finance**: they mirror a certified bill or a retention release, and cancelling one would orphan it. Correcting a certified bill is a later feature.
+- **Client bills become receivables in Billing**, not Finance's payables model: due date = certification + the contract's `paymentTermDays`; finance records receipts (`billing.receipts`), which are voided with a reason rather than deleted. Receivables are listed with ageing buckets.
+- **Retention is a flag on deduction lines** (`isRetention`), not a separate calculation. Held = retention lines on certified bills; released = `RetentionRelease` records. Releasing on a subcontract raises another approved vendor bill (`Invoice.retentionReleaseId`); on a client contract it records the retention received.
+
+---
+
+## Alternatives
+
+- **Create subcontract vendor bills as drafts or pending approval**: a second approval of the same money, adding a step without adding a check.
+- **Put tax on vendor bill lines (taxPercent) and deductions elsewhere**: per-line GST rounding drifts from the bill's net by paise, and deductions would still need representing.
+- **Model client receivables as Finance invoices**: Finance invoices are vendor-shaped (vendor, PO match, approval); bending them to clients would complicate every payables screen.
+
+---
+
+## Consequences
+
+- Finance's payables, overdue and cash-out figures now include subcontract bills automatically; receivables and retention are not yet on the Finance dashboard.
+- A mistakenly certified bill can't be reversed yet; its vendor bill stays approved until a correction flow exists.
+
+---
+
+# ADR-033 - Importing BOQs and Measurement Books in Each Organization's Layout
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Organizations keep BOQs and measurement books in their own spreadsheets (see MIPL's RA Bill 04: an Abstract tab, and an MB tab where an item row is followed by "RA Bill 1st/2nd" sections, measurement rows, deduction rows, notes and total / hold / paid rows). ADR-029 already learns flat sheet layouts once and reuses them. Measurement books aren't flat, and contracts brought in mid-way (at RA-04) need their earlier certified quantities.
+
+---
+
+## Decision
+
+- **Reuse ADR-029's layouts.** `BOQ` and `MEASUREMENT_BOOK` are two more import entities with field lists; column mapping (AI-proposed once, name-matched without AI, confirmed by a person) and saved templates work unchanged. They are marked with a `context` and imported from the contract or bill page, not the generic Imports page, through Billing routes that check billing permissions.
+- **Measurement books are parsed by fixed rules, never AI.** A row with an item number starts an item; text-only rows are section markers ("RA Bill …"), totals ("Total … / hold / paid") or notes; rows with a quantity are measurements; deduction wording (Deduction, Desuction, Less, Minus, (-)) or a negative quantity marks deductions. The words are built in for now.
+- **The sheet's quantity is the truth.** A row keeps its Nos × L × B × H only when the stored (4-decimal) dimensions reproduce the sheet's quantity within its 2-decimal display rounding; otherwise the row keeps the sheet's quantity, with the full dimensions in its description. The preview shows exactly what will be claimed.
+- **Cross-checks, not corrections.** Each item's rows are compared with the sheet's own total; differences (e.g. a sheet that adds its deductions) and held quantities are shown as warnings for a person to judge. Nothing is written until the preview is accepted; each item's rows replace that item's measurements through the same path as the measurement screen.
+- **Opening balance.** A BOQ column of quantities certified before SitePilot becomes one certified bill (`isOpeningBalance`) numbered as the organization's last bill, so the next bill continues their numbering with correct previous quantities. It raises no vendor bill, receivable or retention.
+- **Output.** A print view (landscape A4) and an Excel workbook (Abstract + Measurement Book); the MB sheet uses the organization's own saved MB columns when there is one.
+
+---
+
+## Alternatives
+
+- **AI parses every measurement book**: copes with odd layouts, but money quantities must be reproducible and auditable, and it costs time and money on every upload.
+- **Per-organization parser code**: precise for one customer, unmaintainable across many.
+- **Import previous bills one by one**: more history, but most organizations only have the latest cumulative sheet.
+
+---
+
+## Consequences
+
+- Layouts that break the item-row convention (e.g. item numbers only in a merged heading) need mapping to a column that carries them, or editable row rules later.
+- .numbers files must be exported to Excel first; there is no maintained reader.
+
+---
+
+# ADR-034 - Material Recovery and Margin per Item
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Contractors routinely supply material (cement, steel, blocks) to subcontractors and recover its cost from their RA bills, and want to know, item by item, how much they bill the client against what they pay subcontractors for the same work.
+
+---
+
+## Decision
+
+- **Issues name the subcontract.** `MaterialIssue.contractId` records the subcontract a material issue (or return) was for, with a `recoveryRate` that defaults to the carrying cost; returns default to the rate it was issued at. Returns can't exceed what that subcontractor was issued. The stock ledger is unchanged: it is still an issue to the project.
+- **Recovery is an ordinary bill deduction.** Recovering adds a FIXED DEDUCT `RaBillAdjustment` of kind `MATERIAL_RECOVERY` per material, and the issue notes it covers point at it (`recoveryAdjustmentId`). Totals, the vendor bill raised at certification (ADR-032), print and Excel need no special handling. An issue is pending while it is unlinked or linked to a cancelled bill, so cancelling a bill frees its material without rewriting history; removing the line unlinks it. Manual edits of a bill's taxes and deductions replace only `MANUAL` lines.
+- **Margin is measured on links, not guesses.** A subcontract BOQ line points at the client BOQ line it delivers (`ContractItem.clientItemId`, same project). Suggestions are deterministic (rate code, then description, then item number with the same unit) and only offered when exactly one client line matches; a person confirms.
+- **Margin figures are certified work value** at the rates frozen on each certified bill, before taxes and deductions: client billed minus linked subcontract cost per client line, with unlinked subcontract work shown as cost not set against any line. Material recovered is reported separately, because the material's own cost sits in procurement. The report needs `finance.view` on top of `billing.view`.
+
+---
+
+## Alternatives
+
+- **A separate "recoveries" ledger on the bill**: cleaner separation, but every total, the vendor bill, print and export would need to learn about it.
+- **Recover automatically on the next bill**: convenient, but subcontract terms differ (some recover monthly, some at completion), so recovery stays a deliberate step.
+- **Margin from matching item numbers at report time**: no setup, but silently wrong whenever numbering differs between the client and subcontract BOQs.
+
+---
+
+## Consequences
+
+- Material issued before this change has no subcontract and isn't recoverable through Billing.
+- Margin ignores material and overheads; it answers "what do we keep on the work we subcontract", not project profit.
+
+---
+
+# ADR-035 - Background Jobs and Generated Reports
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Reports were generated inside the request and saved as a raw JSON dump. Nothing produced a file, nothing ran on a schedule, and the next run time ignored the schedule's time zone. Report generation, emails with attachments and AI summaries are too slow for a request, and they need retries.
+
+---
+
+## Decision
+
+- **One queue behind a small interface.** `JobsService` (common/jobs) offers `register`, `enqueue` and `every`. With `REDIS_URL` set, jobs go through a BullMQ queue (`sitepilot`) with three attempts and exponential backoff, and recurring jobs use a BullMQ job scheduler, so several API instances tick once between them. Without Redis (local development, tests) the same handlers run in-process with the same retry rules. Feature code never imports BullMQ. Job ids can't contain `:` (BullMQ reserves it), and `enqueue` rejects them.
+- **Reports are built once and rendered many ways.** Each report type has a builder that returns a `ReportDocument` (headline metrics, sections with typed tables or bullets). The PDF (pdfmake, Roboto, so ₹ renders), the Excel workbook (exceljs, one sheet per table, real numbers and dates) and the in-app preview all render that same document. The document is stored on `GeneratedReport.data`, and the files go to object storage (`pdfKey`, `excelKey`).
+- **Requests only queue.** `POST /reports/generate` creates a PENDING report for whole UTC days in a chosen period (30 days by default, 366 at most) and enqueues `reports.generate`. The page polls while anything is pending. Failures on the last attempt are saved as a message a member can act on.
+- **Schedules claim their run.** A once-a-minute tick finds due schedules and moves each one's `nextRunAt` forward with a conditional update before queueing, so a run is never produced twice. Next runs step in the schedule's own time zone (09:00 stays 09:00 through DST), and runs missed during downtime are skipped rather than sent in a burst. One-off schedules switch themselves off after running. Each run covers the frequency's window (last day, 7 days, 30 days).
+- **Recipients are roles, not labels.** Schedule recipients are `OrgRole` values plus extra addresses. Financial reports only go to roles with `finance.view`. Each person gets their own email with the files attached (links only above 10 MB) and 7-day signed download links. The outcome (DELIVERED, PARTIAL, FAILED, NO_RECIPIENTS) is shown on the schedule.
+- **Downloads use short-lived signed links** that save as an attachment. A local-disk storage driver (`STORAGE_DRIVER=local`) serves HMAC-signed links from `/api/files/:token` for development without S3.
+- **The AI summary is optional and never blocks a report.** It goes through `AiFeaturesService.summarizeReport` (feature `report_summary`). Without AI access the report is delivered without it.
+
+---
+
+## Alternatives
+
+- **Node cron inside the API**: no retries or persistence, and every instance would fire every schedule.
+- **Rendering PDFs with a headless browser**: pixel-perfect HTML, but a heavy Chromium dependency on every server. pdfmake is pure JavaScript and fast enough for tabular reports.
+- **Storing only the files**: the in-app preview would have to parse PDFs; storing the document also lets reports be re-rendered later.
+
+---
+
+## Consequences
+
+- Production needs Redis for durable jobs; without it, queued work is lost on restart (the API logs a warning).
+- The PDF shows at most 200 rows per table; the Excel file and preview point there for the rest. A report stores at most 5,000 rows per table.
+- Seeded demo data no longer includes generated reports without files; generate one from the Reports page.
+
+---
+
+# ADR-036 - Archived Projects Are Closed for New Site Work
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Archiving hid a project from pickers and made its details read-only, but every other module still accepted new work against it through the API: reports, attendance, orders, material issues, documents.
+
+---
+
+## Decision
+
+- One shared guard (`modules/projects/project-guards.ts`): `findProjectInOrganization` for reads and `findOpenProject` / `assertProjectOpen` for new work. It replaces five copies of the same project lookup and answers 409 with "This project is archived, so you can't …. Restore it from the project menu first."
+- **Blocked:** creating, editing or submitting daily reports; marking attendance and check-in/out; assigning workers; creating, editing, submitting or approving purchase orders; RFQs and awards; material issues and plans; linking stores; uploading documents; contracts and new RA bills.
+- **Still allowed:** reading everything; approving or rejecting reports already submitted; rejecting or cancelling orders; returning leftover stock to a store; editing workers already on the site; vendor bills, payments and client receipts, because money owed doesn't end when a site closes.
+
+---
+
+## Alternatives
+
+- **Block everything**: would strand pending approvals and unpaid bills on closed sites.
+- **Frontend-only hiding**: the API would still accept the work.
+
+---
+
+## Consequences
+
+- Draft daily reports and purchase orders on an archived project are frozen until it's restored; pending orders can be rejected or cancelled.
+
+---
+
+# ADR-037 - Budget Heads with Derived Commitments and Spend
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Budget lines held allocated, committed and spent amounts that only the seed ever wrote, so they never moved with real purchase orders or bills. Their names ("Steel & Rebar") also didn't match the categories orders and bills use ("Steel").
+
+---
+
+## Decision
+
+- A budget line is a **head**: a project, a category name and an allocation. Only those are stored.
+- **Committed** = approved purchase orders in that category not yet billed (order total minus approved bills against it, never below zero). **Spent** = approved, part-paid and paid vendor bills in that category. Both include GST, like order and bill totals.
+- Categories match case-insensitively, ignoring surrounding spaces. Orders and bills whose category has no head show as **Unbudgeted** on the project, so nothing silently disappears.
+- PO and vendor-bill forms list the project's heads first (`GET /projects/:id/budget/categories`, names only, open to every member). The money view (`GET /projects/:id/budget`) needs `finance.view`; changing heads needs the new `budget.manage`.
+- One `BudgetService` feeds the project Budget tab, Finance → Budget, the finance summary and the Cost report.
+
+---
+
+## Alternatives
+
+- **A budget-line field on every PO and bill**: more precise, but adds a choice to every order and needs existing records mapped.
+- **Typed-in figures**: drift from what procurement and finance record.
+
+---
+
+## Consequences
+
+- The `spent` and `committed` columns were dropped (migration `20261101090000`); the seed now uses heads named like its orders and bills.
+- Utilisation on heads now includes commitments, so budget risk warnings fire before money is actually spent.
+- Labour paid outside vendor bills isn't counted yet.
+
+---
+
+# ADR-038 - In-App Help, Product Tours and the Getting-Started Checklist
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+New members had no guidance inside the product: workflows such as RA billing (BOQ → measurement book → certification → receivables) take several screens to learn, and nothing told a new organization what to set up first.
+
+---
+
+## Decision
+
+- **Guides are code.** One typed file per module in `features/help/content/` (title, short steps, tip, keywords, optional permission). They ship and change with the feature they describe; no CMS.
+- **Role-aware.** A guide or module with a permission is hidden from members whose role lacks it, using the same `useCan` checks as the rest of the UI.
+- **One help center.** A side drawer opened from the header `?`, the account menu, ⌘K (which also searches guide titles), empty states (“Learn how contracts work”) and contextual `?` links on complex screens. It opens on the current page's module.
+- **Tours highlight `data-tour` anchors.** A welcome tour plays on the first dashboard visit; each module's mini tour plays the first time its page opens (after the welcome tour). Steps whose element is hidden at the current screen size are skipped, so one tour works on desktop and phone. Escape exits, focus stays in the card, motion respects reduced-motion.
+- **Progress lives on the server** in `help_progress` (per member and organization: `tour.<key>` completed or skipped, plus the checklist dismissal), so it follows people across devices. Tour keys are shared through `@sitepilot/types`; the API rejects unknown keys.
+- **The checklist is derived.** Each step (invite team, create project, submit a daily report, record attendance, add a store, raise a PO, add a BOQ) is an existence check on the organization's real data, never a click. Members only see steps their role can do.
+- Help endpoints are personal (like notification preferences): no permission and no audit entry.
+
+---
+
+## Alternatives
+
+- **A third-party tour/help SaaS**: faster to start, but content drifts from the code, can't use our permissions, and sends usage data out.
+- **Tour progress in localStorage**: simpler, but replays tours on every new device.
+- **Checklist ticked by the member**: easy to fake and goes stale; derived steps stay true.
+
+---
+
+## Consequences
+
+- New pages that deserve a tour need `data-tour` attributes on their key elements and an entry in `features/help/tours/`.
+- Guides have no screenshots or clips yet; text only.
+- The AI “Ask SitePilot how to…” can later answer from the same guide files.
+
+---
+
+# ADR-039 - Worker Certifications Derive Their Status
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Certifications were a JSON list on each worker with a typed-in `status`. Nothing updated it as dates passed, so certificates that expired months ago still showed as "expiring", and they couldn't be added or edited in the app.
+
+---
+
+## Decision
+
+- Certificates live in their own table, `worker_certifications` (name, issuer, certificate number, issue and expiry dates, who added and last changed them), scoped by organization.
+- Status is never stored. `certificationState(expiresOn, today)` returns valid, expiring (30 days or fewer left, including the expiry day itself) or expired (from the day after), with the days left. "Today" is the organization's calendar day in its time zone, the same rule attendance uses.
+- Reports judge certificates at the end of their period, or today if the period is still running.
+- Add, edit/renew and remove need `workforce.manage` and are audited against the worker.
+
+---
+
+## Alternatives
+
+- **Keep the JSON and recompute status on read**: avoids a migration, but can't be queried or indexed and has no per-certificate audit trail.
+- **A nightly job updating a stored status**: stays wrong between runs and adds a moving part for no gain.
+
+---
+
+## Consequences
+
+- The migration copies the old entries (name and a well-formed expiry date) and drops the JSON column.
+- Renewal reminders (added the same day): the stage last reminded about is stored on the certificate (`remindedStage`: EXPIRING_SOON, EXPIRING_THIS_WEEK, EXPIRED) and claimed with a conditional update before sending, so each stage is sent once even across instances; a new expiry date clears it. Digests go per project to members with `workforce.manage`, preferring the project team, after 08:00 local time, in a new "Reminders" notification category.
+
+---
+
+# ADR-040 - Switching Organizations Within a Session
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+A person can belong to several organizations (for example a consultant, or a subcontractor's engineer working for two contractors), but sign-in always opened the one they joined first and there was no way to move between them.
+
+---
+
+## Decision
+
+- Tokens keep carrying a single `organizationId`. Switching re-issues them for the chosen organization by rotating the current refresh token on the **same session**: the session list stays accurate, and the old organization's refresh token can't be replayed.
+- The server checks membership and account status, and that the refresh cookie belongs to the person making the request, before touching the session.
+- `users.lastOrganizationId` remembers the organization last used; sign-in reopens it while they're still a member, otherwise the earliest-joined one.
+- The switch is audited in the organization being entered (`auth.switched_organization`), like a sign-in there.
+- The frontend reloads into the new organization's dashboard after switching, rather than patching state in place: cached queries, the notification socket's rooms and the brand colour all belong to the previous organization. Cached permissions are keyed by user and organization.
+
+---
+
+## Alternatives
+
+- **Several organizations in one token**: every query would need to pick one, and a bug could read across tenants.
+- **Sign out and back in**: works, but loses the session and is clumsy for people who move between organizations daily.
+
+---
+
+## Consequences
+
+- An access token for the previous organization stays valid until it expires (15 minutes), but the browser no longer holds it.
+- Organization logos aren't shown in the switcher yet (names and roles only).
+
+---
+
+# ADR-041 - Material Requests From Site to Stores
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+Material could only reach a site when someone with store rights issued it directly. Sites had no way to ask for material, and the stores had no queue of what sites were waiting for.
+
+---
+
+## Decision
+
+- A **material request** (`MRQ-0001`) is raised for one project with one or more material lines and an optional needed-by date. It moves no stock. Raising needs the new `material.request` permission, given to site roles (site engineers and project managers).
+- Lifecycle: `PENDING → APPROVED → PARTLY_ISSUED → ISSUED`. The exits are `REJECTED` (stores, before approval, with a note), `CANCELLED` (the requester, while nothing is issued) and `CLOSED` (stores, when the rest won't be sent, with a note). Approving, rejecting, issuing and closing need `material.issue`. Maker-checker applies: whoever raised a request can't approve or reject it. Status changes are conditional updates, so two reviewers can't both act on the same request.
+- Issuing against a request goes through the same path as a direct issue (`ProjectMaterialsService.writeNote`). Each line becomes a normal `MIN` issue note through the stock ledger, linked to its request line by `material_issues.requestItemId`. Store availability, project consumption, the project timeline and subcontract reports therefore work unchanged. One issue call uses one store. A request can be filled in several calls from different stores.
+- The request row is locked (`SELECT … FOR UPDATE`) while issuing, and each line's `issuedQuantity` is updated in the same transaction. Concurrent issues take turns, and no line can be issued beyond what was requested.
+- Archived projects can't get new requests, approvals or issues. Rejecting and closing stay possible so the stores can clear their queue.
+- Notifications reuse the audit-driven rules: the stores on the project hear about new requests, and the requester hears approval, rejection, each issue (partly or in full) and closure. Links open the request on the project's Materials tab (`?request=<id>`).
+
+---
+
+## Alternatives
+
+- **Reserve stock on approval**: it would keep the stores honest about what they've promised. But `reserved` already belongs to purchase-order and transfer flows, and stores often fill requests from whichever store has stock on the day. Not done for now.
+- **Let stores approve a smaller quantity**: issuing in parts and then closing covers the same ground without a second quantity to keep in step.
+- **Turn requests into stock transfers to the site store**: only works for sites with their own store, and adds a receiving step that sites asking for a few bags don't need.
+
+---
+
+## Consequences
+
+- Direct issues still work for stores that don't use requests.
+- Subcontractor material recovery is set on direct issues only; issues made against a request are the project's own consumption.
+- A requested quantity can't be raised after approval; the site raises a second request for more.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

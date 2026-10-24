@@ -149,6 +149,20 @@ export class AiFeaturesService {
     return { id: reportId, aiSummary: answer.text, ...toView(answer) };
   }
 
+  /** A short narrative for the top of a generated report. Plain text, because PDFs and emails don't render Markdown. */
+  async summarizeReport(organizationId: string, userId: string, reportContext: string): Promise<string> {
+    const answer = await this.ai.complete(
+      { organizationId, userId, feature: 'report_summary' },
+      {
+        system: `${GROUNDING}\nWrite the executive summary of one generated report in 3 to 5 plain sentences (no Markdown, no headings, no bullets). Lead with the most important finding, cite the key numbers, and end with the one thing that most needs action, if any.`,
+        messages: [{ role: 'user', content: dataBlock(reportContext) }],
+        maxTokens: 400,
+        temperature: 0.2,
+      },
+    );
+    return answer.text.trim();
+  }
+
   async latestInsights(organizationId: string): Promise<InsightSnapshotView | null> {
     const snapshot = await this.prisma.aiInsightSnapshot.findFirst({ where: { organizationId }, orderBy: { createdAt: 'desc' } });
     if (!snapshot) return null;

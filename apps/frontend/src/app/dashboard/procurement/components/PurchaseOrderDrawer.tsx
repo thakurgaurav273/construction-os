@@ -12,6 +12,7 @@ import { StatusBadge } from './StatusBadge';
 import { formatCurrency } from './procurement-format';
 import { PurchaseOrderActions } from './PurchaseOrderActions';
 import { PurchaseOrderDeliveries } from './PurchaseOrderDeliveries';
+import { RecordHistory } from '@/features/audit/components/RecordHistory';
 
 interface PurchaseOrderDrawerProps {
   orderId: string | null;
@@ -195,6 +196,7 @@ export function PurchaseOrderDrawer({ orderId, open, onClose, onOpenOrder }: Pur
                     </div>
                   ))}
                 </Section>
+                <RecordHistory entityType="purchase_order" entityId={order.id} />
               </div>
             </ScrollArea>
 

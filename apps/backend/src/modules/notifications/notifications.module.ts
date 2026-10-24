@@ -22,6 +22,6 @@ import { FirebasePushProvider } from './push/firebase-push.provider';
     MailService,
     { provide: PUSH_PROVIDER, useClass: FirebasePushProvider },
   ],
-  exports: [NotificationsService],
+  exports: [NotificationsService, NotificationRecipientsService],
 })
 export class NotificationsModule {}

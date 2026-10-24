@@ -7,6 +7,7 @@ import { useAuthHydrated, useAuthStore } from '@/store/auth.store';
 
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
 import { UserMenu } from '@/features/auth/components/UserMenu';
+import { HelpButton } from '@/features/help/components/HelpButton';
 
 export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void, onSearchClick: () => void }) {
   const pathname = usePathname();
@@ -24,6 +25,7 @@ export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void
         type="button" 
         className="-m-2.5 p-2.5 text-muted-foreground md:hidden"
         onClick={onMenuClick}
+        data-tour="header-menu"
       >
         <span className="sr-only">Open sidebar</span>
         <Menu className="h-6 w-6" aria-hidden="true" />
@@ -42,8 +44,9 @@ export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void
         <div className="flex items-center gap-x-4 lg:gap-x-6 ml-auto">
           <button
             onClick={onSearchClick}
-            className="group flex max-w-md flex-1 items-center gap-2 rounded-full border border-border/50 bg-background shadow-sm hover:shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted/30 transition-all duration-200 w-48 sm:w-64 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+            className="group flex max-w-md flex-1 items-center gap-2 rounded-full border border-border/50 bg-background shadow-sm hover:shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted/30 transition-all duration-200 w-36 sm:w-64 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
             aria-label="Search"
+            data-tour="header-search"
           >
             <Search className="h-4 w-4" />
             <span className="flex-1 text-left">Search...</span>
@@ -53,7 +56,8 @@ export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void
           </button>
 
           <div className="flex items-center gap-x-2">
-            <NotificationBell />
+            <HelpButton />
+            <div data-tour="header-notifications" className="flex"><NotificationBell /></div>
             {/* The sidebar (with the account menu) is hidden on small screens. */}
             <div className="md:hidden">
               <UserMenu align="end" side="bottom">

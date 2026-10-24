@@ -104,7 +104,7 @@ export function ImportWizard({ initialEntity }: { initialEntity: ImportEntity | 
 
       {step === 'upload' && (
         <SheetUploadStep
-          entities={entities}
+          entities={entities.filter((candidate) => !candidate.context)}
           entity={entity}
           onEntityChange={setEntity}
           onUpload={(selected) => { void readSheet(selected); }}
@@ -119,6 +119,7 @@ export function ImportWizard({ initialEntity }: { initialEntity: ImportEntity | 
           fileName={file.name}
           template={template}
           rereading={analyzeSheet.isPending}
+          guideId="settings.data-import"
           onReread={(options) => { void readSheet(file, options); }}
           onSaved={(saved) => {
             setTemplate(saved);

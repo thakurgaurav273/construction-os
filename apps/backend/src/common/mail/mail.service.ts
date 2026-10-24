@@ -1,10 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+}
+
 interface SendEmailParams {
   to: string;
   subject: string;
   html: string;
+  attachments?: EmailAttachment[];
 }
 
 @Injectable()
@@ -16,6 +22,15 @@ export class MailService {
     if (process.env.RESEND_API_KEY) {
       this.resend = new Resend(process.env.RESEND_API_KEY);
     }
+  }
+
+  /** False when no provider key is set: emails are only logged, which is fine locally but not in production. */
+  get isDeliveryConfigured(): boolean {
+    return Boolean(this.resend);
+  }
+
+  get senderAddress(): string {
+    return process.env.EMAIL_FROM || 'noreply@sitepilot.dev';
   }
 
   async sendInvitationEmail(to: string, organizationName: string, role: string, acceptUrl: string): Promise<boolean> {
@@ -44,14 +59,16 @@ export class MailService {
     }
   }
 
-  async sendEmail({ to, subject, html }: SendEmailParams): Promise<boolean> {
+  async sendEmail({ to, subject, html, attachments }: SendEmailParams): Promise<boolean> {
     if (!this.resend) {
-      this.logger.log(`[stub] Would send email to ${to}: ${subject}`);
+      const files = attachments?.length ? ` with ${attachments.map((attachment) => attachment.filename).join(', ')}` : '';
+      this.logger.log(`[stub] Would send email to ${to}: ${subject}${files}`);
       return true;
     }
 
     try {
-      await this.resend.emails.send({ from: process.env.EMAIL_FROM || 'noreply@sitepilot.dev', to, subject, html });
+      const { error } = await this.resend.emails.send({ from: process.env.EMAIL_FROM || 'noreply@sitepilot.dev', to, subject, html, attachments });
+      if (error) throw new Error(error.message);
       return true;
     } catch (error) {
       this.logger.error(`Failed to send email to ${to}:`, error);

@@ -25,6 +25,8 @@ export interface ImportEntityDefinition {
   canUpdateExisting: boolean;
   /** Whether unmapped columns can be kept on the record (as material specifications). */
   keepsExtraColumns: boolean;
+  /** Set when the import lands in one record (a contract's BOQ, a bill's measurement book) and starts from its page. */
+  context?: 'contract' | 'ra_bill';
   fields: readonly ImportField[];
 }
 
@@ -111,11 +113,49 @@ export const PURCHASE_ORDER_IMPORT: ImportEntityDefinition = {
   ],
 };
 
+export const BOQ_IMPORT: ImportEntityDefinition = {
+  entity: ImportEntity.BOQ,
+  label: 'Bill of quantities',
+  permission: 'contract.manage',
+  canUpdateExisting: true,
+  keepsExtraColumns: false,
+  context: 'contract',
+  fields: [
+    text('itemNo', 'Item no.', 'The contract item number, e.g. 50.1; existing lines are matched on it', ['item no', 'po item no', 'sl no', 'item', 'boq no', 's no'], true),
+    text('rateCode', 'Rate code', 'Schedule of rates code such as DSR 2.32 or NS-1.1', ['dsr code', 'dsr item', 'code', 'sor code', 'ref']),
+    text('description', 'Description', 'What the item is', ['description of items', 'descripion of items', 'particulars', 'item description', 'description of work'], true),
+    text('unit', 'Unit', 'Unit of measure such as Sqm, Cum, Kg', ['uom', 'units'], true),
+    number('quantity', 'BOQ quantity', 'Quantity agreed in the contract', ['qty', 'boq qty', 'as per boq', 'contract qty', 'quantity'], true),
+    number('rate', 'Rate', 'Agreed rate per unit before GST', ['unit rate', 'rate rs', 'price'], true),
+    number('previousQuantity', 'Certified before SitePilot', 'Quantity already certified on bills raised before this contract was in SitePilot', ['upto pre bill', 'upto previous bill', 'previous qty', 'certified till date', 'executed till date']),
+  ],
+};
+
+export const MEASUREMENT_BOOK_IMPORT: ImportEntityDefinition = {
+  entity: ImportEntity.MEASUREMENT_BOOK,
+  label: 'Measurement book',
+  permission: 'billing.prepare',
+  canUpdateExisting: false,
+  keepsExtraColumns: false,
+  context: 'ra_bill',
+  fields: [
+    text('itemNo', 'Item no.', 'Contract item number on the row that starts each item, e.g. 50.1', ['po item no', 'item no', 'boq item', 'item'], true),
+    text('description', 'Description', 'What was measured, e.g. Wall-1 or Deduction W1', ['particulars', 'details', 'description of work'], true),
+    number('nos', 'Nos', 'Number of like parts', ['no', 'number', 'nos.', 'no of']),
+    number('length', 'Length', 'Length in metres', ['l', 'len', 'length m']),
+    number('breadth', 'Breadth / width', 'Breadth or width in metres', ['b', 'width', 'w', 'breadth m']),
+    number('height', 'Height / depth', 'Height, depth or thickness in metres', ['h', 'depth', 'd', 'thickness']),
+    number('quantity', 'Quantity', 'The row’s quantity as worked out in the sheet', ['qty', 'total', 'contents', 'quantity total'], true),
+  ],
+};
+
 export const IMPORT_DEFINITIONS: Record<ImportEntity, ImportEntityDefinition> = {
   MATERIAL: MATERIAL_IMPORT,
   VENDOR: VENDOR_IMPORT,
   OPENING_STOCK: OPENING_STOCK_IMPORT,
   PURCHASE_ORDER: PURCHASE_ORDER_IMPORT,
+  BOQ: BOQ_IMPORT,
+  MEASUREMENT_BOOK: MEASUREMENT_BOOK_IMPORT,
 };
 
 /** Larger sheets should be split; every row runs the same checks as the screens that create records. */

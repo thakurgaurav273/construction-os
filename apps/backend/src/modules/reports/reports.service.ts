@@ -1,239 +1,245 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Prisma, ReportSchedule } from '@prisma/client';
+import { StorageService } from '../../common/storage/storage.service';
 import { PrismaService } from '../../database/prisma.service';
-import { CreateScheduleDto, GenerateReportDto, UpdateScheduleDto } from './dto/report.dto';
+import { CreateScheduleDto, GenerateReportDto, ReportDownloadQueryDto, UpdateScheduleDto } from './dto/report.dto';
+import { ReportGenerationService } from './report-generation.service';
+import { ReportSchedulerService } from './report-scheduler.service';
+import {
+  REPORT_LIST_SELECT, ReportDetailView, ReportScheduleView, ReportView, toReportDetailView, toReportView, toScheduleView,
+} from './reports.mapper';
+import { DEFAULT_REPORT_DAYS, MAX_REPORT_DAYS, REPORT_TITLES, REPORT_TYPES } from './reports.constants';
+import { firstRunAt, isValidTimeZone } from './schedule-timing';
+
+const DAY_MS = 24 * 3600 * 1000;
+const DEFAULT_TIME = '09:00';
+const DEFAULT_TIMEZONE = 'Asia/Kolkata';
+/** Links from the page are used straight away. */
+const DOWNLOAD_LINK_TTL_SECONDS = 5 * 60;
+
+const REPORT_DESCRIPTIONS: Record<string, { description: string; icon: string }> = {
+  EXECUTIVE: { description: 'Portfolio health, spend, attendance and the risks that need a decision.', icon: 'LayoutDashboard' },
+  COST: { description: 'Budget allocation, commitments and spend by category and project.', icon: 'PieChart' },
+  WORKFORCE: { description: 'Headcount by trade, attendance, overtime and compliance gaps.', icon: 'Users' },
+  SCHEDULE: { description: 'Progress against each project’s planned timeline, and site reporting.', icon: 'BarChart3' },
+  PROCUREMENT: { description: 'Purchase orders, vendor spend and delivery performance.', icon: 'ShoppingCart' },
+  INVENTORY: { description: 'Stock on hand and its value, reorder needs and movements.', icon: 'Package' },
+  FINANCIAL: { description: 'Payables, receivables, cash flow and budget use.', icon: 'Wallet' },
+  SAFETY: { description: 'Site issues from daily reports, PPE compliance and certifications.', icon: 'ShieldAlert' },
+};
+
+export interface ReportTemplateView {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+}
+
+export interface ReportPage {
+  items: ReportView[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/** Financial reports are hidden from members without finance access everywhere they could be read. */
+const visibleTypes = (includeFinancial: boolean): Prisma.GeneratedReportWhereInput => (includeFinancial ? {} : { type: { not: 'FINANCIAL' } });
+
+function startOfUtcDay(value: string): Date {
+  const date = new Date(value);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+/** Reports cover whole days: from the start of the first to the end of the last. */
+export function reportPeriod(periodFrom: string | undefined, periodTo: string | undefined, now: Date): { from: Date; to: Date } {
+  const to = periodTo ? new Date(startOfUtcDay(periodTo).getTime() + DAY_MS - 1) : now;
+  const from = periodFrom ? startOfUtcDay(periodFrom) : startOfUtcDay(new Date(to.getTime() - (DEFAULT_REPORT_DAYS - 1) * DAY_MS).toISOString());
+  if (from > to) throw new BadRequestException('The start date must be on or before the end date.');
+  if (to.getTime() - from.getTime() > MAX_REPORT_DAYS * DAY_MS) throw new BadRequestException(`A report can cover at most ${MAX_REPORT_DAYS} days.`);
+  return { from, to };
+}
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ReportsService.name);
 
-  // Get available report templates
-  getTemplates() {
-    return [
-      { id: 'EXECUTIVE', name: 'Executive Summary', description: 'High-level overview of all active projects, financials, and major risks.', icon: 'LayoutDashboard' },
-      { id: 'COST', name: 'Cost Analysis', description: 'Detailed budget tracking, variances, and procurement spend.', icon: 'PieChart' },
-      { id: 'WORKFORCE', name: 'Workforce Report', description: 'Attendance trends, trade distribution, and overtime analytics.', icon: 'Users' },
-      { id: 'SCHEDULE', name: 'Schedule Progress', description: 'Milestone tracking, critical path analysis, and delays.', icon: 'BarChart3' },
-      { id: 'PROCUREMENT', name: 'Procurement Report', description: 'Purchase orders, RFQs, deliveries, and vendor performance.', icon: 'ShoppingCart' },
-      { id: 'INVENTORY', name: 'Inventory Report', description: 'Stock levels, movements, and warehouse analytics.', icon: 'Package' },
-      { id: 'FINANCIAL', name: 'Financial Report', description: 'Invoices, payments, cash flow, and budget utilization.', icon: 'Wallet' },
-      { id: 'SAFETY', name: 'Safety & Compliance', description: 'Incident reports, site audits, and compliance metrics.', icon: 'ShieldAlert' },
-    ];
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+    private readonly generation: ReportGenerationService,
+    private readonly scheduler: ReportSchedulerService,
+  ) {}
+
+  getTemplates(includeFinancial: boolean): ReportTemplateView[] {
+    return REPORT_TYPES
+      .filter((type) => includeFinancial || type !== 'FINANCIAL')
+      .map((type) => ({ id: type, name: REPORT_TITLES[type], ...REPORT_DESCRIPTIONS[type] }));
   }
 
-  // Generate a report - aggregates data from all modules
-  async generate(input: GenerateReportDto & { userId: string }, organizationId: string) {
-    const { type, projectIds, name, userId } = input;
-    const format = input.format ?? 'PDF';
-    await this.assertProjectsInOrganization(organizationId, projectIds);
-
-    // Get or create template report
-    let templateReport = await this.prisma.report.findFirst({ where: { type, organizationId } });
-    if (!templateReport) {
-      templateReport = await this.prisma.report.create({
-        data: { name: input.name || type, type, description: `Auto-generated ${type} report`, projects: projectIds ?? [], organizationId, createdBy: userId },
-      });
-    }
-
-    // Create generated report record
-    const generated = await this.prisma.generatedReport.create({
-      data: {
-        reportId: templateReport.id,
-        name,
-        type,
-        format,
-        status: 'GENERATING',
-        generatedBy: userId,
-        organizationId,
-        projectId: projectIds?.[0] ?? null,
-      },
+  /** Creates the pending report and queues it; the client polls until its files are ready. */
+  async generate(dto: GenerateReportDto, organizationId: string, userId: string): Promise<ReportView> {
+    const projectIds = await this.assertProjectsInOrganization(organizationId, dto.projectIds);
+    const period = reportPeriod(dto.periodFrom, dto.periodTo, new Date());
+    const report = await this.generation.queue({
+      organizationId,
+      userId,
+      type: dto.type,
+      name: dto.name.trim(),
+      format: dto.format ?? 'PDF',
+      projectIds,
+      from: period.from,
+      to: period.to,
+      includeAiSummary: dto.includeAiSummary ?? false,
     });
-
-    // Aggregate data based on report type
-    const data = await this.aggregateReportData(type, organizationId, projectIds);
-
-    // Update with data and mark complete
-    return this.prisma.generatedReport.update({
-      where: { id: generated.id },
-      data: {
-        status: 'COMPLETED',
-        data,
-        fileSize: JSON.stringify(data).length,
-      },
-    });
+    return toReportView(report);
   }
 
-  private async aggregateReportData(type: string, orgId: string, projectIds?: string[]) {
-    // Every query is scoped to the organization; project ids only narrow it further.
-    const projectFilter: Prisma.ProjectWhereInput = {
-      organizationId: orgId,
-      deletedAt: null,
-      ...(projectIds?.length ? { id: { in: projectIds } } : {}),
-    };
-
-    const [projects, dailyReports, purchaseOrders, inventory, finance, workforce] = await Promise.all([
-      this.prisma.project.findMany({ where: projectFilter, select: { id: true, name: true, code: true, status: true, progress: true, budget: true, spent: true } }),
-      this.prisma.dailyReport.findMany({ where: { organizationId: orgId, project: projectFilter }, take: 100, orderBy: { date: 'desc' } }),
-      this.prisma.purchaseOrder.findMany({ where: { organizationId: orgId, ...(projectIds?.length ? { projectId: { in: projectIds } } : {}) } }),
-      this.prisma.inventoryItem.findMany({ where: { organizationId: orgId }, include: { material: true, warehouse: true } }),
-      this.getFinanceSummary(orgId, projectIds),
-      this.getWorkforceSummary(orgId, projectIds),
-    ]);
-
-    return { type, projects, dailyReports, purchaseOrders, inventory, finance, workforce, generatedAt: new Date().toISOString() };
-  }
-
-  private async getFinanceSummary(orgId: string, projectIds?: string[]) {
-    const [budgetItems, invoices, payments] = await Promise.all([
-      this.prisma.budgetItem.findMany({ where: { organizationId: orgId, ...(projectIds?.length ? { projectId: { in: projectIds } } : {}) } }),
-      this.prisma.invoice.findMany({ where: { organizationId: orgId, ...(projectIds?.length ? { projectId: { in: projectIds } } : {}) } }),
-      this.prisma.payment.findMany({ where: { organizationId: orgId, ...(projectIds?.length ? { projectId: { in: projectIds } } : {}) } }),
-    ]);
-    return { budgetItems, invoices, payments };
-  }
-
-  private async getWorkforceSummary(orgId: string, projectIds?: string[]) {
-    const workers = await this.prisma.worker.findMany({
-      where: { organizationId: orgId, ...(projectIds?.length ? { projectId: { in: projectIds } } : {}) },
-    });
-    return { workers, totalCount: workers.length };
-  }
-
-  // List generated reports history
-  async getHistory(organizationId: string, options?: { page?: number; limit?: number }, includeFinancial = true) {
-    const page = options?.page ?? 1;
-    const limit = options?.limit ?? 20;
-    const skip = (page - 1) * limit;
-    const where = { organizationId, ...(includeFinancial ? {} : { type: { not: 'FINANCIAL' } }) };
-
-    const [data, total] = await Promise.all([
-      this.prisma.generatedReport.findMany({
-        where,
-        include: { project: { select: { id: true, name: true } } },
-        orderBy: { generatedAt: 'desc' },
-        skip,
-        take: limit,
-      }),
+  async getHistory(organizationId: string, options: { page?: number; limit?: number }, includeFinancial: boolean): Promise<ReportPage> {
+    const page = options.page ?? 1;
+    const limit = options.limit ?? 20;
+    const where: Prisma.GeneratedReportWhereInput = { organizationId, ...visibleTypes(includeFinancial) };
+    const [reports, total] = await Promise.all([
+      this.prisma.generatedReport.findMany({ where, select: REPORT_LIST_SELECT, orderBy: { generatedAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
       this.prisma.generatedReport.count({ where }),
     ]);
-
-    return { data, total, page, limit };
+    return { items: reports.map(toReportView), total, page, limit };
   }
 
-  // Get single report
-  async getById(id: string, organizationId: string, includeFinancial = true) {
-    return this.prisma.generatedReport.findFirst({
-      where: { id, organizationId, ...(includeFinancial ? {} : { type: { not: 'FINANCIAL' } }) },
+  async getById(id: string, organizationId: string, includeFinancial: boolean): Promise<ReportDetailView> {
+    const report = await this.prisma.generatedReport.findFirst({ where: { id, organizationId, ...visibleTypes(includeFinancial) } });
+    if (!report) throw new NotFoundException('Report not found.');
+    return toReportDetailView(report);
+  }
+
+  async downloadLink(id: string, query: ReportDownloadQueryDto, organizationId: string, includeFinancial: boolean): Promise<{ url: string; fileName: string }> {
+    const report = await this.prisma.generatedReport.findFirst({
+      where: { id, organizationId, ...visibleTypes(includeFinancial) },
+      select: { status: true, pdfKey: true, excelKey: true },
     });
+    if (!report) throw new NotFoundException('Report not found.');
+    if (report.status !== 'COMPLETED') throw new ConflictException('This report is still being generated.');
+    const key = query.format === 'pdf' ? report.pdfKey : report.excelKey;
+    if (!key) throw new NotFoundException(`This report wasn’t generated as ${query.format === 'pdf' ? 'a PDF' : 'an Excel file'}.`);
+    const fileName = key.slice(key.lastIndexOf('/') + 1);
+    return { url: await this.storage.getSignedDownloadUrl(key, DOWNLOAD_LINK_TTL_SECONDS, fileName), fileName };
   }
 
-  // Delete report
-  async delete(id: string, organizationId: string) {
-    await this.prisma.generatedReport.deleteMany({ where: { id, organizationId } });
-    return { message: 'Report deleted' };
-  }
-
-  // Schedule a report
-  async createSchedule(input: CreateScheduleDto, organizationId: string, userId: string) {
-    await this.assertProjectsInOrganization(organizationId, input.projects);
-    // Get or create the report template
-    let report = await this.prisma.report.findFirst({ where: { type: input.reportType, organizationId } });
-    if (!report) {
-      report = await this.prisma.report.create({
-        data: { name: input.name, type: input.reportType, description: `Scheduled ${input.reportType} report`, projects: input.projects ?? [], organizationId, createdBy: userId },
-      });
+  async delete(id: string, organizationId: string, includeFinancial: boolean): Promise<{ id: string }> {
+    const report = await this.prisma.generatedReport.findFirst({
+      where: { id, organizationId, ...visibleTypes(includeFinancial) },
+      select: { id: true, pdfKey: true, excelKey: true },
+    });
+    if (!report) throw new NotFoundException('Report not found.');
+    await this.prisma.generatedReport.delete({ where: { id } });
+    for (const key of [report.pdfKey, report.excelKey]) {
+      if (key) await this.storage.delete(key).catch((error: unknown) => this.logger.warn(`Couldn't delete report file ${key}: ${String(error)}`));
     }
+    return { id };
+  }
 
-    const nextRunAt = this.computeNextRun(input.frequency, input.time ?? '09:00');
+  async getSchedules(organizationId: string, includeFinancial: boolean): Promise<ReportScheduleView[]> {
+    const schedules = await this.prisma.reportSchedule.findMany({
+      where: { organizationId, ...(includeFinancial ? {} : { reportType: { not: 'FINANCIAL' } }) },
+      orderBy: { createdAt: 'desc' },
+    });
+    return schedules.map(toScheduleView);
+  }
 
-    return this.prisma.reportSchedule.create({
+  async createSchedule(dto: CreateScheduleDto, organizationId: string, userId: string): Promise<ReportScheduleView> {
+    const projects = await this.assertProjectsInOrganization(organizationId, dto.projects);
+    const time = dto.time ?? DEFAULT_TIME;
+    const timezone = this.assertTimeZone(dto.timezone ?? DEFAULT_TIMEZONE);
+    const report = await this.generation.definitionFor(organizationId, dto.reportType, userId);
+    const schedule = await this.prisma.reportSchedule.create({
       data: {
         reportId: report.id,
-        reportType: input.reportType,
-        name: input.name,
-        frequency: input.frequency,
-        time: input.time ?? '09:00',
-        timezone: input.timezone ?? 'Asia/Kolkata',
-        projects: input.projects ?? [],
-        recipients: input.recipients ?? [],
-        emails: input.emails ?? [],
-        outputFormat: input.outputFormat ?? 'PDF',
-        includeAiSummary: input.includeAiSummary ?? true,
-        nextRunAt,
+        reportType: dto.reportType,
+        name: dto.name.trim(),
+        frequency: dto.frequency,
+        time,
+        timezone,
+        projects,
+        recipients: dto.recipients ?? [],
+        emails: dto.emails ?? [],
+        outputFormat: dto.outputFormat ?? 'PDF',
+        includeAiSummary: dto.includeAiSummary ?? false,
+        nextRunAt: firstRunAt(time, timezone, new Date()),
         organizationId,
         createdBy: userId,
       },
     });
+    return toScheduleView(schedule);
   }
 
-  // Update schedule
-  async updateSchedule(id: string, input: UpdateScheduleDto, organizationId: string) {
-    const schedule = await this.prisma.reportSchedule.findFirst({ where: { id, organizationId } });
-    if (!schedule) throw new NotFoundException('Schedule not found.');
-    await this.assertProjectsInOrganization(organizationId, input.projects);
-    const timingChanged = input.frequency !== undefined || input.time !== undefined;
-    return this.prisma.reportSchedule.update({
+  async updateSchedule(id: string, dto: UpdateScheduleDto, organizationId: string, includeFinancial: boolean): Promise<ReportScheduleView> {
+    const schedule = await this.findSchedule(id, organizationId, includeFinancial);
+    const projects = dto.projects === undefined ? undefined : await this.assertProjectsInOrganization(organizationId, dto.projects);
+    const time = dto.time ?? schedule.time;
+    const timezone = dto.timezone === undefined ? schedule.timezone : this.assertTimeZone(dto.timezone);
+    const timingChanged = time !== schedule.time || timezone !== schedule.timezone || (dto.frequency !== undefined && dto.frequency !== schedule.frequency);
+    const updated = await this.prisma.reportSchedule.update({
       where: { id },
       data: {
-        name: input.name,
-        frequency: input.frequency,
-        time: input.time,
-        timezone: input.timezone,
-        projects: input.projects,
-        recipients: input.recipients,
-        emails: input.emails,
-        outputFormat: input.outputFormat,
-        includeAiSummary: input.includeAiSummary,
-        ...(timingChanged && {
-          nextRunAt: this.computeNextRun(input.frequency ?? schedule.frequency, input.time ?? schedule.time),
-        }),
+        name: dto.name?.trim(),
+        frequency: dto.frequency,
+        time,
+        timezone,
+        projects,
+        recipients: dto.recipients,
+        emails: dto.emails,
+        outputFormat: dto.outputFormat,
+        includeAiSummary: dto.includeAiSummary,
+        ...(timingChanged && { nextRunAt: firstRunAt(time, timezone, new Date()) }),
       },
     });
+    return toScheduleView(updated);
+  }
+
+  async toggleSchedule(id: string, organizationId: string, includeFinancial: boolean): Promise<ReportScheduleView> {
+    const schedule = await this.findSchedule(id, organizationId, includeFinancial);
+    const enabling = !schedule.enabled;
+    const updated = await this.prisma.reportSchedule.update({
+      where: { id },
+      data: {
+        enabled: enabling,
+        // Resuming starts from the next slot instead of catching up on everything missed while paused.
+        ...(enabling && schedule.nextRunAt <= new Date() && { nextRunAt: firstRunAt(schedule.time, schedule.timezone, new Date()) }),
+      },
+    });
+    return toScheduleView(updated);
+  }
+
+  async runScheduleNow(id: string, organizationId: string, userId: string, includeFinancial: boolean): Promise<ReportScheduleView> {
+    const schedule = await this.findSchedule(id, organizationId, includeFinancial);
+    await this.scheduler.runNow(schedule, userId);
+    return toScheduleView(await this.prisma.reportSchedule.findUniqueOrThrow({ where: { id } }));
+  }
+
+  async deleteSchedule(id: string, organizationId: string, includeFinancial: boolean): Promise<{ id: string }> {
+    await this.findSchedule(id, organizationId, includeFinancial);
+    await this.prisma.reportSchedule.delete({ where: { id } });
+    return { id };
+  }
+
+  private async findSchedule(id: string, organizationId: string, includeFinancial: boolean): Promise<ReportSchedule> {
+    const schedule = await this.prisma.reportSchedule.findFirst({
+      where: { id, organizationId, ...(includeFinancial ? {} : { reportType: { not: 'FINANCIAL' } }) },
+    });
+    if (!schedule) throw new NotFoundException('Schedule not found.');
+    return schedule;
+  }
+
+  private assertTimeZone(timezone: string): string {
+    if (!isValidTimeZone(timezone)) throw new BadRequestException('Choose a valid time zone, like Asia/Kolkata.');
+    return timezone;
   }
 
   /** Project ids arrive from the client, so every one must belong to the caller's organization. */
-  private async assertProjectsInOrganization(organizationId: string, projectIds: string[] | undefined): Promise<void> {
-    if (!projectIds?.length) return;
+  private async assertProjectsInOrganization(organizationId: string, projectIds: string[] | undefined): Promise<string[]> {
+    if (!projectIds?.length) return [];
     const unique = [...new Set(projectIds)];
     const found = await this.prisma.project.count({ where: { id: { in: unique }, organizationId, deletedAt: null } });
     if (found !== unique.length) throw new BadRequestException('Choose projects from your organization.');
-  }
-
-  private computeNextRun(frequency: string, time: string): Date {
-    const now = new Date();
-    const [h, m] = time.split(':').map(Number);
-    const next = new Date(now);
-    next.setHours(h, m, 0, 0);
-    if (next <= now) {
-      switch (frequency) {
-        case 'DAILY': next.setDate(next.getDate() + 1); break;
-        case 'WEEKLY': next.setDate(next.getDate() + 7); break;
-        case 'MONTHLY': next.setMonth(next.getMonth() + 1); break;
-        default: next.setDate(next.getDate() + 1); break;
-      }
-    }
-    return next;
-  }
-
-  // Get schedules
-  async getSchedules(organizationId: string) {
-    return this.prisma.reportSchedule.findMany({
-      where: { organizationId },
-      include: { report: true },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  // Delete schedule
-  async deleteSchedule(id: string, organizationId: string) {
-    await this.prisma.reportSchedule.deleteMany({ where: { id, organizationId } });
-    return { message: 'Schedule deleted' };
-  }
-
-  // Toggle schedule
-  async toggleSchedule(id: string, organizationId: string) {
-    const schedule = await this.prisma.reportSchedule.findFirst({ where: { id, organizationId } });
-    if (!schedule) throw new NotFoundException('Schedule not found.');
-    return this.prisma.reportSchedule.update({ where: { id }, data: { enabled: !schedule.enabled } });
+    return unique;
   }
 }

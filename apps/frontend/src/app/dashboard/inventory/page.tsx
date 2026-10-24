@@ -118,7 +118,7 @@ export default function InventoryPage(): React.ReactElement {
         animate={{ opacity: 1, y: 0 }}
       >
         <Tabs defaultValue="items">
-          <TabsList className="mb-4 flex-wrap h-auto">
+          <TabsList className="mb-4 flex-wrap h-auto" data-tour="inventory-tabs">
             <TabsTrigger value="items">Items</TabsTrigger>
             <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
             <TabsTrigger value="transfers">Transfers</TabsTrigger>

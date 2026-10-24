@@ -69,7 +69,7 @@ export interface CreateProjectInput {
   expectedCompletion?: string;
 }
 
-export type UpdateProjectInput = Partial<CreateProjectInput> & { spent?: number };
+export type UpdateProjectInput = Partial<CreateProjectInput>;
 
 export interface AddMemberInput {
   userId: string;
@@ -116,6 +116,12 @@ export function useProjectList(filters: ProjectListFilters) {
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
+}
+
+/** False once the project is archived: it stays readable, but the API refuses new site work on it. */
+export function useProjectOpenForWork(id: string): boolean {
+  const { data: project } = useProject(id);
+  return project?.status !== 'ARCHIVED';
 }
 
 export function useProject(id: string) {

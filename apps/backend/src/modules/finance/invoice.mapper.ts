@@ -12,7 +12,29 @@ export const INVOICE_LIST_INCLUDE = {
   createdBy: NAME_REF,
   items: { orderBy: { sortOrder: 'asc' } },
   payments: { select: { amount: true, status: true } },
+  raBill: { select: { id: true, sequence: true, contract: { select: { id: true, code: true } } } },
+  retentionRelease: { select: { contract: { select: { id: true, code: true } } } },
 } satisfies Prisma.InvoiceInclude;
+
+/** Where a bill came from when Billing raised it, e.g. "RA-02 on CT-0003". */
+export interface InvoiceSource {
+  kind: 'ra_bill' | 'retention_release';
+  label: string;
+  contractId: string;
+  raBillId: string | null;
+}
+
+function invoiceSource(invoice: InvoiceListRecord): InvoiceSource | null {
+  if (invoice.raBill) {
+    const { id, sequence, contract } = invoice.raBill;
+    return { kind: 'ra_bill', label: `RA-${String(sequence).padStart(2, '0')} on ${contract.code}`, contractId: contract.id, raBillId: id };
+  }
+  if (invoice.retentionRelease) {
+    const { contract } = invoice.retentionRelease;
+    return { kind: 'retention_release', label: `Retention release on ${contract.code}`, contractId: contract.id, raBillId: null };
+  }
+  return null;
+}
 
 export const INVOICE_DETAIL_INCLUDE = {
   ...INVOICE_LIST_INCLUDE,
@@ -50,6 +72,7 @@ export interface InvoiceView {
   createdBy: NamedRef | null;
   matchStatus: MatchStatus;
   lineCount: number;
+  source: InvoiceSource | null;
 }
 
 export interface InvoiceLineView {
@@ -126,6 +149,7 @@ export function toInvoiceView(invoice: InvoiceListRecord | InvoiceDetailRecord, 
     createdBy: invoice.createdBy,
     matchStatus,
     lineCount: invoice.items.length,
+    source: invoiceSource(invoice),
   };
 }
 

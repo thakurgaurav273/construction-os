@@ -13,6 +13,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { canEditReport, canReviewReport } from '../utils/report-permissions';
 import { RejectReportDialog } from './RejectReportDialog';
 import { useCan } from '@/hooks/api/use-access';
+import { useProjectOpenForWork } from '@/hooks/api/use-projects';
 
 /**
  * Authors edit and submit their own reports; anyone else reviews submitted ones.
@@ -25,7 +26,9 @@ export function ReportReviewActions({ report }: { report: DailyReportDetail }) {
   const reviewReport = useReviewDailyReport(report.projectId);
 
   const can = useCan();
-  const canEdit = canEditReport(report, currentUserId) && can('dailyReport.write');
+  // Drafts on an archived project are frozen; reviews of reports already submitted can still finish.
+  const isOpen = useProjectOpenForWork(report.projectId);
+  const canEdit = canEditReport(report, currentUserId) && can('dailyReport.write') && isOpen;
   const canReview = canReviewReport(report, currentUserId) && can('dailyReport.approve');
 
   async function handleSubmit(): Promise<void> {

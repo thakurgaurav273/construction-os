@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Rfq, RfqItem } from '@prisma/client';
+import { findOpenProject } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
 import { normalizeOptionalText } from '../../common/utils/normalize-text';
 import { withDocumentNumberRetry } from './document-numbers';
@@ -73,6 +74,7 @@ export class RfqQuotesService {
     const rfq = await this.findQuotableRfq(rfqId, organizationId);
     if (!rfq.projectId) throw new BadRequestException('Assign the RFQ to a project before awarding it.');
     const projectId = rfq.projectId;
+    await findOpenProject(this.prisma, projectId, organizationId, 'award orders for it');
 
     const invitation = await this.prisma.rfqInvitation.findFirst({
       where: { id: dto.invitationId, rfqId },

@@ -6,7 +6,8 @@
 const PREFIX = 'sp:';
 
 export const DEVICE_CACHE_KEYS = {
-  access: (userId: string): string => `access:${userId}`,
+  /** Per organization: the same person can have different roles in each. */
+  access: (userId: string, organizationId: string): string => `access:${userId}:${organizationId}`,
   brandCss: 'brand-css',
 } as const;
 

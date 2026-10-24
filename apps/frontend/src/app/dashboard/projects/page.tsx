@@ -82,13 +82,13 @@ export default function ProjectsListPage() {
           </p>
         </div>
         <Can permission="project.create">
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button onClick={() => setCreateOpen(true)} data-tour="projects-new">
             <Plus className="mr-2 h-4 w-4" /> New Project
           </Button>
         </Can>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-center gap-3" data-tour="projects-filters">
         <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input

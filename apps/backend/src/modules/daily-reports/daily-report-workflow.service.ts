@@ -4,12 +4,14 @@ import {
 import { DailyReport, DailyReportStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { DailyReportDetailView } from './daily-report.mapper';
-import { DailyReportsService } from './daily-reports.service';
+import { DailyReportsService, EDITABLE_STATUSES } from './daily-reports.service';
 import { ApproveDailyReportDto, RejectDailyReportDto } from './dto/review-daily-report.dto';
 
 interface ReportTransition {
   report: DailyReport;
   actorId: string;
+  /** The statuses the report must still be in when the change is written. */
+  from: DailyReportStatus[];
   status: DailyReportStatus;
   changes: Omit<Prisma.DailyReportUncheckedUpdateInput, 'status'>;
   activityTitle: string;
@@ -41,6 +43,7 @@ export class DailyReportWorkflowService {
     await this.transition({
       report,
       actorId: userId,
+      from: EDITABLE_STATUSES,
       status: 'SUBMITTED',
       changes: {
         submittedAt: new Date(),
@@ -66,6 +69,7 @@ export class DailyReportWorkflowService {
     await this.transition({
       report,
       actorId: userId,
+      from: ['SUBMITTED'],
       status: 'APPROVED',
       changes: {
         reviewedById: userId,
@@ -90,6 +94,7 @@ export class DailyReportWorkflowService {
     await this.transition({
       report,
       actorId: userId,
+      from: ['SUBMITTED'],
       status: 'REJECTED',
       changes: {
         reviewedById: userId,
@@ -122,11 +127,18 @@ export class DailyReportWorkflowService {
   }
 
   private async transition(transition: ReportTransition): Promise<void> {
-    const { report, actorId, status, changes, activityTitle, activityDescription } = transition;
+    const { report, actorId, from, status, changes, activityTitle, activityDescription } = transition;
 
-    await this.prisma.$transaction([
-      this.prisma.dailyReport.update({ where: { id: report.id }, data: { ...changes, status } }),
-      this.prisma.activity.create({
+    await this.prisma.$transaction(async (tx) => {
+      // Matching on the expected status stops two reviewers (or a review and a resubmit) both winning.
+      const { count } = await tx.dailyReport.updateMany({
+        where: { id: report.id, status: { in: from } },
+        data: { ...changes, status },
+      });
+      if (count === 0) {
+        throw new ConflictException('This report was just updated by someone else. Refresh and try again.');
+      }
+      await tx.activity.create({
         data: {
           type: 'report',
           title: activityTitle,
@@ -138,8 +150,8 @@ export class DailyReportWorkflowService {
           projectId: report.projectId,
           organizationId: report.organizationId,
         },
-      }),
-    ]);
+      });
+    });
   }
 }
 

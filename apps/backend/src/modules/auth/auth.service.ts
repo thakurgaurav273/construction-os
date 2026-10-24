@@ -5,11 +5,11 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
-import { TokenPair, TokenService } from './token.service';
+import { SessionClient, TokenPair, TokenService, UNKNOWN_CLIENT } from './token.service';
 
 export const PASSWORD_HASH_ROUNDS = 12;
 
-export type PublicUser = Omit<User, 'password'>;
+export type PublicUser = Omit<User, 'password' | 'lastOrganizationId'>;
 
 export interface SessionView {
   user: PublicUser;
@@ -31,7 +31,7 @@ export class AuthService {
     private readonly tokens: TokenService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<StartedSession> {
+  async register(dto: RegisterDto, client: SessionClient = UNKNOWN_CLIENT): Promise<StartedSession> {
     const existing = await this.findUserByEmail(dto.email);
     if (existing) throw new ConflictException('An account with this email already exists');
 
@@ -41,11 +41,11 @@ export class AuthService {
     const finalSlug = slugExists ? `${slug}-${Date.now()}` : slug;
 
     const { user, organization } = await this.prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: { name: dto.name.trim(), email: dto.email, password: hashedPassword, status: 'ACTIVE' },
-      });
       const newOrg = await tx.organization.create({
         data: { name: dto.organizationName.trim(), slug: finalSlug, currency: 'INR', timezone: 'Asia/Kolkata' },
+      });
+      const newUser = await tx.user.create({
+        data: { name: dto.name.trim(), email: dto.email, password: hashedPassword, status: 'ACTIVE', lastOrganizationId: newOrg.id },
       });
       await tx.userOrganization.create({ data: { userId: newUser.id, organizationId: newOrg.id, role: 'OWNER' } });
       return { user: newUser, organization: newOrg };
@@ -53,27 +53,32 @@ export class AuthService {
 
     return {
       session: { user: toPublicUser(user), organization },
-      tokens: await this.tokens.issue(user.id, organization.id),
+      tokens: await this.tokens.issue(user.id, organization.id, client),
     };
   }
 
-  async login(dto: LoginDto): Promise<StartedSession> {
+  async login(dto: LoginDto, client: SessionClient = UNKNOWN_CLIENT): Promise<StartedSession> {
     const user = await this.findUserByEmail(dto.email);
     // Compare against a dummy hash when the email is unknown so response time doesn't reveal which emails exist.
     const passwordMatches = await bcrypt.compare(dto.password, user?.password ?? DUMMY_HASH);
     if (!user || !passwordMatches) throw new UnauthorizedException(INVALID_CREDENTIALS);
     if (user.status !== 'ACTIVE') throw new UnauthorizedException('This account is inactive. Ask your administrator to reactivate it.');
 
-    const membership = await this.prisma.userOrganization.findFirst({
+    // Reopen the organization they last used; if they've since left it, the one they joined first.
+    const memberships = await this.prisma.userOrganization.findMany({
       where: { userId: user.id },
       orderBy: { joinedAt: 'asc' },
       include: { organization: true },
     });
+    const membership = memberships.find((candidate) => candidate.organizationId === user.lastOrganizationId) ?? memberships[0];
     if (!membership) throw new UnauthorizedException('This account is not a member of any organization.');
+    if (membership.organizationId !== user.lastOrganizationId) {
+      await this.prisma.user.update({ where: { id: user.id }, data: { lastOrganizationId: membership.organizationId } });
+    }
 
     return {
       session: { user: toPublicUser(user), organization: membership.organization },
-      tokens: await this.tokens.issue(user.id, membership.organizationId),
+      tokens: await this.tokens.issue(user.id, membership.organizationId, client),
     };
   }
 
@@ -81,9 +86,9 @@ export class AuthService {
    * Rotates the session. Membership and account status are checked again, so someone removed from the
    * organization or deactivated can't keep a session alive by refreshing.
    */
-  async refresh(refreshToken: string | undefined): Promise<TokenPair> {
+  async refresh(refreshToken: string | undefined, client: SessionClient = UNKNOWN_CLIENT): Promise<TokenPair> {
     if (!refreshToken) throw new UnauthorizedException('Your session has expired. Sign in again.');
-    const { payload, tokens } = await this.tokens.rotate(refreshToken);
+    const { payload, tokens } = await this.tokens.rotate(refreshToken, client);
     const membership = await this.prisma.userOrganization.findUnique({
       where: { userId_organizationId: { userId: payload.sub, organizationId: payload.organizationId } },
       select: { user: { select: { status: true } } },

@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { NotificationType } from '@prisma/client';
+import { MaterialRequestStatus, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditAction } from '../../common/audit';
 import { DomainEvent, DomainEventsService } from '../../common/events';
@@ -48,6 +48,16 @@ export class NotificationRulesService implements OnModuleInit {
     'daily_report.submitted': (event) => this.dailyReportSubmitted(event),
     'daily_report.approved': (event) => this.dailyReportDecided(event, NotificationType.SUCCESS, 'approved'),
     'daily_report.rejected': (event) => this.dailyReportDecided(event, NotificationType.WARNING, 'sent back'),
+    'ra_bill.submitted': (event) => this.raBillSubmitted(event),
+    'ra_bill.certified': async (event) => [
+      ...await this.raBillDecided(event, NotificationType.SUCCESS, 'certified'),
+      ...await this.raBillReadyToPay(event),
+    ],
+    'ra_bill.changes_requested': (event) => this.raBillDecided(event, NotificationType.WARNING, 'sent back'),
+    'ra_bill.reopened': async (event) => [
+      ...await this.raBillDecided(event, NotificationType.WARNING, 'reopened'),
+      ...await this.raBillPaymentWithdrawn(event),
+    ],
     'invoice.submitted': (event) => this.invoiceSubmitted(event),
     'invoice.approved': (event) => this.invoiceDecided(event, NotificationType.SUCCESS, 'approved'),
     'invoice.rejected': (event) => this.invoiceDecided(event, NotificationType.ERROR, 'rejected'),
@@ -59,6 +69,13 @@ export class NotificationRulesService implements OnModuleInit {
     'transfer.approved': (event) => this.transferDecided(event, NotificationType.SUCCESS, 'approved'),
     'transfer.rejected': (event) => this.transferDecided(event, NotificationType.ERROR, 'rejected'),
     'transfer.received': (event) => this.transferDecided(event, NotificationType.SUCCESS, 'received'),
+    'material_request.raised': (event) => this.materialRequestRaised(event),
+    'material_request.approved': (event) => this.materialRequestDecided(event, NotificationType.SUCCESS, 'approved'),
+    'material_request.rejected': (event) => this.materialRequestDecided(event, NotificationType.ERROR, 'rejected'),
+    'material_request.issued': (event) => this.materialRequestDecided(
+      event, NotificationType.SUCCESS, 'issued material against', (status) => (status === 'ISSUED' ? 'issued in full' : 'partly issued'),
+    ),
+    'material_request.closed': (event) => this.materialRequestDecided(event, NotificationType.WARNING, 'closed'),
     'member.role_changed': (event) => this.roleChanged(event),
     'project.member_added': (event) => this.addedToProject(event),
     'ai.access_approved': (event) => this.aiAccessDecided(event, true),
@@ -142,6 +159,71 @@ export class NotificationRulesService implements OnModuleInit {
       title: `Daily report ${verb}`,
       body: `${event.actorName} ${verb} your ${report.project.name} report for ${formatDay(report.date)}.${reviewNote(event)}`,
       link: `/dashboard/projects/${report.projectId}/daily-reports/${event.entityId}`,
+    }];
+  }
+
+  private findRaBill(id: string | null) {
+    return this.prisma.raBill.findUnique({
+      where: { id: id ?? '' },
+      select: { sequence: true, projectId: true, preparedById: true, contract: { select: { code: true, direction: true } } },
+    });
+  }
+
+  /** Only subcontract bills wait on someone here; a client bill waits on the client. */
+  private async raBillSubmitted(event: DomainEvent): Promise<NotificationPlan[]> {
+    const bill = await this.findRaBill(event.entityId);
+    if (!bill || bill.contract.direction !== 'SUBCONTRACT') return [];
+    const code = `RA-${String(bill.sequence).padStart(2, '0')}`;
+    return [{
+      recipients: await this.recipients.withPermission('billing.certify', event.organizationId, event.actorId, bill.projectId),
+      category: 'approvals',
+      type: NotificationType.INFO,
+      title: `${code} on ${bill.contract.code} needs certification`,
+      body: `${event.actorName} submitted a subcontractor RA bill for certification.`,
+      link: `/dashboard/billing/ra-bills/${event.entityId}`,
+    }];
+  }
+
+  private async raBillDecided(event: DomainEvent, type: NotificationType, verb: string): Promise<NotificationPlan[]> {
+    const bill = await this.findRaBill(event.entityId);
+    if (!bill) return [];
+    const code = `RA-${String(bill.sequence).padStart(2, '0')}`;
+    return [{
+      recipients: this.recipients.only(bill.preparedById, event.actorId),
+      category: 'decisions',
+      type,
+      title: `${code} on ${bill.contract.code} ${verb}`,
+      body: `${event.actorName} ${verb} the RA bill you prepared.${reviewNote(event)}`,
+      link: `/dashboard/billing/ra-bills/${event.entityId}`,
+    }];
+  }
+
+  /** A certified subcontract bill is now an approved vendor bill; whoever requests payments should hear. */
+  private async raBillReadyToPay(event: DomainEvent): Promise<NotificationPlan[]> {
+    const bill = await this.findRaBill(event.entityId);
+    if (!bill || bill.contract.direction !== 'SUBCONTRACT') return [];
+    const code = `RA-${String(bill.sequence).padStart(2, '0')}`;
+    return [{
+      recipients: await this.recipients.withPermission('payment.request', event.organizationId, event.actorId, bill.projectId),
+      category: 'approvals',
+      type: NotificationType.INFO,
+      title: `${code} on ${bill.contract.code} is ready for payment`,
+      body: `${event.actorName} certified a subcontractor bill. Its vendor bill is approved in Finance.`,
+      link: '/dashboard/finance',
+    }];
+  }
+
+  private async raBillPaymentWithdrawn(event: DomainEvent): Promise<NotificationPlan[]> {
+    const bill = await this.findRaBill(event.entityId);
+    if (!bill || bill.contract.direction !== 'SUBCONTRACT') return [];
+    const code = `RA-${String(bill.sequence).padStart(2, '0')}`;
+    return [{
+      recipients: await this.recipients.withPermission('payment.request', event.organizationId, event.actorId, bill.projectId),
+      category: 'approvals',
+      type: NotificationType.WARNING,
+      title: `${code} on ${bill.contract.code} is no longer payable`,
+      body: `${event.actorName} reopened a certified subcontractor bill, so its vendor bill was cancelled in Finance.${reviewNote(event)}`,
+      link: '/dashboard/finance',
     }];
   }
 
@@ -257,6 +339,45 @@ export class NotificationRulesService implements OnModuleInit {
       title: `${transfer.code} ${verb}`,
       body: `${event.actorName} ${verb} your transfer to ${transfer.toWarehouse.name}.${reviewNote(event)}`,
       link: '/dashboard/inventory',
+    }];
+  }
+
+  private async materialRequestRaised(event: DomainEvent): Promise<NotificationPlan[]> {
+    const request = await this.prisma.materialRequest.findUnique({
+      where: { id: event.entityId ?? '' },
+      select: { code: true, projectId: true, project: { select: { name: true } }, _count: { select: { items: true } } },
+    });
+    if (!request) return [];
+    const materials = request._count.items === 1 ? '1 material' : `${request._count.items} materials`;
+    return [{
+      recipients: await this.recipients.withPermission('material.issue', event.organizationId, event.actorId, request.projectId),
+      category: 'approvals',
+      type: NotificationType.INFO,
+      title: `${request.code} needs approval`,
+      body: `${event.actorName} requested ${materials} for ${request.project.name}.`,
+      link: `/dashboard/projects/${request.projectId}/materials?request=${event.entityId}`,
+    }];
+  }
+
+  private async materialRequestDecided(
+    event: DomainEvent,
+    type: NotificationType,
+    verb: string,
+    outcome: (status: MaterialRequestStatus) => string = () => verb,
+  ): Promise<NotificationPlan[]> {
+    const request = await this.prisma.materialRequest.findUnique({
+      where: { id: event.entityId ?? '' },
+      select: { code: true, status: true, projectId: true, requestedById: true },
+    });
+    if (!request) return [];
+    const progress = request.status === 'PARTLY_ISSUED' ? ' The rest is still to come.' : '';
+    return [{
+      recipients: this.recipients.only(request.requestedById, event.actorId),
+      category: 'decisions',
+      type,
+      title: `${request.code} ${outcome(request.status)}`,
+      body: `${event.actorName} ${verb} your material request ${request.code}.${progress}${reviewNote(event)}`,
+      link: `/dashboard/projects/${request.projectId}/materials?request=${event.entityId}`,
     }];
   }
 

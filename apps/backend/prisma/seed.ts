@@ -28,7 +28,6 @@ const PROJECTS = [
     priority:          'HIGH'       as const,
     progress:          52,
     budget:            92_000_000,
-    spent:             47_840_000,
     startOffset:       -240,
     completionOffset:  180,
   },
@@ -42,7 +41,6 @@ const PROJECTS = [
     priority:          'CRITICAL'   as const,
     progress:          34,
     budget:            28_000_000,
-    spent:              9_520_000,
     startOffset:       -150,
     completionOffset:  210,
   },
@@ -56,7 +54,6 @@ const PROJECTS = [
     priority:          'HIGH'       as const,
     progress:          78,
     budget:            320_000_000,
-    spent:             249_600_000,
     startOffset:       -540,
     completionOffset:   90,
   },
@@ -70,7 +67,6 @@ const PROJECTS = [
     priority:          'MEDIUM'     as const,
     progress:          22,
     budget:            55_000_000,
-    spent:             12_100_000,
     startOffset:       -180,
     completionOffset:  360,
   },
@@ -181,7 +177,6 @@ async function seedOrg(orgId: string, ownerId: string) {
           priority:           p.priority,
           progress:           p.progress,
           budget:             p.budget,
-          spent:              p.spent,
           startDate:          subDays(new Date(), -p.startOffset),
           expectedCompletion: addDays(new Date(), p.completionOffset),
           organizationId:     orgId,
@@ -231,23 +226,26 @@ async function seedOrg(orgId: string, ownerId: string) {
 
 // ─── Workforce Seed Data ────────────────────────────────────────────────────
 
-const CV_C = { name: 'Safety Induction Certificate',  expiryDate: '2027-01-15', status: 'valid'    };
-const CV_E = { name: 'Safety Induction Certificate',  expiryDate: '2026-08-05', status: 'expiring' };
-const CV_X = { name: 'Safety Induction Certificate',  expiryDate: '2026-06-10', status: 'expired'  };
-const FA_C = { name: 'First Aid & CPR',               expiryDate: '2027-03-20', status: 'valid'    };
-const FA_E = { name: 'First Aid & CPR',               expiryDate: '2026-07-28', status: 'expiring' };
-const HS_C = { name: 'Height Safety Training',        expiryDate: '2027-06-30', status: 'valid'    };
-const HS_E = { name: 'Height Safety Training',        expiryDate: '2026-08-12', status: 'expiring' };
-const EL_C = { name: 'Electrical Safety Certificate', expiryDate: '2027-02-28', status: 'valid'    };
-const EL_E = { name: 'Electrical Safety Certificate', expiryDate: '2026-08-01', status: 'expiring' };
-const EL_X = { name: 'Electrical Safety Certificate', expiryDate: '2026-05-14', status: 'expired'  };
-const EQ_C = { name: 'Equipment Operation License',   expiryDate: '2027-09-30', status: 'valid'    };
-const OS_C = { name: 'OSHA 10-Hour Safety',           expiryDate: '2027-12-31', status: 'valid'    };
-const MF_C = { name: 'Medical Fitness Certificate',   expiryDate: '2027-07-01', status: 'valid'    };
-const MF_E = { name: 'Medical Fitness Certificate',   expiryDate: '2026-07-22', status: 'expiring' };
-const MF_X = { name: 'Medical Fitness Certificate',   expiryDate: '2026-04-10', status: 'expired'  };
-const PP_C = { name: 'PPE Compliance Certificate',    expiryDate: '2027-05-15', status: 'valid'    };
-const PP_X = { name: 'PPE Compliance Certificate',    expiryDate: '2026-03-30', status: 'expired'  };
+// Expiry is relative to the day the seed runs, so demo data always has valid, expiring and expired certificates.
+type CertificationSeed = { name: string; expiresInDays: number };
+
+const CV_C: CertificationSeed = { name: 'Safety Induction Certificate', expiresInDays: 180 };
+const CV_E: CertificationSeed = { name: 'Safety Induction Certificate', expiresInDays: 12 };
+const CV_X: CertificationSeed = { name: 'Safety Induction Certificate', expiresInDays: -40 };
+const FA_C: CertificationSeed = { name: 'First Aid & CPR', expiresInDays: 240 };
+const FA_E: CertificationSeed = { name: 'First Aid & CPR', expiresInDays: 5 };
+const HS_C: CertificationSeed = { name: 'Height Safety Training', expiresInDays: 300 };
+const HS_E: CertificationSeed = { name: 'Height Safety Training', expiresInDays: 21 };
+const EL_C: CertificationSeed = { name: 'Electrical Safety Certificate', expiresInDays: 150 };
+const EL_E: CertificationSeed = { name: 'Electrical Safety Certificate', expiresInDays: 27 };
+const EL_X: CertificationSeed = { name: 'Electrical Safety Certificate', expiresInDays: -95 };
+const EQ_C: CertificationSeed = { name: 'Equipment Operation License', expiresInDays: 400 };
+const OS_C: CertificationSeed = { name: 'OSHA 10-Hour Safety', expiresInDays: 500 };
+const MF_C: CertificationSeed = { name: 'Medical Fitness Certificate', expiresInDays: 260 };
+const MF_E: CertificationSeed = { name: 'Medical Fitness Certificate', expiresInDays: 9 };
+const MF_X: CertificationSeed = { name: 'Medical Fitness Certificate', expiresInDays: -160 };
+const PP_C: CertificationSeed = { name: 'PPE Compliance Certificate', expiresInDays: 210 };
+const PP_X: CertificationSeed = { name: 'PPE Compliance Certificate', expiresInDays: -210 };
 
 const W_CIVIL     = ['Foundation Work', 'Excavation', 'Formwork', 'Concrete Pouring', 'Survey Reading'];
 const W_ELEC      = ['Wiring & Cabling', 'Panel Installation', 'Testing & Commissioning', 'Cable Management', 'Electrical Safety'];
@@ -266,7 +264,7 @@ type WorkerSeedEntry = {
   name: string; initials: string; role: string; trade: string; type: 'EMPLOYEE' | 'SUBCONTRACTOR';
   projectCode: string; phone: string; email: string; status: 'ACTIVE' | 'LATE' | 'ABSENT' | 'ON_LEAVE';
   experienceYears: number; shift: 'DAY' | 'NIGHT'; attendancePercent: number; lastCheckIn: string;
-  supervisor: string; emergencyContact: object; skills: string[]; certifications: object[];
+  supervisor: string; emergencyContact: object; skills: string[]; certifications: CertificationSeed[];
   ppeCompliant: boolean;
 };
 
@@ -333,6 +331,12 @@ const WORKER_SEEDS: WorkerSeedEntry[] = [
   { name: 'Prakash Yadav', initials: 'PrY', role: 'Painter Helper', trade: 'Painting', type: 'SUBCONTRACTOR', projectCode: 'GRV-004', phone: '+91 98765 43269', email: 'prakash.yadav@sitepilot.in', status: 'ACTIVE', experienceYears: 5, shift: 'DAY', attendancePercent: 81, lastCheckIn: 'Today, 08:12 AM', supervisor: 'Lalit Gupta', emergencyContact: { name: 'Sarita Yadav', phone: '+91 98766 00060', relation: 'Wife' }, skills: W_PAINTING, certifications: [CV_C, MF_C], ppeCompliant: true },
 ];
 
+/** A calendar day (UTC midnight, as @db.Date stores it) the given number of days from today. */
+function daysFromToday(days: number): Date {
+  const today = new Date();
+  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + days));
+}
+
 async function seedWorkers(orgId: string) {
   const workerCount = await prisma.worker.count({ where: { organizationId: orgId } });
   if (workerCount > 0) {
@@ -364,9 +368,15 @@ async function seedWorkers(orgId: string) {
         projectId,
         emergencyContact: w.emergencyContact,
         skills:           w.skills,
-        certifications:   w.certifications,
         ppeCompliant:     w.ppeCompliant,
         organizationId:   orgId,
+        certifications: {
+          create: w.certifications.map((certification) => ({
+            name: certification.name,
+            expiresOn: daysFromToday(certification.expiresInDays),
+            organizationId: orgId,
+          })),
+        },
       },
     });
   }
@@ -1284,17 +1294,18 @@ async function seedFinance(orgId: string) {
   // Bills are entered by the finance team so the owner can approve them (maker-checker).
   const clerk = await prisma.user.findUnique({ where: { email: 'suresh.b@grovyn.com' }, select: { id: true } });
 
-  const CATS = ['Steel & Rebar', 'Cement & Concrete', 'Electrical', 'Mechanical', 'Labour', 'Equipment Hire', 'Overheads'];
-  const BD: Record<string, number[][]> = {
-    'GRV-001': [[28e6,14.2e6,4.8e6],[18e6,9.4e6,2.2e6],[12e6,5.8e6,1.9e6],[10e6,4.2e6,2.1e6],[14e6,8.64e6,1.2e6],[6e6,3.4e6,.8e6],[4e6,2.2e6,.4e6]],
-    'GRV-002': [[6e6,2.1e6,.9e6],[5e6,1.8e6,.6e6],[4e6,1.2e6,.5e6],[3e6,.8e6,.4e6],[5e6,2.02e6,.3e6],[3e6,1e6,.2e6],[2e6,.6e6,.1e6]],
-    'GRV-003': [[96e6,74.88e6,8e6],[64e6,49.92e6,5.2e6],[42e6,32.76e6,3.8e6],[38e6,29.64e6,2.6e6],[48e6,37.44e6,4e6],[18e6,14.04e6,1.5e6],[14e6,10.92e6,.9e6]],
-    'GRV-004': [[16e6,3.52e6,.5e6],[10e6,2.2e6,.3e6],[8e6,1.76e6,.2e6],[6e6,1.32e6,.1e6],[8e6,1.76e6,.2e6],[4e6,.88e6,.1e6],[3e6,.66e6,.05e6]],
+  // Budget heads use the same names as purchase order and bill categories; committed and spent are derived from those.
+  const CATS = ['Steel', 'Concrete', 'Electrical', 'Mechanical', 'Labour', 'Equipment', 'Finishes'];
+  const BD: Record<string, number[]> = {
+    'GRV-001': [28e6, 18e6, 12e6, 10e6, 14e6, 6e6, 4e6],
+    'GRV-002': [6e6, 5e6, 4e6, 3e6, 5e6, 3e6, 2e6],
+    'GRV-003': [96e6, 64e6, 42e6, 38e6, 48e6, 18e6, 14e6],
+    'GRV-004': [16e6, 10e6, 8e6, 6e6, 8e6, 4e6, 3e6],
   };
   for (const [code, items] of Object.entries(BD)) {
     const pid = projIdByCode[code]; if (!pid) continue;
     for (let i = 0; i < items.length; i++) {
-      await prisma.budgetItem.create({ data: { projectId: pid, organizationId: orgId, category: CATS[i], allocated: items[i][0], spent: items[i][1], committed: items[i][2] } });
+      await prisma.budgetItem.create({ data: { projectId: pid, organizationId: orgId, category: CATS[i], allocated: items[i] } });
     }
   }
 
@@ -1429,62 +1440,35 @@ main()
 // ─── Reports Seed Data ────────────────────────────────────────────────────────
 
 async function seedReports(orgId: string) {
-  const count = await prisma.generatedReport.count({ where: { organizationId: orgId } });
+  const count = await prisma.reportSchedule.count({ where: { organizationId: orgId } });
   if (count > 0) { console.log('  → Reports already seeded, skipping'); return; }
 
-  const templates = [
-    { type: 'EXECUTIVE', name: 'Executive Summary - Q3', desc: 'High-level overview' },
-    { type: 'COST', name: 'Cost Analysis - September', desc: 'Budget tracking' },
-    { type: 'WORKFORCE', name: 'Workforce Report - Week 38', desc: 'Attendance trends' },
-    { type: 'FINANCIAL', name: 'Financial Report - September', desc: 'Invoices and payments' },
-  ];
+  // Generated reports aren't seeded: they need real files, so generate one from the Reports page instead.
+  const owner = await prisma.userOrganization.findFirstOrThrow({ where: { organizationId: orgId, role: 'OWNER' }, select: { userId: true } });
+  const definition = await prisma.report.create({
+    data: { name: 'Executive Summary', type: 'EXECUTIVE', description: '', projects: [], organizationId: orgId, createdBy: owner.userId },
+  });
+  const nextMonday = new Date();
+  nextMonday.setUTCDate(nextMonday.getUTCDate() + ((8 - nextMonday.getUTCDay()) % 7 || 7));
+  nextMonday.setUTCHours(3, 30, 0, 0); // 09:00 in Asia/Kolkata
 
-  const reports = await Promise.all(
-    templates.map((t, i) =>
-      prisma.report.create({
-        data: { name: t.name, type: t.type, description: t.desc, projects: [], organizationId: orgId, createdBy: 'system' },
-      })
-    )
-  );
-
-  const history = [
-    { name: 'Executive Summary - Q3', type: 'EXECUTIVE', format: 'PDF', size: 4200000, daysAgo: 3, by: 'Automated Schedule' },
-    { name: 'Cost Analysis - September', type: 'COST', format: 'EXCEL', size: 1800000, daysAgo: 18, by: 'Alex Manager' },
-    { name: 'Workforce Report - Week 36', type: 'WORKFORCE', format: 'PDF', size: 2400000, daysAgo: 25, by: 'Sarah HR' },
-    { name: 'Safety Audit - Marina Bay', type: 'SAFETY', format: 'PDF', size: 3100000, daysAgo: 30, by: 'Mike Safety' },
-  ];
-
-  for (const h of history) {
-    await prisma.generatedReport.create({
-      data: {
-        reportId: reports[Math.floor(Math.random() * reports.length)].id,
-        organizationId: orgId,
-        name: h.name,
-        type: h.type,
-        format: h.format,
-        status: 'COMPLETED',
-        fileSize: h.size,
-        generatedBy: h.by,
-        generatedAt: new Date(Date.now() - h.daysAgo * 24 * 60 * 60 * 1000),
-      },
-    });
-  }
-
-  // Seed one schedule
   await prisma.reportSchedule.create({
     data: {
-      reportId: reports[0].id,
-      reportType: reports[0].type,
+      reportId: definition.id,
+      reportType: 'EXECUTIVE',
       name: 'Weekly Executive Summary',
       frequency: 'WEEKLY',
+      time: '09:00',
+      timezone: 'Asia/Kolkata',
       projects: [],
-      recipients: ['manager@grovyn.com'],
+      recipients: ['OWNER', 'PROJECT_MANAGER'],
+      emails: [],
       enabled: true,
-      nextRunAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      nextRunAt: nextMonday,
       organizationId: orgId,
-      createdBy: 'system',
+      createdBy: owner.userId,
     },
   });
 
-  console.log(`  → Seeded reports: ${templates.length} templates, ${history.length} history, 1 schedule`);
+  console.log('  → Seeded reports: 1 weekly schedule');
 }
