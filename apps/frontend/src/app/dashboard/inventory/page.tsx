@@ -22,6 +22,7 @@ import { format } from 'date-fns';
 import { fetchAllInventoryItems } from '@/hooks/api/use-inventory';
 import { downloadCsv } from '@/lib/download-csv';
 import { getApiErrorMessage } from '@/lib/api/errors';
+import { ImportButton } from '@/features/data-import/components/ImportButton';
 
 // Analytics is chart-heavy and sits behind a tab, so load it on demand.
 const AnalyticsTab = dynamic(
@@ -104,6 +105,7 @@ export default function InventoryPage(): React.ReactElement {
           <Button variant="outline" onClick={handleExport} disabled={exporting}>
             <Download className="mr-1.5 h-4 w-4" /> {exporting ? 'Exporting…' : 'Export'}
           </Button>
+          <ImportButton entity="OPENING_STOCK" />
         </div>
       </motion.div>
 

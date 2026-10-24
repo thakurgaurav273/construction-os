@@ -35,6 +35,7 @@ export type Permission =
   | 'members.manage'
   | 'organization.manage'
   | 'audit.view'
+  | 'data.import'
   | 'ai.use'
   | 'ai.history.view'
   | 'ai.manage';

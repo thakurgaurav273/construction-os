@@ -37,6 +37,8 @@ export interface DraftOrderInput {
   deliveryAddress: string;
   notes: string;
   items: DraftLineItem[];
+  /** The organization's own order number, when the order came from their spreadsheet. */
+  externalReference?: string | null;
   /** Timeline entry describing how the order came to exist. */
   origin: { stage: string; note: string };
 }
@@ -70,7 +72,12 @@ export class PurchaseOrdersService {
     return toPurchaseOrderDetailView(order, new Date());
   }
 
-  async create(organizationId: string, userId: string, dto: CreatePurchaseOrderDto): Promise<PurchaseOrderDetailView> {
+  async create(
+    organizationId: string,
+    userId: string,
+    dto: CreatePurchaseOrderDto,
+    options: { externalReference?: string } = {},
+  ): Promise<PurchaseOrderDetailView> {
     await this.assertProjectInOrganization(dto.projectId, organizationId);
     await this.vendors.findActiveVendor(dto.vendorId, organizationId);
     await assertMaterialLinks(this.prisma, organizationId, dto.items);
@@ -87,7 +94,11 @@ export class PurchaseOrdersService {
       deliveryAddress: dto.deliveryAddress?.trim() ?? '',
       notes: dto.notes?.trim() ?? '',
       items: toDraftLineItems(dto.items, category),
-      origin: { stage: PO_EVENTS.created, note: '' },
+      externalReference: options.externalReference ?? null,
+      origin: {
+        stage: PO_EVENTS.created,
+        note: options.externalReference ? `Imported from spreadsheet (order ${options.externalReference})` : '',
+      },
     })));
     return this.findOne(order.id, organizationId);
   }
@@ -171,6 +182,7 @@ export class PurchaseOrdersService {
         expectedDelivery: input.expectedDelivery,
         deliveryAddress: input.deliveryAddress,
         notes: input.notes,
+        externalReference: input.externalReference ?? null,
         amount: orderTotal(input.items),
         requestedById: input.requesterId,
         projectId: input.projectId,

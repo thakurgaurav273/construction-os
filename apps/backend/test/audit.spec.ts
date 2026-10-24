@@ -21,6 +21,9 @@ const UNAUDITED_WRITES = new Set([
   'AiController.organizationChat',
   'AiController.projectChat',
   'AiController.refreshInsights',
+  // Reading an upload and dry-running it write nothing; the mapping AI call is logged in ai_usage.
+  'DataImportController.analyze',
+  'DataImportController.preview',
   // Platform console: decisions are recorded in the tenant's audit log by the service; platform keys belong to no tenant.
   'PlatformController.approve',
   'PlatformController.reject',

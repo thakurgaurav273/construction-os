@@ -1124,6 +1124,50 @@ Assistant chats lived only in the browser and were lost on refresh. Members want
 
 ---
 
+# ADR-029 - Spreadsheet Import with Learned Layouts
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-23
+
+---
+
+## Context
+
+Every organization keeps materials, vendors, stock and purchase orders in its own spreadsheet format. Re-typing them into SitePilot during onboarding is slow and error-prone, and no single template fits every company.
+
+---
+
+## Decision
+
+- An admin uploads a sheet (.xlsx or .csv) in their own format. The first time, its columns are mapped onto SitePilot fields and saved as an `ImportTemplate` (header row, headings, column mapping, fixed values, value translations such as "Urgent" → CRITICAL).
+- AI only proposes the mapping. It sees the headings and five sample rows through `AiService` (feature `import_mapping`), never the whole sheet, and its answer is sanitized to known fields, real headings and allowed options. Without AI, columns are matched by name. The admin always confirms before saving.
+- Later uploads whose headings match a saved layout skip mapping. Parsing, validation and writes are deterministic: no AI is involved in importing rows.
+- Every upload is dry-run first (create / update / skip / problem per row). Rows are written one at a time through the existing services (`MaterialsService`, `VendorsService`, `InventoryAdjustmentsService`, `PurchaseOrdersService`) and validated with the endpoints' own DTOs, so imported records follow the same rules as records entered by hand.
+- Opening stock is posted as stock adjustments, keeping the ledger consistent. Purchase orders are created as drafts and remember the organization's own number (`PurchaseOrder.externalReference`), so re-uploading a sheet never duplicates orders.
+- The same template exports current data back in the organization's layout.
+- Access: the `data.import` permission (owners and admins) plus the entity's own permission (e.g. `material.manage`).
+
+---
+
+## Alternatives
+
+- **AI reads every row**: copes with messier sheets, but is costly, slow, sends all data to the model, and can invent values.
+- **One fixed SitePilot template**: simple, but pushes the reformatting work back onto every customer.
+
+---
+
+## Consequences
+
+- Imports run synchronously and are capped at 2,000 rows and 5 MB per file. Larger onboarding can move to a background job later without changing templates.
+- A changed layout (columns added, renamed or reordered) is treated as a new layout and mapped again.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

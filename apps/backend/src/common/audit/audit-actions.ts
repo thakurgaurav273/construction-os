@@ -125,6 +125,9 @@ export const AUDIT_ACTIONS = {
   'ai.access_cancelled': action('cancelled an AI access request', 'ai_access_request'),
   'ai.access_approved': action('approved AI access', 'ai_access_request'),
   'ai.access_rejected': action('rejected an AI access request', 'ai_access_request'),
+  'import.template_saved': action('saved a spreadsheet import template', 'import_template'),
+  'import.template_deleted': action('deleted a spreadsheet import template', 'import_template'),
+  'import.completed': action('imported data from a spreadsheet', 'import_template'),
   'daily_report.ai_summary_generated': action('generated an AI summary of a daily report', 'daily_report'),
 } as const satisfies Record<string, AuditActionInfo>;
 

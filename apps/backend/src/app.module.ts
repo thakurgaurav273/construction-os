@@ -5,6 +5,7 @@ import { DatabaseModule } from './database/database.module';
 
 import { AiModule } from './modules/ai/ai.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { DataImportModule } from './modules/data-import/data-import.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -47,6 +48,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     NotificationsModule,
     ReportsModule,
     SettingsModule,
+    DataImportModule,
   ],
 })
 export class AppModule {}

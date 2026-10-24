@@ -28,6 +28,6 @@ import { WarehouseSetupService } from './warehouse-setup.service';
     InventoryTransferWorkflowService,
     WarehouseSetupService,
   ],
-  exports: [StockLedgerService],
+  exports: [StockLedgerService, InventoryAdjustmentsService],
 })
 export class InventoryModule {}

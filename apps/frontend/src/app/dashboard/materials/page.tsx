@@ -20,6 +20,7 @@ import { SuppliersTab } from './components/SuppliersTab';
 import { useMaterials } from '@/hooks/api/use-materials';
 import { Can } from '@/components/shared/Can';
 import { downloadCsv } from '@/lib/download-csv';
+import { ImportButton } from '@/features/data-import/components/ImportButton';
 import { format } from 'date-fns';
 
 // Analytics is chart-heavy and sits behind a tab, so load it on demand.
@@ -84,6 +85,7 @@ export default function MaterialsPage(): React.ReactElement {
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-1.5 h-4 w-4" /> Export
           </Button>
+          <ImportButton entity="MATERIAL" />
           <Can permission="material.manage">
             <Button onClick={() => setFormOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" /> Add Material
