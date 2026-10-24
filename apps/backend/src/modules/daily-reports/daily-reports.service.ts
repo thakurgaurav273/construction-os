@@ -14,7 +14,7 @@ import { CreateDailyReportDto } from './dto/create-daily-report.dto';
 import { DailyReportQueryDto } from './dto/daily-report-query.dto';
 import { UpdateDailyReportDto } from './dto/update-daily-report.dto';
 
-const EDITABLE_STATUSES: DailyReportStatus[] = ['DRAFT', 'REJECTED'];
+export const EDITABLE_STATUSES: DailyReportStatus[] = ['DRAFT', 'REJECTED'];
 const SORTABLE_FIELDS = ['date', 'createdAt', 'submittedAt'] as const;
 
 export interface PaginatedDailyReports {
@@ -131,10 +131,12 @@ export class DailyReportsService {
     dto: UpdateDailyReportDto,
   ): Promise<DailyReportDetailView> {
     await this.findEditableReport(projectId, reportId, organizationId, userId);
-    await this.prisma.dailyReport.update({
-      where: { id: reportId },
+    // Guarding on status inside the write keeps an edit from landing after a concurrent submit.
+    const { count } = await this.prisma.dailyReport.updateMany({
+      where: { id: reportId, status: { in: EDITABLE_STATUSES } },
       data: toDailyReportContentData(dto),
     });
+    if (count === 0) throw new ConflictException('Submitted reports are locked and can no longer be edited.');
     return this.findOne(projectId, reportId, organizationId);
   }
 

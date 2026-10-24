@@ -66,6 +66,22 @@ AI
 
 ---
 
+## Tests
+
+Backend tests use Node's built-in test runner.
+
+```bash
+cd apps/backend
+npm test                      # unit tests, no database needed
+
+# Service tests against a real Postgres database (migrated automatically).
+# The database name must contain "test"; each run creates its own organizations, so no cleanup is needed.
+createdb sitepilot_integration_test
+TEST_DATABASE_URL=postgresql://localhost:5432/sitepilot_integration_test npm run test:integration
+```
+
+---
+
 ## Documentation
 
 docs/product.md

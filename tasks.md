@@ -273,5 +273,13 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 
 > Verified 2026-10-24: 2 new unit tests (planned monthly burn, payments bucketed by paid month), 20 HTTP checks across owner / project manager / site engineer / finance (spend trend gated by finance access and matching released payments, queues per permission, own requests excluded, unattributed requests still counted, totals), and a headless-browser run (owner with queues and spend chart, queue link opens the module, site engineer sees attendance and nothing waiting without New Project, phone layout without horizontal scroll).
 
-### T19. Tests
-- [ ] Jest setup for backend; service tests for daily reports, attendance, transfers, PO approvals
+### T19. Tests  `[x]`
+- [x] Backend service tests for daily reports, attendance, transfers and PO approvals. Kept on the existing `node:test` runner rather than adding Jest (one runner for unit and integration tests)
+- [x] `npm run test:integration` runs the real services against Postgres (`TEST_DATABASE_URL`, migrated on start, refuses any database whose name lacks "test"); every file builds its own organization, so runs need no cleanup and can repeat on the same database
+- [x] Covered: state machines, maker-checker, locked records, timelines/history, archived-project rules, organization isolation, and concurrent actions (two reviewers, two sites, double receive, two transfers competing for the same stock), each race repeated to catch timing
+- [x] Bug found: two reviewers acting on the same daily report at once could both succeed (approve and reject both written, both on the timeline). Report transitions and draft edits now update only if the report is still in the expected status, like purchase orders
+- [x] Bug found: two sites marking the same worker at the same moment both reported success while the worker stayed at only one site. Marking now verifies every record landed on this site inside the transaction and otherwise rolls back with a 409; a clash on the first record of the day returns a 409 instead of a 500
+- [ ] Run the integration suite in CI (needs a Postgres service; there is no CI workflow yet)
+- [ ] Extend service tests to finance (bills, payments) and billing (RA bills, certification)
+
+> Verified 2026-10-24: 36 integration tests pass twice in a row on the same database (daily reports 9, attendance 10, transfers 8, purchase orders 9); both races failed before their fixes (daily-report review on attempt 1 of 30, attendance on attempt 2 of 15); 98 unit tests unchanged; the guard refuses the dev database `sitepilot` before connecting.
