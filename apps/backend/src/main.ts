@@ -30,6 +30,10 @@ async function bootstrap() {
   // Set TRUST_PROXY to the number of proxy hops; leave it unset when clients connect directly.
   const trustedProxyHops = Number(config.get<string>('TRUST_PROXY') ?? 0);
   if (trustedProxyHops > 0) app.set('trust proxy', trustedProxyHops);
+  if (trustedProxyHops === 0 && config.get<string>('NODE_ENV') === 'production') {
+    console.warn('TRUST_PROXY is not set. Signed-in requests are rate-limited per person, but sign-in and other anonymous '
+      + 'requests are limited per connecting IP: behind a load balancer that is the balancer, so set TRUST_PROXY to its hop count.');
+  }
 
   app.use(helmet());
   app.use(cookieParser(config.get<string>('COOKIE_SECRET')));

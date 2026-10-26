@@ -11,6 +11,10 @@ export const OFF_SITE_STATUSES: AttendanceStatus[] = ['ABSENT', 'ON_LEAVE'];
 /** Shift start as minutes after local midnight. Checking in after start + grace counts as late. */
 export const SHIFT_START_MINUTES: Record<WorkerShift, number> = { DAY: 8 * 60, NIGHT: 20 * 60 };
 export const LATE_GRACE_MINUTES = 30;
+/** A night shift's attendance day is the evening it starts: anything before noon belongs to the night before. */
+export const NIGHT_SHIFT_ROLLOVER_MINUTES = 12 * 60;
+/** A check-in older than this with no check-out is treated as forgotten, not as a shift still in progress. */
+export const MAX_OPEN_SHIFT_HOURS = 16;
 
 export const ATTENDANCE_RATE_WINDOW_DAYS = 30;
 export const RECENT_ATTENDANCE_LIMIT = 14;

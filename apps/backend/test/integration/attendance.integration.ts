@@ -136,6 +136,22 @@ describe('attendance', () => {
     await assert.rejects(attendance.checkOut(org.organizationId, org.projectId, org.engineer.id, worker), ConflictException);
   });
 
+  it('checks a night shift out the morning after, on the evening it started, and ignores forgotten check-ins', async () => {
+    const [nightWorker, forgetful] = await crew(2, 'Crew N');
+    await prisma.worker.updateMany({ where: { id: { in: [nightWorker, forgetful] } }, data: { shift: 'NIGHT' } });
+    const hoursAgo = (hours: number): Date => new Date(Date.now() - hours * 3_600_000);
+    const yesterday = dateKeyToDbDate(shiftDateKey(today, -1));
+    const base = { projectId: org.projectId, organizationId: org.organizationId, date: yesterday, status: 'PRESENT' as const, markedById: org.engineer.id };
+    await prisma.attendance.create({ data: { ...base, workerId: nightWorker, checkInAt: hoursAgo(9) } });
+    await prisma.attendance.create({ data: { ...base, workerId: forgetful, checkInAt: hoursAgo(20) } });
+
+    const record = await attendance.checkOut(org.organizationId, org.projectId, org.engineer.id, nightWorker);
+    assert.ok(record.hoursWorked !== null && Math.abs(record.hoursWorked - 9) < 0.1);
+    const stored = await prisma.attendance.findUniqueOrThrow({ where: { id: record.id } });
+    assert.equal(stored.date.getTime(), yesterday.getTime(), 'the shift stays on the day it started');
+    await assert.rejects(attendance.checkOut(org.organizationId, org.projectId, org.engineer.id, forgetful), ConflictException);
+  });
+
   it('lists the site’s crew plus anyone recorded there that day who has since moved', async () => {
     const siteId = await createProject(prisma, org.organizationId, org.owner.id, 'Flyover');
     const [stayed, moved] = await crew(2, 'Crew H', siteId);

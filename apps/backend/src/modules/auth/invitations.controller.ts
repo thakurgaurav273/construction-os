@@ -1,6 +1,6 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AUTH_RATE_LIMIT } from './auth.constants';
 import { setAuthCookies } from './auth-cookies';
@@ -12,7 +12,6 @@ import { sessionClientOf } from './session-client';
 
 /** Public: the invitation token in the link is the credential. Sending and managing invitations lives in Settings. */
 @Controller('invitations')
-@UseGuards(ThrottlerGuard)
 @Throttle(AUTH_RATE_LIMIT)
 export class InvitationsController {
   constructor(

@@ -1693,6 +1693,190 @@ Material could only reach a site when someone with store rights issued it direct
 
 ---
 
+# ADR-042 - Project Spend Is Derived From Vendor Bills
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+`Project.spent` was a number typed in when a project was edited, while Finance and the budget heads (ADR-037) derived spend from vendor bills. The same seeded data showed 64.5% of budget used on the Dashboard and 3% in Finance.
+
+---
+
+## Decision
+
+- A project's spend is the total of its approved, part-paid and paid vendor bills incl. GST (`projectSpend()` in the finance module, the same statuses as the budget heads). It is never stored: the `projects.spent` column is dropped (`20261107090000_derive_project_spend_from_bills`) and `spent` is no longer accepted when a project is updated.
+- The project list and header, the Dashboard, the AI context and the Executive and Financial reports all read it from `projectSpend()`.
+
+---
+
+## Alternatives
+
+- **Keep the column and update it on every bill status change**: a second copy of the truth that drifts whenever a path forgets to update it.
+
+---
+
+## Consequences
+
+- Dashboard and Finance now agree on spend. They can still differ slightly on "budget used": Finance divides by the budget heads, which exclude bills filed under no head (Unbudgeted), while the Dashboard divides by the project budget.
+- Projects carried over from before have no typed-in spend to fall back on; only bills count.
+
+---
+
+# ADR-043 - Reopening a Certified RA Bill; Receivables and Retention in Finance
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-24
+
+---
+
+## Context
+
+A certified RA bill could not be corrected: certification froze its quantities and rates, and a subcontract bill had already raised an approved vendor bill. Receivables and retention lived only in Billing, so Finance's dashboard and cash flow showed only money going out.
+
+---
+
+## Decision
+
+- Certifiers (`billing.certify`) can **reopen** a certified bill with a reason: `CERTIFIED → CHANGES_REQUESTED`, keeping the claims and clearing the certification, due date, invoice number, certified quantities and frozen rates. On a subcontract the vendor bill it raised is cancelled and unlinked, so certifying the corrected bill raises a fresh one (numbered with a `-R2`, `-R3` revision if needed).
+- Reopening is refused while anything depends on the bill: a later bill on the contract that isn't cancelled, a receipt that isn't voided, a payment requested, approved or made against its vendor bill, or retention already released beyond what is held without it. Opening balances and bills on closed contracts can't be reopened. The checks run inside the transaction, with the bill, contract and invoice rows locked the same way receipts, retention releases and payment requests lock them.
+- The Finance summary adds **receivables** (outstanding certified client bills, overdue and due this week), **retention** in both directions, and a **cash forecast** of money already owed both ways by due date (overdue, next 30 days, 31–60, 61–90, later), built from bills rather than projections.
+
+---
+
+## Alternatives
+
+- **Credit notes against the certified bill**: closer to how accounts are kept, but heavier than needed while bills can only be corrected before money moves.
+
+---
+
+## Consequences
+
+- Once money has moved, the fix is on the next bill (or by voiding receipts and cancelling payments first), which matches site practice.
+- The monthly cash-flow ledger still holds typed-in figures; the bill forecast sits next to it.
+
+---
+
+# ADR-044 - Profile Photos Served From Unguessable Links
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-26
+
+---
+
+## Context
+
+`User.avatar` existed but nothing could set it, and the app showed initials everywhere. A person belongs to several organizations, and their photo is shown wherever their name is: teams, member lists, the sidebar.
+
+---
+
+## Decision
+
+- Members upload their own photo from Settings → Profile (`POST` / `DELETE /auth/profile/avatar`, PNG, JPG or WebP up to 2 MB, the same checks as the organization logo). It is stored under the user (`users/<id>/avatars/<uuid>.<ext>`), not a tenant.
+- `User.avatar` stores the API path it is served from (`/api/avatars/<userId>/<uuid>.<ext>`), so every response that already returned `avatar` needs no change. The route needs no session: `<img>` tags can't send credentials across origins, and the random file name works like a presigned link. Only a person's current photo is served; replacing or removing it frees the old link. A new photo gets a new name, so responses are cached as immutable.
+- Files served to `<img>` tags (`/api/files`, `/api/avatars`) send `Cross-Origin-Resource-Policy: cross-origin`, since helmet's default blocks embedding them from the app's origin.
+
+---
+
+## Alternatives
+
+- **Signed links resolved in every response**, as for logos: correct, but every view returning people would need the storage service, and links would expire in cached pages.
+
+---
+
+## Consequences
+
+- Anyone holding a photo's link can view it, as with most products' avatars. Photos are not private documents.
+
+---
+
+# ADR-045 - API-Wide Rate Limit Counted Per Person
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-26
+
+---
+
+## Context
+
+Only sign-in, password, invitation and AI routes were rate-limited, all per IP. A global per-IP limit would throttle a whole office behind one NAT, and every user at once when the API sits behind a proxy without `TRUST_PROXY`.
+
+---
+
+## Decision
+
+- A global `ApiThrottlerGuard` applies `API_RATE_LIMIT_PER_MINUTE` (default 300) to every route. Requests with a valid access token are counted per user; others per client IP. Route limits (`@Throttle`) go through the same guard, so password changes and AI calls are now counted per person too.
+- Signed file and photo links are exempt (`@SkipThrottle`), since a page shows many images at once.
+- In production without `TRUST_PROXY` the API logs a warning at startup: anonymous limits (sign-in) then key on the proxy's address.
+
+---
+
+## Alternatives
+
+- **Wait for `TRUST_PROXY` before enabling a global limit**: leaves the API unprotected wherever it is forgotten.
+
+---
+
+## Consequences
+
+- Behind a proxy with `TRUST_PROXY` unset, signed-in people are unaffected, but everyone shares the sign-in limit.
+
+---
+
+# ADR-046 - Night Shifts Belong to the Evening They Start
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-26
+
+---
+
+## Context
+
+Check-ins were recorded on the calendar day. A night worker checking in at 21:00 couldn't check out at 06:00 the next morning ("hasn't checked in today"), and an arrival at 01:30 was put on the next day and never counted as late.
+
+---
+
+## Decision
+
+- A check-in's attendance day comes from the worker's shift (`shiftMoment()`): day shifts follow the calendar; for night shifts (20:00 start) anything before 12:00 belongs to the shift that started the evening before. Lateness is minutes after that shift's start.
+- Check-out closes the worker's latest open check-in from the last 16 hours, whatever day it was recorded on, so night shifts and day shifts running past midnight can check out. Older open check-ins are treated as forgotten.
+
+---
+
+## Consequences
+
+- At 02:00 a night crew that checked in last evening shows on yesterday's attendance, which is the shift it is working.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

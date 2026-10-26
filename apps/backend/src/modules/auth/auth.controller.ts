@@ -2,7 +2,7 @@ import {
   Body, Controller, Get, HttpCode, HttpStatus, Logger, Post, Req, Res, UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AUTH_COOKIES, AUTH_RATE_LIMIT } from './auth.constants';
 import { clearAuthCookies, readCookie, setAuthCookies } from './auth-cookies';
@@ -34,7 +34,6 @@ export class AuthController {
     private readonly config: ConfigService,
   ) {}
 
-  @UseGuards(ThrottlerGuard)
   @Throttle(AUTH_RATE_LIMIT)
   @Audit('auth.registered')
   @Post('register')
@@ -44,7 +43,6 @@ export class AuthController {
     return session;
   }
 
-  @UseGuards(ThrottlerGuard)
   @Throttle(AUTH_RATE_LIMIT)
   @HttpCode(HttpStatus.OK)
   @Audit('auth.signed_in')
@@ -77,7 +75,6 @@ export class AuthController {
   }
 
   /** Always answers the same way and returns before any email is sent, so it can't reveal which emails have accounts. */
-  @UseGuards(ThrottlerGuard)
   @Throttle(AUTH_RATE_LIMIT)
   @HttpCode(HttpStatus.OK)
   @Post('forgot-password')
@@ -88,7 +85,6 @@ export class AuthController {
     return { success: true, message: 'If an account exists for that email, a reset link is on its way.', data: null };
   }
 
-  @UseGuards(ThrottlerGuard)
   @Throttle(AUTH_RATE_LIMIT)
   @HttpCode(HttpStatus.OK)
   @Post('reset-password')

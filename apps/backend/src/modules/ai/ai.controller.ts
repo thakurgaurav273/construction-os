@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseEnumPipe, ParseUUIDPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import type { Permission } from '@sitepilot/types';
 import { AiProvider } from '@prisma/client';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
@@ -107,7 +107,6 @@ export class AiController {
   }
 
   @RequirePermission('ai.use')
-  @UseGuards(ThrottlerGuard)
   @Throttle(AI_CALL_LIMIT)
   @HttpCode(HttpStatus.OK)
   @Post('chat')
@@ -116,7 +115,6 @@ export class AiController {
   }
 
   @RequirePermission('ai.use')
-  @UseGuards(ThrottlerGuard)
   @Throttle(AI_CALL_LIMIT)
   @HttpCode(HttpStatus.OK)
   @Post('projects/:projectId/chat')
@@ -139,7 +137,6 @@ export class AiController {
 
   @RequirePermission('ai.use')
   @Audit('daily_report.ai_summary_generated', { idParam: 'reportId' })
-  @UseGuards(ThrottlerGuard)
   @Throttle(AI_CALL_LIMIT)
   @HttpCode(HttpStatus.OK)
   @Post('projects/:projectId/daily-reports/:reportId/summary')
@@ -154,7 +151,6 @@ export class AiController {
   }
 
   @RequirePermission('ai.use')
-  @UseGuards(ThrottlerGuard)
   @Throttle(AI_CALL_LIMIT)
   @HttpCode(HttpStatus.OK)
   @Post('insights/refresh')

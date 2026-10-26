@@ -1,7 +1,7 @@
 import axios, { type AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/store/auth.store';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5174';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5174';
 
 /**
  * Every request carries the session cookies (`withCredentials`). When the 15-minute access cookie expires,

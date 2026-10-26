@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, Mail, Users } from 'lucide-react';
 import { Card, CardContent, Button, Skeleton } from '@sitepilot/ui';
 import { useProject } from '@/hooks/api/use-projects';
-import { getInitials } from '@/lib/utils';
+import { UserAvatar } from '@/components/shared/UserAvatar';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { AddMemberDialog } from '../../components/AddMemberDialog';
 import { useCan } from '@/hooks/api/use-access';
@@ -71,9 +71,7 @@ export default function ProjectTeamPage({ params }: { params: { id: string } }) 
               <Card className="h-full hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start">
-                    <div className="h-16 w-16 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xl font-bold mb-4">
-                      {getInitials(member.user.name)}
-                    </div>
+                    <UserAvatar name={member.user.name} avatar={member.user.avatar} className="mb-4 h-16 w-16" fallbackClassName="text-xl" />
                     {canManage && <ProjectMemberMenu projectId={params.id} member={member} />}
                   </div>
                   <h4 className="font-semibold text-lg">{member.user.name}</h4>

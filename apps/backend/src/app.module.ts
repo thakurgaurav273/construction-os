@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
 
@@ -24,15 +24,22 @@ import { HelpModule } from './modules/help/help.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SettingsModule } from './modules/settings/settings.module';
 
+/** Generous for people clicking around (a busy page makes about a dozen calls), tight enough to stop scripted abuse. */
+const DEFAULT_API_RATE_LIMIT_PER_MINUTE = 300;
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '../../.env'],
     }),
-    ThrottlerModule.forRoot({
-      throttlers: [{ ttl: 60000, limit: 100 }],
-      errorMessage: 'Too many attempts. Wait a minute and try again.',
+    // The API-wide limit per person (or per IP when signed out); see ApiThrottlerGuard. Routes tighten it with @Throttle.
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        throttlers: [{ ttl: 60_000, limit: Number(config.get<string>('API_RATE_LIMIT_PER_MINUTE') ?? DEFAULT_API_RATE_LIMIT_PER_MINUTE) }],
+        errorMessage: 'Too many requests. Wait a minute and try again.',
+      }),
     }),
     DatabaseModule,
     AuthModule,

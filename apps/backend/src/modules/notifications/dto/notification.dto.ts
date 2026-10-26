@@ -14,6 +14,11 @@ export class NotificationQueryDto {
   @Transform(({ value }: { value: unknown }) => value === true || value === 'true')
   @IsBoolean()
   unreadOnly?: boolean;
+
+  @ApiPropertyOptional({ enum: NOTIFICATION_CATEGORY_KEYS, description: 'Only one preference group, e.g. approvals' })
+  @IsOptional()
+  @IsIn(NOTIFICATION_CATEGORY_KEYS)
+  category?: string;
 }
 
 export class RegisterDeviceDto {

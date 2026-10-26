@@ -49,6 +49,38 @@ export function useNotifications() {
   });
 }
 
+export interface NotificationHistoryQuery {
+  page: number;
+  unreadOnly: boolean;
+  category?: string;
+}
+
+const HISTORY_PAGE_SIZE = 25;
+
+/** Every notification, a page at a time, for the history page. The bell only shows the latest. */
+export function useNotificationHistory(query: NotificationHistoryQuery) {
+  return useQuery<NotificationPage>({
+    queryKey: [...NOTIFICATIONS_KEY, 'history', query],
+    queryFn: async () => {
+      const res = await apiClient.get('/notifications', {
+        params: { page: query.page, limit: HISTORY_PAGE_SIZE, unreadOnly: query.unreadOnly || undefined, category: query.category },
+      });
+      return res.data.data ?? res.data;
+    },
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useDeleteNotification() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      await apiClient.delete(`/notifications/${id}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY }),
+  });
+}
+
 export function useMarkNotificationRead() {
   const queryClient = useQueryClient();
   return useMutation({

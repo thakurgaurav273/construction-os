@@ -22,17 +22,41 @@ export interface ChangePasswordInput {
 
 const SESSIONS_KEY = ['account', 'sessions'] as const;
 
-export function useUpdateProfile() {
+function useAccountUserMutation<TInput>(request: (input: TInput) => Promise<User>) {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { name: string }): Promise<User> => {
-      const res = await apiClient.patch('/auth/profile', input);
-      return res.data.data ?? res.data;
-    },
-    // The sidebar, menus and maker-checker labels read the name from the session store.
+    mutationFn: request,
+    // The sidebar, menus and maker-checker labels read the name and photo from the session store;
+    // member lists and project teams show them too.
     onSuccess: (user) => {
+      void queryClient.invalidateQueries({ queryKey: ['settings', 'members'] });
+      void queryClient.invalidateQueries({ queryKey: ['project'] });
       const { organization, setAuth } = useAuthStore.getState();
       setAuth(user, organization);
     },
+  });
+}
+
+export function useUpdateProfile() {
+  return useAccountUserMutation(async (input: { name: string }): Promise<User> => {
+    const res = await apiClient.patch('/auth/profile', input);
+    return res.data.data ?? res.data;
+  });
+}
+
+export function useUploadAvatar() {
+  return useAccountUserMutation(async (file: File): Promise<User> => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await apiClient.post('/auth/profile/avatar', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return res.data.data ?? res.data;
+  });
+}
+
+export function useRemoveAvatar() {
+  return useAccountUserMutation<void>(async (): Promise<User> => {
+    const res = await apiClient.delete('/auth/profile/avatar');
+    return res.data.data ?? res.data;
   });
 }
 

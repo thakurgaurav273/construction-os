@@ -1,12 +1,15 @@
 import {
-  Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Req, UseGuards,
+  Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Req, UploadedFile, UseGuards, UseInterceptors,
 } from '@nestjs/common';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { Audit } from '../../common/audit';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { MAX_IMAGE_BYTES } from '../../common/storage/image-uploads';
 import { AccountService, PasswordChangeResult } from './account.service';
 import { AUTH_COOKIES, AUTH_RATE_LIMIT } from './auth.constants';
+import { AvatarService } from './avatar.service';
 import { readCookie } from './auth-cookies';
 import { PublicUser } from './auth.service';
 import { ChangePasswordDto, UpdateProfileDto } from './dto/account.dto';
@@ -23,6 +26,7 @@ import { AuthenticatedUser } from './strategies/jwt.strategy';
 export class AccountController {
   constructor(
     private readonly account: AccountService,
+    private readonly avatars: AvatarService,
     private readonly sessions: SessionsService,
   ) {}
 
@@ -32,8 +36,21 @@ export class AccountController {
     return this.account.updateProfile(user.id, dto);
   }
 
+  @Audit('account.avatar_updated')
+  @Post('profile/avatar')
+  // The limit here stops oversized uploads before they are buffered; the service checks type and size again.
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_IMAGE_BYTES + 1 } }))
+  uploadAvatar(@CurrentUser() user: AuthenticatedUser, @UploadedFile() file: Express.Multer.File | undefined): Promise<PublicUser> {
+    return this.avatars.upload(user.id, file);
+  }
+
+  @Audit('account.avatar_removed')
+  @Delete('profile/avatar')
+  removeAvatar(@CurrentUser() user: AuthenticatedUser): Promise<PublicUser> {
+    return this.avatars.remove(user.id);
+  }
+
   /** Rate-limited like sign-in, since it checks the current password. */
-  @UseGuards(ThrottlerGuard)
   @Throttle(AUTH_RATE_LIMIT)
   @HttpCode(HttpStatus.OK)
   @Audit('account.password_changed')

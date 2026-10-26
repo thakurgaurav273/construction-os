@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { Button, Progress, Skeleton } from '@sitepilot/ui';
 import { useShiftEvent, useWorker, type Worker } from '@/hooks/api/use-workforce';
 import { getApiErrorMessage } from '@/lib/api/errors';
-import { ATTENDANCE_STATUS_STYLES } from '@/features/workforce/constants';
+import { ATTENDANCE_STATUS_STYLES, MAX_OPEN_SHIFT_HOURS } from '@/features/workforce/constants';
 import { AttendanceStatusLabel } from '@/features/workforce/components/AttendanceStatusLabel';
 import { attendanceRateTone, formatCheckIn, toDisplayStatus } from '@/features/workforce/utils/attendance';
 import { useCan } from '@/hooks/api/use-access';
@@ -22,9 +22,12 @@ export function WorkerAttendanceCard({ worker }: { worker: Worker }): React.Reac
   const shiftEvent = useShiftEvent(worker.projectId ?? '');
 
   const today = detail?.recentAttendance.find((record) => record.date === detail.week[detail.week.length - 1]?.date);
-  const canCheckIn = worker.isActive && !!worker.projectId && !today?.checkInAt
+  // A night shift that started yesterday evening is still open after midnight, on yesterday's record.
+  const openShift = detail?.recentAttendance.find((record) => record.checkInAt && !record.checkOutAt
+    && Date.now() - new Date(record.checkInAt).getTime() < MAX_OPEN_SHIFT_HOURS * 3_600_000);
+  const canCheckIn = worker.isActive && !!worker.projectId && !today?.checkInAt && !openShift
     && worker.todayStatus !== 'ABSENT' && worker.todayStatus !== 'ON_LEAVE';
-  const canCheckOut = worker.isActive && !!today?.checkInAt && !today.checkOutAt;
+  const canCheckOut = worker.isActive && !!openShift;
 
   async function recordShiftEvent(event: 'check-in' | 'check-out'): Promise<void> {
     try {

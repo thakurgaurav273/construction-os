@@ -13,6 +13,7 @@ import { useChangeMemberRole, useMembers, useRemoveMember, type Member } from '@
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { useAuthStore } from '@/store/auth.store';
 import { formatRole, type OrgRole } from '../constants';
+import { UserAvatar } from '@/components/shared/UserAvatar';
 
 interface MembersCardProps {
   canManage: boolean;
@@ -82,9 +83,7 @@ export function MembersCard({ canManage, currentRole, assignableRoles, onInvite 
             {members.map((member) => (
               <li key={member.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                    {(member.name || member.email).charAt(0).toUpperCase()}
-                  </div>
+                  <UserAvatar name={member.name || member.email} avatar={member.avatar} className="h-9 w-9" fallbackClassName="text-xs" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">
                       {member.name || member.email}
