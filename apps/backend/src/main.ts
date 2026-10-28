@@ -61,15 +61,18 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalInterceptors(new ResponseInterceptor());
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('SitePilot API')
-    .setDescription('Construction ERP API')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
+  // A public map of every endpoint helps attackers more than anyone else, so production serves it only on request.
+  if (config.get<string>('NODE_ENV') !== 'production' || config.get<string>('API_DOCS') === 'true') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('SitePilot API')
+      .setDescription('Construction ERP API')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = config.get<number>('PORT', 5174);
   await app.listen(port);

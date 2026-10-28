@@ -60,7 +60,8 @@ export function usePlatformUsage() {
 
 function usePlatformMutation<TVariables>(request: (variables: TVariables) => Promise<unknown>) {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: request, onSuccess: () => queryClient.invalidateQueries({ queryKey: PLATFORM_KEY }) });
+  // gcTime 0: the variables can hold an API key, so the cache forgets them as soon as the request settles.
+  return useMutation({ mutationFn: request, gcTime: 0, onSuccess: () => queryClient.invalidateQueries({ queryKey: PLATFORM_KEY }) });
 }
 
 export function useApproveAiRequest() {
@@ -132,6 +133,8 @@ function useIntegrationMutation<TVariables>(request: (variables: TVariables) => 
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: request,
+    // The variables hold access keys; forget them as soon as the request settles.
+    gcTime: 0,
     onSuccess: () => Promise.all([
       queryClient.invalidateQueries({ queryKey: INTEGRATIONS_KEY }),
       queryClient.invalidateQueries({ queryKey: ['settings', 'integrations'] }),

@@ -8,6 +8,7 @@ import {
   Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input,
 } from '@sitepilot/ui';
 import { FormField } from '@/components/shared/FormField';
+import { SecretInput } from '@/components/shared/SecretInput';
 import { useRemoveIntegration, useSaveEmailIntegration, type PlatformIntegrationRecord } from '@/hooks/api/use-platform';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { emailIntegrationSchema, type EmailIntegrationFormValues } from '../validation/integration.schema';
@@ -29,8 +30,9 @@ export function EmailIntegrationDialog({ open, onOpenChange, saved, adminEmail }
     defaultValues: { apiKey: '', fromAddress: saved?.settings.fromAddress ?? '' },
   });
 
+  // Also on close, so typed keys don't stay in the form after the dialog is gone.
   React.useEffect(() => {
-    if (open) reset({ apiKey: '', fromAddress: saved?.settings.fromAddress ?? '' });
+    reset({ apiKey: '', fromAddress: saved?.settings.fromAddress ?? '' });
   }, [open, saved, reset]);
 
   async function onSubmit(values: EmailIntegrationFormValues): Promise<void> {
@@ -65,7 +67,7 @@ export function EmailIntegrationDialog({ open, onOpenChange, saved, adminEmail }
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           {saved && <SavedIntegrationNote record={saved} summary={`Resend, sending from ${saved.settings.fromAddress}`} />}
           <FormField label="Resend API key" htmlFor="email-api-key" error={errors.apiKey?.message} hint="Resend → API Keys. Sending access is enough.">
-            <Input id="email-api-key" type="password" placeholder="re_…" autoComplete="new-password" {...register('apiKey')} />
+            <SecretInput id="email-api-key" placeholder="re_…" {...register('apiKey')} />
           </FormField>
           <FormField label="Send from" htmlFor="email-from" error={errors.fromAddress?.message} hint="An address on a domain you’ve verified in Resend.">
             <Input id="email-from" placeholder="SitePilot <noreply@yourcompany.com>" autoComplete="off" {...register('fromAddress')} />

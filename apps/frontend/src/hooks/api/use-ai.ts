@@ -142,6 +142,8 @@ function useAiSettingsMutation<TVariables>(request: (variables: TVariables) => P
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: request,
+    // The variables can hold an API key, so the cache forgets them as soon as the request settles.
+    gcTime: 0,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: AI_KEY }),
   });
 }

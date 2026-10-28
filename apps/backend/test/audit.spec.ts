@@ -75,6 +75,11 @@ describe('audit metadata', () => {
     assert.deepEqual(clean, { password: '[redacted]', nested: { refreshToken: '[redacted]', name: 'Site A' }, list: [{ secretKey: '[redacted]' }] });
   });
 
+  it('redacts cloud storage keys', () => {
+    const clean = sanitizeForAudit({ bucket: 'files', accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'x', access_key: 'y', privateKey: 'z' });
+    assert.deepEqual(clean, { bucket: 'files', accessKeyId: '[redacted]', secretAccessKey: '[redacted]', access_key: '[redacted]', privateKey: '[redacted]' });
+  });
+
   it('caps long text and large lists', () => {
     const clean = sanitizeForAudit({ note: 'x'.repeat(2000), items: Array.from({ length: 60 }, (_, index) => index) });
     assert.ok(typeof clean === 'object' && clean !== null && !Array.isArray(clean));

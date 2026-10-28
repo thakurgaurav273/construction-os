@@ -9,6 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@sitepilot/ui';
 import { FormField } from '@/components/shared/FormField';
+import { SecretInput } from '@/components/shared/SecretInput';
 import { useRemoveIntegration, useSaveStorageIntegration, type PlatformIntegrationRecord } from '@/hooks/api/use-platform';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { STORAGE_PROVIDER_OPTIONS, storageIntegrationSchema, type StorageIntegrationFormValues } from '../validation/integration.schema';
@@ -42,8 +43,9 @@ export function StorageIntegrationDialog({ open, onOpenChange, saved }: StorageI
   });
   const provider = watch('provider');
 
+  // Also on close, so typed keys don't stay in the form after the dialog is gone.
   React.useEffect(() => {
-    if (open) reset(defaultValues(saved));
+    reset(defaultValues(saved));
   }, [open, saved, reset]);
 
   async function onSubmit(values: StorageIntegrationFormValues): Promise<void> {
@@ -117,7 +119,7 @@ export function StorageIntegrationDialog({ open, onOpenChange, saved }: StorageI
               <Input id="storage-access-key" autoComplete="off" spellCheck={false} {...register('accessKeyId')} />
             </FormField>
             <FormField label="Secret access key" htmlFor="storage-secret" error={errors.secretAccessKey?.message}>
-              <Input id="storage-secret" type="password" autoComplete="new-password" {...register('secretAccessKey')} />
+              <SecretInput id="storage-secret" {...register('secretAccessKey')} />
             </FormField>
           </div>
           <p className="text-xs text-muted-foreground">
