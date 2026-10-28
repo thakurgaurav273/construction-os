@@ -5,7 +5,7 @@ import {
   dateKeyToDbDate, dbDateToKey, lastDateKeys, shiftDateKey, toLocalDateKey,
 } from './attendance-dates';
 import {
-  ATTENDANCE_RATE_WINDOW_DAYS, DEFAULT_TIME_ZONE, RECENT_ATTENDANCE_LIMIT, TREND_DAYS, TREND_WEEKS, WEEK_DAYS,
+  ATTENDANCE_RATE_WINDOW_DAYS, DEFAULT_TIME_ZONE, ON_SITE_STATUSES, RECENT_ATTENDANCE_LIMIT, TREND_DAYS, TREND_WEEKS, WEEK_DAYS,
 } from './workforce.constants';
 import { AttendanceHistoryItem, WorkerAttendanceSummary } from './worker.mapper';
 
@@ -92,7 +92,7 @@ export class AttendanceInsightsService {
     const workerFilter: Prisma.AttendanceWhereInput = workerIds ? { workerId: { in: workerIds } } : {};
     const windowStart = dateKeyToDbDate(shiftDateKey(today, -(ATTENDANCE_RATE_WINDOW_DAYS - 1)));
 
-    const [todayRecords, windowGroups, checkInGroups] = await Promise.all([
+    const [todayRecords, windowGroups, checkInGroups, onSiteGroups] = await Promise.all([
       this.prisma.attendance.findMany({
         where: { organizationId, ...workerFilter, date: dateKeyToDbDate(today) },
         select: { workerId: true, status: true },
@@ -107,6 +107,11 @@ export class AttendanceInsightsService {
         where: { organizationId, ...workerFilter, checkInAt: { not: null } },
         _max: { checkInAt: true },
       }),
+      this.prisma.attendance.groupBy({
+        by: ['workerId'],
+        where: { organizationId, ...workerFilter, status: { in: ON_SITE_STATUSES }, date: { lte: dateKeyToDbDate(today) } },
+        _max: { date: true },
+      }),
     ]);
 
     const countsByWorker = new Map<string, AttendanceCounts>();
@@ -117,8 +122,9 @@ export class AttendanceInsightsService {
     }
     const todayStatusByWorker = new Map(todayRecords.map((record) => [record.workerId, record.status]));
     const lastCheckInByWorker = new Map(checkInGroups.map((group) => [group.workerId, group._max.checkInAt]));
+    const lastOnSiteByWorker = new Map(onSiteGroups.map((group) => [group.workerId, group._max.date ? dbDateToKey(group._max.date) : null]));
 
-    const workerIdsWithData = new Set([...countsByWorker.keys(), ...todayStatusByWorker.keys(), ...lastCheckInByWorker.keys()]);
+    const workerIdsWithData = new Set([...countsByWorker.keys(), ...todayStatusByWorker.keys(), ...lastCheckInByWorker.keys(), ...lastOnSiteByWorker.keys()]);
     const summaries = new Map<string, WorkerAttendanceSummary>();
     for (const workerId of workerIdsWithData) {
       const counts = countsByWorker.get(workerId);
@@ -126,6 +132,7 @@ export class AttendanceInsightsService {
         todayStatus: todayStatusByWorker.get(workerId) ?? null,
         attendanceRate: counts ? computeAttendanceRate(counts) : null,
         lastCheckInAt: lastCheckInByWorker.get(workerId) ?? null,
+        lastOnSiteDate: lastOnSiteByWorker.get(workerId) ?? null,
       });
     }
     return summaries;

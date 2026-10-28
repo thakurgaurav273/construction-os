@@ -20,11 +20,13 @@ export class MaterialRequestsController {
     private readonly workflow: MaterialRequestWorkflowService,
   ) {}
 
+  @RequirePermission('material.view')
   @Get()
   findAll(@Query() query: MaterialRequestQueryDto, @CurrentUser() user: AuthUser): Promise<Paginated<MaterialRequestView>> {
     return this.requests.findAll(user.organizationId, query);
   }
 
+  @RequirePermission('material.view')
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<MaterialRequestDetailView> {
     return this.requests.findOne(id, user.organizationId);

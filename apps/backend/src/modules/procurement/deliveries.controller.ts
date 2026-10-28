@@ -14,6 +14,7 @@ interface AuthUser { id: string; organizationId: string; role: string }
 export class DeliveriesController {
   constructor(private readonly deliveries: DeliveriesService) {}
 
+  @RequirePermission('procurement.view')
   @Get()
   findAll(@Query() query: DeliveryQueryDto, @CurrentUser() user: AuthUser): Promise<DeliveryView[]> {
     return this.deliveries.findAll(user.organizationId, query);

@@ -4,12 +4,10 @@ import { useState, useEffect } from 'react';
 import { Command } from 'cmdk';
 import { Dialog, DialogContent, DialogTitle } from '@sitepilot/ui';
 import type { Permission } from '@sitepilot/types';
-import {
-  Search, Briefcase, Users, FileText, ShoppingCart, Settings, Package, Warehouse, DollarSign, Receipt, BarChart3,
-  LayoutDashboard, CircleHelp, BookOpen, type LucideIcon,
-} from 'lucide-react';
+import { Search, CircleHelp, BookOpen, type LucideIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCan } from '@/hooks/api/use-access';
+import { navigation } from '@/components/layout/navigation';
 import { useHelpStore } from '@/store/help.store';
 import { useVisibleHelpModules } from '@/features/help/hooks/use-visible-help';
 
@@ -20,19 +18,9 @@ interface PaletteLink {
   permission?: Permission;
 }
 
-const NAVIGATION: PaletteLink[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Projects', href: '/dashboard/projects', icon: Briefcase },
-  { name: 'Daily Reports', href: '/dashboard/daily-reports', icon: FileText },
-  { name: 'Procurement', href: '/dashboard/procurement', icon: ShoppingCart },
-  { name: 'Materials', href: '/dashboard/materials', icon: Package },
-  { name: 'Inventory', href: '/dashboard/inventory', icon: Warehouse },
-  { name: 'Workforce', href: '/dashboard/workforce', icon: Users },
-  { name: 'Finance', href: '/dashboard/finance', icon: DollarSign, permission: 'finance.view' },
-  { name: 'Billing', href: '/dashboard/billing', icon: Receipt, permission: 'billing.view' },
-  { name: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-];
+/** The sidebar's items, so search hides exactly what the menu hides. */
+const NAVIGATION: PaletteLink[] = navigation.flatMap((group) => group.items);
+
 
 const ITEM_CLASS = 'flex items-center gap-2 rounded-sm px-2 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground mt-1 text-foreground aria-selected:bg-accent aria-selected:text-accent-foreground';
 const GROUP_CLASS = 'px-2 py-1 text-xs font-medium text-muted-foreground';

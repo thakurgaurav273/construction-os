@@ -46,9 +46,10 @@ export interface DashboardStats {
   totalBudget: number;
   totalSpent: number;
   approvals: PendingApprovals;
-  workforceToday: number;
-  workforceTotal: number;
-  workforceNotMarked: number;
+  /** Null without workforce.view. */
+  workforceToday: number | null;
+  workforceTotal: number | null;
+  workforceNotMarked: number | null;
   projects: DashboardProject[];
   recentActivity: DashboardActivity[];
   /** Null for members without finance access: payments are finance data. */
@@ -66,10 +67,13 @@ export class DashboardService {
   async getStats(member: DashboardMember): Promise<DashboardStats> {
     const { organizationId } = member;
     const canSeeFinance = member.permissions.includes('finance.view');
+    const canSeeProjects = member.permissions.includes('project.view');
+    const canSeeWorkforce = member.permissions.includes('workforce.view');
     const today = new Date();
     const [projects, spend, recentActivities, workforceStats, approvals, paidPayments] = await Promise.all([
       this.prisma.project.findMany({
-        where: { organizationId, deletedAt: null },
+        // No project access: no project figures or activity on the dashboard either.
+        where: { organizationId, deletedAt: null, ...(canSeeProjects ? {} : { id: { in: [] } }) },
         select: {
           id: true, name: true, status: true, budget: true, progress: true, location: true, startDate: true,
           expectedCompletion: true, priority: true, clientName: true, createdAt: true, members: { select: { id: true } },
@@ -78,12 +82,12 @@ export class DashboardService {
       }),
       projectSpend(this.prisma, organizationId),
       this.prisma.activity.findMany({
-        where: { organizationId },
+        where: { organizationId, ...(canSeeProjects ? {} : { id: { in: [] } }) },
         orderBy: { createdAt: 'desc' },
         take: 6,
         include: { actor: { select: { id: true, name: true, avatar: true } } },
       }),
-      this.workforce.getStats(organizationId),
+      canSeeWorkforce ? this.workforce.getStats(organizationId) : Promise.resolve(null),
       this.approvals.forMember(member),
       canSeeFinance
         ? this.prisma.payment.findMany({ where: { organizationId, status: 'PAID' }, select: { amount: true, paidDate: true } })
@@ -104,9 +108,9 @@ export class DashboardService {
       totalBudget,
       totalSpent,
       approvals,
-      workforceToday: workforceStats.presentToday,
-      workforceTotal: workforceStats.total,
-      workforceNotMarked: workforceStats.notMarkedToday,
+      workforceToday: workforceStats?.presentToday ?? null,
+      workforceTotal: workforceStats?.total ?? null,
+      workforceNotMarked: workforceStats?.notMarkedToday ?? null,
       projects: liveProjects.slice(0, 5).map((project) => ({
         id: project.id,
         name: project.name,

@@ -1,12 +1,10 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Invitation, OrgRole, UserStatus } from '@prisma/client';
-import type { Permission } from '@sitepilot/types';
 import { PrismaService } from '../../database/prisma.service';
 import { MailService } from '../../common/mail/mail.service';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
-import { ALL_PERMISSIONS, PERMISSION_CATALOGUE, PermissionInfo, permissionsForRole } from '../../common/permissions';
 
 @Injectable()
 export class SettingsService {
@@ -47,14 +45,8 @@ export class SettingsService {
       status: m.user.status,
       joinedAt: m.joinedAt,
       lastActive: lastActiveByUser.get(m.userId) ?? null,
+      hasCustomPermissions: m.grantedPermissions.length > 0 || m.revokedPermissions.length > 0,
     }));
-  }
-
-  getRoleCatalogue(): RoleCatalogue {
-    return {
-      permissions: ALL_PERMISSIONS.map((key) => ({ key, ...PERMISSION_CATALOGUE[key] })),
-      roles: Object.values(OrgRole).map((role) => ({ role, permissions: permissionsForRole(role) })),
-    };
   }
 
   // Change member role
@@ -215,12 +207,8 @@ export interface MemberView {
   joinedAt: Date;
   /** Last sign-in or session refresh; null if they haven't signed in since sessions were recorded. */
   lastActive: Date | null;
-}
-
-/** What each role can do, for the read-only Roles & Permissions view. */
-export interface RoleCatalogue {
-  permissions: (PermissionInfo & { key: Permission })[];
-  roles: { role: OrgRole; permissions: Permission[] }[];
+  /** Their access differs from their role's (permissions added or taken away just for them). */
+  hasCustomPermissions: boolean;
 }
 
 export interface InvitationView {

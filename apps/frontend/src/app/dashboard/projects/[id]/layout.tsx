@@ -4,27 +4,30 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ChevronRight, ArrowLeft, Building2, MapPin, Calendar, CheckCircle2, Archive, AlertTriangle } from 'lucide-react';
+import { ChevronRight, ArrowLeft, Building2, MapPin, Calendar, CheckCircle2, Archive, AlertTriangle, Lock } from 'lucide-react';
+import type { Permission } from '@sitepilot/types';
 import { format } from 'date-fns';
 
 import { Badge, Button, Skeleton, cn } from '@sitepilot/ui';
 import { useProject } from '@/hooks/api/use-projects';
 import { ProjectFormDialog } from '../components/ProjectFormDialog';
 import { Can } from '@/components/shared/Can';
+import { useCan, useCurrentAccess } from '@/hooks/api/use-access';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ProjectActionsMenu } from '../components/ProjectActionsMenu';
 
-const tabs = [
+/** Tabs with a permission are hidden, and their page refused, for members without it. */
+const tabs: { name: string; href: string; permission?: Permission }[] = [
   { name: 'Overview',        href: '' },
-  { name: 'Budget',          href: '/budget' },
+  { name: 'Budget',          href: '/budget',          permission: 'finance.view' },
   { name: 'Timeline',        href: '/timeline' },
   { name: 'Team',            href: '/team' },
-  { name: 'Daily Reports',   href: '/daily-reports' },
-  { name: 'AI Assistant',    href: '/ai' },
-  { name: 'Purchase Orders', href: '/purchase-orders' },
+  { name: 'Daily Reports',   href: '/daily-reports',   permission: 'dailyReport.view' },
+  { name: 'AI Assistant',    href: '/ai',              permission: 'ai.use' },
+  { name: 'Purchase Orders', href: '/purchase-orders', permission: 'procurement.view' },
   { name: 'Documents',       href: '/documents' },
-  { name: 'Materials',       href: '/materials' },
-  { name: 'Workforce',       href: '/workforce' },
+  { name: 'Materials',       href: '/materials',       permission: 'material.view' },
+  { name: 'Workforce',       href: '/workforce',       permission: 'workforce.view' },
 ];
 
 function statusVariant(status: string) {
@@ -49,6 +52,13 @@ export default function ProjectDetailLayout({
   const projectId = params.id;
   const { data: project, isLoading, isError, refetch } = useProject(projectId);
   const [editOpen, setEditOpen] = useState(false);
+  const can = useCan();
+  const accessLoaded = useCurrentAccess().data !== undefined;
+  const isTabActive = (href: string): boolean => (href === ''
+    ? pathname === `/dashboard/projects/${projectId}`
+    : pathname.startsWith(`/dashboard/projects/${projectId}${href}`));
+  const visibleTabs = tabs.filter((tab) => !tab.permission || can(tab.permission));
+  const blockedTab = accessLoaded ? tabs.find((tab) => tab.permission && isTabActive(tab.href) && !can(tab.permission)) : undefined;
 
   return (
     <div className="flex-1 flex flex-col h-full relative">
@@ -120,11 +130,9 @@ export default function ProjectDetailLayout({
         {/* Tabs */}
         <div className="px-4 md:px-8 w-full overflow-x-auto scrollbar-none">
           <nav className="flex space-x-1 border-b" aria-label="Tabs">
-            {tabs.map((tab) => {
+            {visibleTabs.map((tab) => {
               const fullHref = `/dashboard/projects/${projectId}${tab.href}`;
-              const isActive = tab.href === ''
-                ? pathname === `/dashboard/projects/${projectId}`
-                : pathname.startsWith(fullHref);
+              const isActive = isTabActive(tab.href);
 
               return (
                 <Link
@@ -173,6 +181,12 @@ export default function ProjectDetailLayout({
                   <Button asChild><Link href="/dashboard/projects">Back to projects</Link></Button>
                 </div>
               )}
+            />
+          ) : blockedTab ? (
+            <EmptyState
+              icon={Lock}
+              title={`You don’t have access to ${blockedTab.name}`}
+              description="Your role or your own permissions don’t include this area. Ask an admin if you need it for your work."
             />
           ) : children}
         </div>

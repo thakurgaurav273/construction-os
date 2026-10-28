@@ -9,6 +9,7 @@ import { NotificationBell } from '@/features/notifications/components/Notificati
 import { UserMenu } from '@/features/auth/components/UserMenu';
 import { UserAvatar } from '@/components/shared/UserAvatar';
 import { HelpButton } from '@/features/help/components/HelpButton';
+import { sectionTitle } from './navigation';
 
 export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void, onSearchClick: () => void }) {
   const pathname = usePathname();
@@ -16,10 +17,7 @@ export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void
   const user = useAuthStore((state) => state.user);
   const hydrated = useAuthHydrated();
   
-  const segments = pathname.split('/').filter(Boolean);
-  const currentPath = segments.length > 0 
-    ? segments[segments.length - 1].charAt(0).toUpperCase() + segments[segments.length - 1].slice(1)
-    : 'Dashboard';
+  const currentPath = sectionTitle(pathname);
 
   return (
     <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-x-4 border-b bg-background/80 backdrop-blur-md px-4 sm:gap-x-6 sm:px-6 lg:px-8">

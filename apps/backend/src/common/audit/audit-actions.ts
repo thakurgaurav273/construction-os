@@ -29,6 +29,8 @@ export const AUDIT_ACTIONS = {
 
   'member.role_changed': action('changed a member\'s role', 'member'),
   'member.removed': action('removed a member', 'member'),
+  'member.permissions_changed': action('changed a member\'s permissions', 'member'),
+  'role.permissions_changed': action('changed a role\'s permissions', 'role'),
   'invitation.sent': action('invited a member', 'invitation'),
   'invitation.resent': action('resent an invitation', 'invitation'),
   'invitation.cancelled': action('cancelled an invitation', 'invitation'),

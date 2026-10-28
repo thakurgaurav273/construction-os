@@ -25,6 +25,7 @@ interface AuthUser { id: string; organizationId: string; role: string }
 export class OrganizationDailyReportsController {
   constructor(private readonly service: DailyReportsService) {}
 
+  @RequirePermission('dailyReport.view')
   @Get()
   findAll(
     @Query() query: DailyReportQueryDto,
@@ -33,6 +34,7 @@ export class OrganizationDailyReportsController {
     return this.service.findAllForOrganization(user.organizationId, query);
   }
 
+  @RequirePermission('dailyReport.view')
   @Get('summary')
   getSummary(@CurrentUser() user: AuthUser): Promise<DailyReportSummary> {
     return this.service.getSummary(user.organizationId);
@@ -47,6 +49,7 @@ export class DailyReportsController {
     private readonly workflow: DailyReportWorkflowService,
   ) {}
 
+  @RequirePermission('dailyReport.view')
   @Get()
   findAll(
     @Param('projectId') projectId: string,
@@ -55,6 +58,7 @@ export class DailyReportsController {
     return this.service.findAllForProject(projectId, user.organizationId);
   }
 
+  @RequirePermission('dailyReport.view')
   @Get(':reportId')
   findOne(
     @Param('projectId') projectId: string,

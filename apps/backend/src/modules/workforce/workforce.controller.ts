@@ -21,21 +21,25 @@ interface AuthUser {
 export class WorkforceController {
   constructor(private readonly workforceService: WorkforceService) {}
 
+  @RequirePermission('workforce.view')
   @Get()
   findAll(@Query() query: WorkforceQueryDto, @CurrentUser() user: AuthUser): Promise<WorkerView[]> {
     return this.workforceService.findAll(user.organizationId, query);
   }
 
+  @RequirePermission('workforce.view')
   @Get('stats')
   getStats(@Query() query: ProjectFilterQueryDto, @CurrentUser() user: AuthUser): Promise<WorkforceStats> {
     return this.workforceService.getStats(user.organizationId, query.projectId);
   }
 
+  @RequirePermission('workforce.view')
   @Get('attendance/trend')
   getAttendanceTrend(@Query() query: ProjectFilterQueryDto, @CurrentUser() user: AuthUser): Promise<AttendanceTrend> {
     return this.workforceService.getAttendanceTrend(user.organizationId, query.projectId);
   }
 
+  @RequirePermission('workforce.view')
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<WorkerDetailView> {
     return this.workforceService.findOne(id, user.organizationId);
@@ -79,6 +83,7 @@ export class WorkforceController {
 export class ProjectWorkforceController {
   constructor(private readonly workforceService: WorkforceService) {}
 
+  @RequirePermission('workforce.view')
   @Get()
   findByProject(
     @Param('projectId') projectId: string,
@@ -87,6 +92,7 @@ export class ProjectWorkforceController {
     return this.workforceService.findAll(user.organizationId, { projectId });
   }
 
+  @RequirePermission('workforce.view')
   @Get('stats')
   getProjectStats(
     @Param('projectId') projectId: string,

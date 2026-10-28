@@ -6,9 +6,10 @@ import { MailService } from '../../common/mail/mail.service';
 import { IntegrationsService } from './integrations.service';
 import { PlatformIntegrationsController } from './platform-integrations.controller';
 import { PlatformIntegrationsService } from './platform-integrations.service';
+import { RolePermissionsService } from './role-permissions.service';
 
 @Module({
   controllers: [SettingsController, PlatformIntegrationsController],
-  providers: [SettingsService, OrganizationSettingsService, IntegrationsService, PlatformIntegrationsService, MailService],
+  providers: [SettingsService, OrganizationSettingsService, IntegrationsService, PlatformIntegrationsService, RolePermissionsService, MailService],
 })
 export class SettingsModule {}

@@ -3,7 +3,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProcurementAnalytics, ProcurementAnalyticsService } from './procurement-analytics.service';
 import { ProcurementSummary, ProcurementSummaryService } from './procurement-summary.service';
-import { PermissionsGuard } from '../../common/permissions';
+import { PermissionsGuard, RequirePermission } from '../../common/permissions';
 
 interface AuthUser { id: string; organizationId: string; role: string }
 
@@ -15,11 +15,13 @@ export class ProcurementInsightsController {
     private readonly analytics: ProcurementAnalyticsService,
   ) {}
 
+  @RequirePermission('procurement.view')
   @Get('summary')
   getSummary(@CurrentUser() user: AuthUser): Promise<ProcurementSummary> {
     return this.summary.getSummary(user.organizationId);
   }
 
+  @RequirePermission('procurement.view')
   @Get('analytics')
   getAnalytics(@CurrentUser() user: AuthUser): Promise<ProcurementAnalytics> {
     return this.analytics.getAnalytics(user.organizationId);

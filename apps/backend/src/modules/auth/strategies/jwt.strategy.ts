@@ -7,7 +7,7 @@ import { isPlatformAdmin } from '../../../common/platform/platform-admins';
 import { OrgRole, UserStatus } from '@prisma/client';
 import type { Permission } from '@sitepilot/types';
 import { PrismaService } from '../../../database/prisma.service';
-import { permissionsForRole } from '../../../common/permissions';
+import { AccessService } from '../../../common/permissions';
 import { AUTH_COOKIES } from '../auth.constants';
 import { readCookie } from '../auth-cookies';
 import { TokenPayload, TokenService } from '../token.service';
@@ -39,6 +39,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     tokens: TokenService,
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly access: AccessService,
   ) {
     super({
       jwtFromRequest: extractAccessToken,
@@ -66,7 +67,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ...membership.user,
       organizationId: payload.organizationId,
       role: membership.role,
-      permissions: permissionsForRole(membership.role),
+      permissions: await this.access.permissionsFor(payload.organizationId, membership),
       isPlatformAdmin: isPlatformAdmin(this.config, membership.user.email),
     };
   }
@@ -76,6 +77,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       where: { userId_organizationId: { userId: payload.sub, organizationId: payload.organizationId } },
       select: {
         role: true,
+        grantedPermissions: true,
+        revokedPermissions: true,
         user: {
           select: {
             id: true, email: true, name: true, status: true, avatar: true, emailVerified: true, createdAt: true, updatedAt: true,

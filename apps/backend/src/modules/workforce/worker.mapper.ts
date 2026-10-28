@@ -13,13 +13,17 @@ export interface WorkerAttendanceSummary {
   todayStatus: AttendanceStatus | null;
   /** Share of marked days (excluding approved leave) the worker was on site; half days count half. */
   attendanceRate: number | null;
+  /** Latest timed check-in; null for days marked from the register, which have no time. */
   lastCheckInAt: Date | null;
+  /** Latest day (YYYY-MM-DD) the worker was on site, however it was marked. */
+  lastOnSiteDate: string | null;
 }
 
 export const EMPTY_ATTENDANCE_SUMMARY: WorkerAttendanceSummary = {
   todayStatus: null,
   attendanceRate: null,
   lastCheckInAt: null,
+  lastOnSiteDate: null,
 };
 
 export interface CertificationView {

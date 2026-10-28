@@ -147,6 +147,7 @@ model Organization {
   updatedAt DateTime @updatedAt
 
   members               UserOrganization[]
+  rolePermissions       OrgRolePermission[]
   projects              Project[]
   activities            Activity[]
   notifications         Notification[]
@@ -205,6 +206,9 @@ model UserOrganization {
   userId         String
   organizationId String
   role           OrgRole  @default(VIEWER)
+  /// Permissions given to this member on top of their role, and taken away from it (ADR-050).
+  grantedPermissions String[] @default([])
+  revokedPermissions String[] @default([])
   joinedAt       DateTime @default(now())
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -214,6 +218,22 @@ model UserOrganization {
   @@index([userId])
   @@index([organizationId])
   @@map("user_organizations")
+}
+
+/// An organization's changes to a role's default permissions (ADR-050). Stored as differences so permissions
+/// added to the product later still reach customised roles through the defaults.
+model OrgRolePermission {
+  organizationId String
+  role           OrgRole
+  granted        String[] @default([])
+  revoked        String[] @default([])
+  updatedById    String
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, role])
+  @@map("org_role_permissions")
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -1840,6 +1860,9 @@ model AiInsightSnapshot {
   provider       AiProvider
   model          String
   generatedById  String
+  /// View permissions whose data went into it; only members holding all of them see it. Empty: made before
+  /// ADR-050 from every area.
+  areas          String[]   @default([])
   createdAt      DateTime   @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

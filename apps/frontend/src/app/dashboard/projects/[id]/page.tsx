@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { FileText, Users, DollarSign, Clock, CheckCircle2, AlertTriangle, ArrowRight, TrendingUp, ShoppingCart } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -159,8 +160,10 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
               <CardTitle>Recent Activity</CardTitle>
               <CardDescription>Latest events for {project.name}</CardDescription>
             </div>
-            <Button variant="ghost" size="sm">
-              View All <ArrowRight className="ml-2 h-4 w-4" />
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/dashboard/projects/${params.id}/timeline`}>
+                View All <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
             </Button>
           </CardHeader>
           <CardContent>

@@ -12,13 +12,14 @@ import { RolesPermissionsCard } from './RolesPermissionsCard';
 export function MembersTab(): React.ReactElement {
   const { data: access } = useCurrentAccess();
   const canManage = access?.permissions.includes('members.manage') ?? false;
+  const canManageRoles = access?.permissions.includes('roles.manage') ?? false;
   // Only owners can hand out the Owner role (enforced server-side too).
   const assignableRoles = ORG_ROLES.filter((role) => role !== 'OWNER' || access?.role === 'OWNER');
   const [inviteOpen, setInviteOpen] = useState(false);
 
   return (
     <div className="space-y-6">
-      <MembersCard canManage={canManage} currentRole={access?.role} assignableRoles={assignableRoles} onInvite={() => setInviteOpen(true)} />
+      <MembersCard canManage={canManage} canManageRoles={canManageRoles} currentRole={access?.role} assignableRoles={assignableRoles} onInvite={() => setInviteOpen(true)} />
       {canManage && <PendingInvitationsCard />}
       <RolesPermissionsCard currentRole={access?.role} />
       {canManage && <InviteMemberDialog open={inviteOpen} onOpenChange={setInviteOpen} assignableRoles={assignableRoles} />}

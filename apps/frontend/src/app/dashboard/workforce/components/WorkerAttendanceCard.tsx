@@ -9,7 +9,7 @@ import { useShiftEvent, useWorker, type Worker } from '@/hooks/api/use-workforce
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { ATTENDANCE_STATUS_STYLES, MAX_OPEN_SHIFT_HOURS } from '@/features/workforce/constants';
 import { AttendanceStatusLabel } from '@/features/workforce/components/AttendanceStatusLabel';
-import { attendanceRateTone, formatCheckIn, toDisplayStatus } from '@/features/workforce/utils/attendance';
+import { attendanceRateTone, formatLastOnSite, toDisplayStatus } from '@/features/workforce/utils/attendance';
 import { useCan } from '@/hooks/api/use-access';
 
 function formatTime(timestamp: string | null): string {
@@ -82,7 +82,7 @@ export function WorkerAttendanceCard({ worker }: { worker: Worker }): React.Reac
             </div>
             <Progress value={worker.attendanceRate ?? 0} className="h-2 rounded-full" />
             <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" /> Last check-in: {formatCheckIn(worker.lastCheckInAt)}
+              <Clock className="h-3 w-3" /> Last on site: {formatLastOnSite(worker)}
             </p>
           </div>
 

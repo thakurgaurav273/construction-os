@@ -1,4 +1,4 @@
-import { format, isToday, isYesterday } from 'date-fns';
+import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import type { AttendanceStatus, Worker } from '@/hooks/api/use-workforce';
 import type { AttendanceDisplayStatus } from '../constants';
 
@@ -24,6 +24,22 @@ export function formatCheckIn(timestamp: string | null): string {
   if (isToday(date)) return `Today, ${time}`;
   if (isYesterday(date)) return `Yesterday, ${time}`;
   return format(date, 'MMM d, h:mm a');
+}
+
+/**
+ * When the worker was last on site. Days marked from the register have no check-in time, so those show the
+ * day alone ("Yesterday", "Oct 27"); a timed check-in on that day or later shows its time.
+ */
+export function formatLastOnSite(worker: Pick<Worker, 'lastCheckInAt' | 'lastOnSiteDate'>): string {
+  const { lastCheckInAt, lastOnSiteDate } = worker;
+  if (lastCheckInAt && (!lastOnSiteDate || format(new Date(lastCheckInAt), 'yyyy-MM-dd') >= lastOnSiteDate)) {
+    return formatCheckIn(lastCheckInAt);
+  }
+  if (!lastOnSiteDate) return '—';
+  const day = parseISO(lastOnSiteDate);
+  if (isToday(day)) return 'Today';
+  if (isYesterday(day)) return 'Yesterday';
+  return format(day, 'MMM d');
 }
 
 export function attendanceRateTone(rate: number | null): string {

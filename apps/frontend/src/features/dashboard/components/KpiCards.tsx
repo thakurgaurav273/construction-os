@@ -47,13 +47,15 @@ export function KpiCards({ stats }: { stats: DashboardStats }): React.ReactEleme
         value={`${stats.budgetUtilization}%`}
         hint={`${formatCrore(stats.totalSpent)} spent of ${formatCrore(stats.totalBudget)}`}
       />
-      <KpiCard
-        title="Workforce Today"
-        icon={Users}
-        value={<>{stats.workforceToday}<span className="text-sm font-normal text-muted-foreground"> / {stats.workforceTotal}</span></>}
-        hint={stats.workforceNotMarked > 0 ? `${stats.workforceNotMarked} not marked yet` : 'Attendance marked for everyone'}
-        href="/dashboard/workforce"
-      />
+      {stats.workforceToday !== null && (
+        <KpiCard
+          title="Workforce Today"
+          icon={Users}
+          value={<>{stats.workforceToday}<span className="text-sm font-normal text-muted-foreground"> / {stats.workforceTotal}</span></>}
+          hint={(stats.workforceNotMarked ?? 0) > 0 ? `${stats.workforceNotMarked} not marked yet` : 'Attendance marked for everyone'}
+          href="/dashboard/workforce"
+        />
+      )}
       <KpiCard
         title="Waiting for You"
         icon={ClipboardCheck}

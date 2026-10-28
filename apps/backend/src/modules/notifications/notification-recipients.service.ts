@@ -1,15 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import type { Permission } from '@sitepilot/types';
 import { PrismaService } from '../../database/prisma.service';
-import { rolesWithPermission } from '../../common/permissions';
+import { AccessService } from '../../common/permissions';
 
 /** Works out who should hear about something. */
 @Injectable()
 export class NotificationRecipientsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly access: AccessService,
+  ) {}
 
   /**
-   * Active members whose role grants the permission, never the person who acted. For project work, prefer
+   * Active members who hold the permission (role plus their own changes), never the person who acted. For project work, prefer
    * those on the project team; if none of them is, everyone with the permission hears about it.
    */
   async withPermission(
@@ -18,16 +21,7 @@ export class NotificationRecipientsService {
     excludeUserId: string | null,
     projectId?: string | null,
   ): Promise<string[]> {
-    const members = await this.prisma.userOrganization.findMany({
-      where: {
-        organizationId,
-        role: { in: rolesWithPermission(permission) },
-        user: { status: 'ACTIVE' },
-        ...(excludeUserId && { userId: { not: excludeUserId } }),
-      },
-      select: { userId: true },
-    });
-    const userIds = members.map((member) => member.userId);
+    const userIds = (await this.access.userIdsWithPermission(organizationId, permission)).filter((userId) => userId !== excludeUserId);
     if (!projectId || userIds.length === 0) return userIds;
 
     const onProject = await this.prisma.projectMember.findMany({

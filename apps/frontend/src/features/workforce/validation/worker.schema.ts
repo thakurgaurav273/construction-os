@@ -8,7 +8,7 @@ export const workerSchema = z
   .object({
     name: z.string().trim().min(2, "Enter the worker's full name").max(120),
     role: z.string().trim().min(2, 'Enter a role, e.g. Mason').max(80),
-    trade: z.string().trim().min(1, 'Select a trade').max(60),
+    trade: z.string().trim().min(1, 'Pick or type a trade').max(60),
     type: z.enum(['EMPLOYEE', 'SUBCONTRACTOR']),
     shift: z.enum(['DAY', 'NIGHT']),
     phone: z.string().trim().max(30).regex(/^[+\d\s()-]*$/, 'Use digits, spaces, +, ( ) or -'),
