@@ -14,6 +14,7 @@ interface AuthUser { id: string; organizationId: string; role: string }
 export class ProjectMaterialsController {
   constructor(private readonly service: ProjectMaterialsService) {}
 
+  @RequirePermission('material.view')
   @Get()
   findAll(
     @Param('projectId') projectId: string,

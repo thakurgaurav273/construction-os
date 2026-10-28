@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { ModuleAccessGuard } from '@/components/layout/ModuleAccessGuard';
 import { CommandPalette } from '@/components/CommandPalette';
 import { BrandThemeStyle } from '@/features/branding/components/BrandThemeStyle';
 import { HelpCenter } from '@/features/help/components/HelpCenter';
@@ -32,7 +33,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           
           <main className="flex-1 overflow-y-auto bg-muted/20 print:overflow-visible print:bg-white">
-            {children}
+            <ModuleAccessGuard>{children}</ModuleAccessGuard>
           </main>
         </div>
         

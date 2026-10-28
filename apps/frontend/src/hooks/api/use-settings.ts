@@ -12,11 +12,23 @@ export interface Member {
   joinedAt: string;
   /** Last sign-in or session refresh; null if unknown. */
   lastActive: string | null;
+  /** Their access differs from their role's. */
+  hasCustomPermissions: boolean;
 }
 
 export interface RoleCatalogue {
   permissions: { key: Permission; group: string; label: string }[];
-  roles: { role: string; permissions: Permission[] }[];
+  /** `permissions` include this organization's changes; `defaults` are the product's. */
+  roles: { role: string; permissions: Permission[]; defaults: Permission[]; customized: boolean }[];
+}
+
+export interface MemberPermissions {
+  userId: string;
+  role: string;
+  rolePermissions: Permission[];
+  permissions: Permission[];
+  granted: Permission[];
+  revoked: Permission[];
 }
 
 export type IntegrationState = 'connected' | 'development' | 'not_configured';
@@ -58,7 +70,46 @@ export function useRoleCatalogue() {
       const res = await apiClient.get('/settings/roles');
       return res.data.data ?? res.data;
     },
-    staleTime: Infinity,
+    staleTime: 60_000,
+  });
+}
+
+/** Changing access can change what anyone (including people on other devices) may do, so refetch it all. */
+function invalidateAccess(queryClient: ReturnType<typeof useQueryClient>): Promise<unknown> {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['settings', 'roles'] }),
+    queryClient.invalidateQueries({ queryKey: ['settings', 'members'] }),
+    queryClient.invalidateQueries({ queryKey: ['auth', 'access'] }),
+  ]);
+}
+
+export function useUpdateRolePermissions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ role, permissions }: { role: string; permissions: Permission[] }) =>
+      (await apiClient.put(`/settings/roles/${role}/permissions`, { permissions })).data,
+    onSuccess: () => invalidateAccess(queryClient),
+  });
+}
+
+/** One member's access; only people who manage roles can read it. */
+export function useMemberPermissions(userId: string | null) {
+  return useQuery<MemberPermissions>({
+    queryKey: ['settings', 'members', userId, 'permissions'],
+    queryFn: async () => {
+      const res = await apiClient.get(`/settings/members/${userId}/permissions`);
+      return res.data.data ?? res.data;
+    },
+    enabled: !!userId,
+  });
+}
+
+export function useUpdateMemberPermissions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, permissions }: { userId: string; permissions: Permission[] }) =>
+      (await apiClient.put(`/settings/members/${userId}/permissions`, { permissions })).data,
+    onSuccess: () => invalidateAccess(queryClient),
   });
 }
 

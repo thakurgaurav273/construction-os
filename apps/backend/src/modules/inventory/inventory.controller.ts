@@ -25,7 +25,7 @@ import { InventoryTransfersService } from './inventory-transfers.service';
 import { InventoryWarehousesService } from './inventory-warehouses.service';
 import { InventoryReorderService, ReorderSuggestion } from './inventory-reorder.service';
 import { ReorderQueryDto } from './dto/reorder-query.dto';
-import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { PermissionsGuard, RequirePermission, RequireAnyPermission } from '../../common/permissions';
 import { Audit } from '../../common/audit';
 
 interface AuthUser {
@@ -50,26 +50,31 @@ export class InventoryController {
   ) {}
 
   /** Suggested quantity, vendor and rate for restocking a material, used to prefill a draft purchase order. */
+  @RequireAnyPermission('inventory.view', 'material.view')
   @Get('reorder-suggestion')
   getReorderSuggestion(@Query() query: ReorderQueryDto, @CurrentUser() user: AuthUser): Promise<ReorderSuggestion> {
     return this.reorder.suggest(user.organizationId, query.materialId, query.warehouseId);
   }
 
+  @RequirePermission('inventory.view')
   @Get('dashboard')
   getDashboard(@CurrentUser() user: AuthUser) {
     return this.dashboard.getDashboard(user.organizationId);
   }
 
+  @RequirePermission('inventory.view')
   @Get('analytics')
   getAnalytics(@CurrentUser() user: AuthUser) {
     return this.dashboard.getAnalytics(user.organizationId);
   }
 
+  @RequireAnyPermission('inventory.view', 'material.view')
   @Get('items')
   getItems(@Query() query: InventoryItemQueryDto, @CurrentUser() user: AuthUser) {
     return this.items.findAll(user.organizationId, query);
   }
 
+  @RequirePermission('inventory.view')
   @Get('items/:id')
   getItem(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.items.findOne(id, user.organizationId);
@@ -82,11 +87,13 @@ export class InventoryController {
     return this.items.update(id, user.organizationId, dto);
   }
 
+  @RequireAnyPermission('inventory.view', 'material.view', 'procurement.view')
   @Get('warehouses')
   getWarehouses(@CurrentUser() user: AuthUser) {
     return this.warehouses.findAll(user.organizationId);
   }
 
+  @RequirePermission('inventory.view')
   @Get('warehouses/:id')
   getWarehouse(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.warehouses.findOne(id, user.organizationId);
@@ -151,11 +158,13 @@ export class InventoryController {
     return this.warehouseSetup.removeLocation(id, locationId, user.organizationId);
   }
 
+  @RequirePermission('inventory.view')
   @Get('transfers')
   getTransfers(@Query() query: TransferQueryDto, @CurrentUser() user: AuthUser) {
     return this.transfers.findAll(user.organizationId, query);
   }
 
+  @RequirePermission('inventory.view')
   @Get('transfers/:id')
   getTransfer(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.transfers.findOne(id, user.organizationId);
@@ -204,11 +213,13 @@ export class InventoryController {
     return this.transferWorkflow.complete(id, user.organizationId, user.id);
   }
 
+  @RequirePermission('inventory.view')
   @Get('transactions')
   getTransactions(@Query() query: TransactionQueryDto, @CurrentUser() user: AuthUser) {
     return this.transactions.findAll(user.organizationId, query);
   }
 
+  @RequirePermission('inventory.view')
   @Get('adjustments')
   getAdjustments(@Query('warehouseId') warehouseId: string | undefined, @CurrentUser() user: AuthUser) {
     return this.adjustments.findAll(user.organizationId, warehouseId);

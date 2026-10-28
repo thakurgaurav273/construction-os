@@ -8,22 +8,28 @@ export interface PermissionInfo {
 
 /** Typed as a full Record so adding a Permission without describing it fails to compile. */
 export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
+  'project.view': { group: 'Projects', label: 'View projects' },
   'project.create': { group: 'Projects', label: 'Create projects' },
   'project.update': { group: 'Projects', label: 'Edit, archive and restore projects' },
   'project.delete': { group: 'Projects', label: 'Delete projects created by mistake' },
   'project.members.manage': { group: 'Projects', label: 'Assign people to projects' },
+  'dailyReport.view': { group: 'Site', label: 'View daily reports' },
   'dailyReport.write': { group: 'Site', label: 'Write and submit daily reports' },
   'dailyReport.approve': { group: 'Site', label: 'Approve daily reports' },
   'document.upload': { group: 'Site', label: 'Upload documents and photos' },
   'document.delete': { group: 'Site', label: 'Delete documents' },
+  'workforce.view': { group: 'Workforce', label: 'View workers and attendance' },
   'workforce.manage': { group: 'Workforce', label: 'Add and edit workers' },
   'attendance.mark': { group: 'Workforce', label: 'Mark attendance' },
+  'material.view': { group: 'Materials', label: 'View materials and material requests' },
   'material.manage': { group: 'Materials', label: 'Manage the material catalogue' },
   'material.issue': { group: 'Materials', label: 'Issue material to sites and take returns' },
   'material.request': { group: 'Site', label: 'Request material from the stores' },
+  'inventory.view': { group: 'Materials', label: 'View stores, stock and transfers' },
   'inventory.adjust': { group: 'Materials', label: 'Adjust stock' },
   'inventory.transfer': { group: 'Materials', label: 'Request, approve and receive stock transfers' },
   'warehouse.manage': { group: 'Materials', label: 'Set up stores and bin locations' },
+  'procurement.view': { group: 'Procurement', label: 'View vendors, RFQs, purchase orders and deliveries' },
   'vendor.manage': { group: 'Procurement', label: 'Manage vendors' },
   'rfq.manage': { group: 'Procurement', label: 'Issue RFQs and record quotes' },
   'rfq.award': { group: 'Procurement', label: 'Award RFQs' },
@@ -37,6 +43,7 @@ export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
   'payment.request': { group: 'Finance', label: 'Request payments' },
   'payment.approve': { group: 'Finance', label: 'Approve payments' },
   'payment.release': { group: 'Finance', label: 'Record released payments' },
+  'report.view': { group: 'Reports', label: 'View and download reports' },
   'report.manage': { group: 'Reports', label: 'Generate and schedule reports' },
   'billing.view': { group: 'Billing', label: 'View contracts and RA bills' },
   'contract.manage': { group: 'Billing', label: 'Set up clients, contracts, BOQs and deductions' },
@@ -44,6 +51,7 @@ export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
   'billing.certify': { group: 'Billing', label: 'Certify RA bills' },
   'billing.receipts': { group: 'Billing', label: 'Record money received from clients' },
   'members.manage': { group: 'Administration', label: 'Invite members and change roles' },
+  'roles.manage': { group: 'Administration', label: 'Change what roles and members can do' },
   'organization.manage': { group: 'Administration', label: 'Edit organization settings' },
   'audit.view': { group: 'Administration', label: 'View the audit log' },
   'data.import': { group: 'Administration', label: 'Import data from spreadsheets and manage sheet templates' },
@@ -54,11 +62,18 @@ export const PERMISSION_CATALOGUE: Record<Permission, PermissionInfo> = {
 
 export const ALL_PERMISSIONS = Object.keys(PERMISSION_CATALOGUE) as Permission[];
 
-const SITE_BASICS: Permission[] = ['dailyReport.write', 'document.upload', 'attendance.mark', 'delivery.receive', 'material.request', 'ai.use'];
+const SITE_VIEWS: Permission[] = [
+  'project.view', 'dailyReport.view', 'procurement.view', 'material.view', 'inventory.view', 'workforce.view', 'report.view',
+];
+
+const SITE_BASICS: Permission[] = [
+  ...SITE_VIEWS, 'dailyReport.write', 'document.upload', 'attendance.mark', 'delivery.receive', 'material.request', 'ai.use',
+];
 
 /**
- * Default grants per role. Reading operational data needs no permission; every write and all financial
- * data does. Maker-checker rules (nobody approves their own PO, bill, payment or material request) apply on top of these.
+ * Default grants per role; an organization can adjust them per role and per member (ADR-050). Reading a
+ * module needs its `*.view` permission, and every write and all financial data need their own. Maker-checker
+ * rules (nobody approves their own PO, bill, payment or material request) apply on top of these.
  */
 export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
   OWNER: ALL_PERMISSIONS,
@@ -77,16 +92,21 @@ export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
   // crews they run, so they manage worker records (no pay data lives there).
   SITE_ENGINEER: [...SITE_BASICS, 'workforce.manage', 'po.create', 'billing.view', 'billing.prepare'],
   STORE_MANAGER: [
+    'project.view', 'procurement.view', 'material.view', 'inventory.view',
     'ai.use', 'document.upload', 'delivery.receive', 'material.manage', 'material.issue', 'inventory.adjust', 'inventory.transfer',
     'warehouse.manage',
   ],
-  PROCUREMENT: ['ai.use', 'document.upload', 'delivery.receive', 'vendor.manage', 'rfq.manage', 'rfq.award', 'po.create'],
+  PROCUREMENT: [
+    'project.view', 'procurement.view', 'material.view', 'inventory.view',
+    'ai.use', 'document.upload', 'delivery.receive', 'vendor.manage', 'rfq.manage', 'rfq.award', 'po.create',
+  ],
   FINANCE: [
+    'project.view', 'procurement.view', 'report.view',
     'ai.use', 'document.upload', 'finance.view', 'budget.manage', 'invoice.create', 'invoice.approve',
     'payment.request', 'payment.approve', 'payment.release', 'report.manage',
     'billing.view', 'contract.manage', 'billing.prepare', 'billing.receipts',
   ],
-  VIEWER: [],
+  VIEWER: ['project.view', 'dailyReport.view'],
 };
 
 export function permissionsForRole(role: OrgRole): Permission[] {

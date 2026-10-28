@@ -111,7 +111,7 @@ export class AiController {
   @HttpCode(HttpStatus.OK)
   @Post('chat')
   organizationChat(@Body() dto: AiChatDto, @CurrentUser() user: AuthUser): Promise<ChatReplyView> {
-    return this.features.organizationChat(user.organizationId, user.id, dto);
+    return this.features.organizationChat(user.organizationId, user.id, user.permissions, dto);
   }
 
   @RequirePermission('ai.use')
@@ -119,7 +119,7 @@ export class AiController {
   @HttpCode(HttpStatus.OK)
   @Post('projects/:projectId/chat')
   projectChat(@Param('projectId') projectId: string, @Body() dto: AiChatDto, @CurrentUser() user: AuthUser): Promise<ChatReplyView> {
-    return this.features.projectChat(user.organizationId, user.id, projectId, dto);
+    return this.features.projectChat(user.organizationId, user.id, user.permissions, projectId, dto);
   }
 
   /** The member's own chats; holders of ai.history.view may ask for the whole organization's. */
@@ -141,13 +141,13 @@ export class AiController {
   @HttpCode(HttpStatus.OK)
   @Post('projects/:projectId/daily-reports/:reportId/summary')
   summarizeReport(@Param('projectId') projectId: string, @Param('reportId') reportId: string, @CurrentUser() user: AuthUser) {
-    return this.features.summarizeDailyReport(user.organizationId, user.id, projectId, reportId);
+    return this.features.summarizeDailyReport(user.organizationId, user.id, user.permissions, projectId, reportId);
   }
 
   @RequirePermission('ai.use')
   @Get('insights')
   insights(@CurrentUser() user: AuthUser): Promise<InsightSnapshotView | null> {
-    return this.features.latestInsights(user.organizationId);
+    return this.features.latestInsights(user.organizationId, user.permissions);
   }
 
   @RequirePermission('ai.use')
@@ -155,6 +155,6 @@ export class AiController {
   @HttpCode(HttpStatus.OK)
   @Post('insights/refresh')
   refreshInsights(@CurrentUser() user: AuthUser): Promise<InsightSnapshotView> {
-    return this.features.refreshInsights(user.organizationId, user.id);
+    return this.features.refreshInsights(user.organizationId, user.id, user.permissions);
   }
 }

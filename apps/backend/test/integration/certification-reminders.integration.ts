@@ -17,6 +17,7 @@ import { WorkerCertificationsService } from '../../src/modules/workforce/worker-
 import { WorkforceService } from '../../src/modules/workforce/workforce.service';
 import { connectTestDatabase } from './support/test-database';
 import { OrganizationFixture, createOrganization, createProject, createWorker, settleTogether } from './support/fixtures';
+import { AccessService } from '../../src/common/permissions';
 
 /** 11:30 in India; the calendar day there is the same as the UTC day. */
 const MORNING = new Date('2026-11-01T06:00:00.000Z');
@@ -42,7 +43,7 @@ describe('certification reminders', () => {
     const push = new PushService(prisma, { sendToTokens: async () => ({ invalidTokens: [] }) });
     const gateway = new NotificationsGateway(new TokenService(new JwtService(), prisma, config));
     const notifications = new NotificationsService(prisma, push, gateway, new MailService(), config);
-    reminders = new CertificationRemindersService(prisma, new JobsService(config), notifications, new NotificationRecipientsService(prisma));
+    reminders = new CertificationRemindersService(prisma, new JobsService(config), notifications, new NotificationRecipientsService(prisma, new AccessService(prisma)));
     certifications = new WorkerCertificationsService(prisma, new WorkforceService(prisma, new AttendanceInsightsService(prisma)));
 
     org = await createOrganization(prisma, 'Reminders');
@@ -95,7 +96,9 @@ describe('certification reminders', () => {
     assert.equal(unassigned.type, 'WARNING');
     assert.equal(unassigned.entityType, 'worker_certification');
 
-    assert.equal((await remindersFor(org.engineer.id)).length, 0, 'site engineers can’t manage the workforce');
+    const engineerInbox = await remindersFor(org.engineer.id);
+    assert.ok(!engineerInbox.some((notification) => notification.title.includes('Ring Road')), 'project digests go to the project team only');
+    assert.ok(engineerInbox.some((notification) => notification.title.startsWith('Sunil Rao')), 'site engineers manage the workforce, so they hear about unassigned workers');
     assert.equal(await stageOf('First Aid'), 'EXPIRING_SOON');
     assert.equal(await stageOf('Height Safety'), 'EXPIRING_THIS_WEEK');
     assert.equal(await stageOf('Medical Fitness'), 'EXPIRED');
@@ -166,7 +169,7 @@ describe('certification reminders', () => {
 
     const theirs = await prisma.notification.findMany({ where: { organizationId: other.organizationId, category: 'reminders' } });
     assert.ok(theirs.length > 0);
-    assert.ok(theirs.every((notification) => [other.owner.id, other.manager.id].includes(notification.userId)));
+    assert.ok(theirs.every((notification) => [other.owner.id, other.manager.id, other.engineer.id].includes(notification.userId)));
     assert.ok(!(await remindersFor(org.manager.id)).some((notification) => notification.message.includes('Their Pass') || notification.title.includes('Other Worker')));
   });
 });

@@ -42,9 +42,10 @@ export interface DashboardStats {
   totalBudget: number;
   totalSpent: number;
   approvals: { total: number; queues: ApprovalQueue[] };
-  workforceToday: number;
-  workforceTotal: number;
-  workforceNotMarked: number;
+  /** Null for members without workforce access. */
+  workforceToday: number | null;
+  workforceTotal: number | null;
+  workforceNotMarked: number | null;
   projects: DashboardProject[];
   recentActivity: DashboardActivity[];
   /** Null for members without finance access. */

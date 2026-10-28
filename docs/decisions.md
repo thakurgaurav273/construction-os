@@ -1981,6 +1981,42 @@ Only owners, admins and project managers could add or edit workers, and the work
 
 ---
 
+# ADR-050 - Module View Permissions and Customisable Access
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-28
+
+---
+
+## Context
+
+Reading operational data needed no permission, so every member saw every module in the menu and could open it. Roles were fixed in code: an organization couldn't adjust what a role or one person may do.
+
+---
+
+## Decision
+
+- **View permissions per area:** `project.view`, `dailyReport.view`, `procurement.view`, `material.view`, `inventory.view`, `workforce.view`, `report.view` (finance and billing already had theirs). Every read route in those areas requires its view (a test fails otherwise). Lookups other areas' forms depend on accept any of several views (`@RequireAnyPermission`), e.g. vendors for procurement, finance or billing. `/projects/options` stays open: it holds names only.
+- **Defaults trimmed by role.** Project managers and site engineers see every site area; store and procurement roles see projects, procurement, materials and inventory; finance sees projects, procurement and reports; viewers see projects and daily reports. Every role holds the view of each area it acts in (tested).
+- **Organizations adjust roles; admins adjust people.** `org_role_permissions` stores a role's grants and removals per organization; `user_organizations.grantedPermissions/revokedPermissions` store a member's. A member's access is: role defaults, plus/minus the role's changes, plus/minus their own. Changes are stored as differences, so permissions added to the product later still reach customised roles. Resolved on every request, so changes apply at once.
+- **Guardrails** (`roles.manage`, Owner and Admin by default): the owner role always has everything; only the owner changes the admin role or an admin's access; nobody changes their own role's or their own access; nobody grants a permission they don't hold. Changes are audited (`role.permissions_changed`, `member.permissions_changed`).
+- **Everything that reads across areas follows the reader's access:** the sidebar, ⌘K search, project tabs and a page guard on the frontend; the dashboard (no projects or workforce figures without their views); report types (each needs its area's view; cost reports need `finance.view`); report emails and notifications (recipients by effective permissions, not role); AI chats and daily report summaries (sections the reader can't view are left out). AI insights are shared, so each snapshot records the areas it drew on and is shown only to members who can view all of them.
+
+---
+
+## Consequences
+
+- Members lose access to modules their role no longer views by default (e.g. Procurement members no longer open Workforce). Admins can grant it back per role or person.
+- The activity feed mixes every area; the dashboard shows it to anyone with `project.view`, and AI includes it only for members who can view every area.
+- Two migrations: `add_custom_permissions`, `record_ai_insight_areas`.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

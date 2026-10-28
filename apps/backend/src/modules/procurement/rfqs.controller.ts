@@ -18,11 +18,13 @@ export class RfqsController {
     private readonly quotes: RfqQuotesService,
   ) {}
 
+  @RequirePermission('procurement.view')
   @Get()
   findAll(@CurrentUser() user: AuthUser): Promise<RfqView[]> {
     return this.rfqs.findAll(user.organizationId);
   }
 
+  @RequirePermission('procurement.view')
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<RfqDetailView> {
     return this.rfqs.findOne(id, user.organizationId);

@@ -8,7 +8,7 @@ import { MaterialQueryDto } from './dto/material-query.dto';
 import { MovementQueryDto } from './dto/movement-query.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
 import { CreateMaterialDto } from './dto/create-material.dto';
-import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { PermissionsGuard, RequirePermission, RequireAnyPermission } from '../../common/permissions';
 import { Audit } from '../../common/audit';
 
 interface AuthUser {
@@ -32,36 +32,43 @@ export class MaterialsController {
     return this.materialsService.create(user.organizationId, dto);
   }
 
+  @RequireAnyPermission('material.view', 'procurement.view', 'inventory.view')
   @Get()
   findAll(@Query() query: MaterialQueryDto, @CurrentUser() user: AuthUser) {
     return this.materialsService.findAll(user.organizationId, query);
   }
 
+  @RequirePermission('material.view')
   @Get('dashboard')
   getDashboard(@CurrentUser() user: AuthUser) {
     return this.dashboardService.getDashboard(user.organizationId);
   }
 
+  @RequirePermission('material.view')
   @Get('categories')
   getCategories(@CurrentUser() user: AuthUser) {
     return this.materialsService.getCategories(user.organizationId);
   }
 
+  @RequirePermission('material.view')
   @Get('low-stock')
   getLowStock(@CurrentUser() user: AuthUser) {
     return this.materialsService.getLowStock(user.organizationId);
   }
 
+  @RequirePermission('material.view')
   @Get('movements')
   getMovements(@Query() query: MovementQueryDto, @CurrentUser() user: AuthUser) {
     return this.materialsService.getMovements(user.organizationId, query);
   }
 
+  @RequirePermission('material.view')
   @Get('suppliers')
   getSuppliers(@CurrentUser() user: AuthUser) {
     return this.materialsService.getSuppliers(user.organizationId);
   }
 
+  @RequirePermission('material.view')
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.materialsService.findOne(id, user.organizationId);

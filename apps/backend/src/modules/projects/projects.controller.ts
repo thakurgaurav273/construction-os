@@ -28,6 +28,7 @@ export class ProjectsController {
     private readonly lifecycle: ProjectLifecycleService,
   ) {}
 
+  @RequirePermission('project.view')
   @Get()
   findAll(@Query() query: ProjectQueryDto, @CurrentUser() user: AuthUser): Promise<Paginated<ProjectSummary>> {
     return this.projectsService.findAll(user.organizationId, query);
@@ -46,11 +47,13 @@ export class ProjectsController {
     return this.projectsService.create(user.organizationId, user.id, dto);
   }
 
+  @RequirePermission('project.view')
   @Get(':id/activities')
   findActivities(@Param('id') id: string, @Query() query: PaginationDto, @CurrentUser() user: AuthUser): Promise<Paginated<ProjectActivityView>> {
     return this.projectsService.findActivities(id, user.organizationId, query.page, query.limit);
   }
 
+  @RequirePermission('project.view')
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.projectsService.findOne(id, user.organizationId);
@@ -88,6 +91,7 @@ export class ProjectsController {
     return this.lifecycle.remove(id, user.organizationId, user.id);
   }
 
+  @RequirePermission('project.view')
   @Get(':id/available-members')
   getAvailableMembers(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<AvailableMember[]> {
     return this.members.getAvailableMembers(id, user.organizationId);

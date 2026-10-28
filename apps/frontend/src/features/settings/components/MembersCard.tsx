@@ -7,16 +7,19 @@ import {
   Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Dialog, DialogContent, DialogDescription,
   DialogFooter, DialogHeader, DialogTitle, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton,
 } from '@sitepilot/ui';
-import { AlertTriangle, Mail, Trash2, Users } from 'lucide-react';
+import { AlertTriangle, Mail, ShieldCheck, Trash2, Users } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useChangeMemberRole, useMembers, useRemoveMember, type Member } from '@/hooks/api/use-settings';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { useAuthStore } from '@/store/auth.store';
 import { formatRole, type OrgRole } from '../constants';
 import { UserAvatar } from '@/components/shared/UserAvatar';
+import { MemberPermissionsDialog } from './MemberPermissionsDialog';
 
 interface MembersCardProps {
   canManage: boolean;
+  /** Can change what individual members may do (roles.manage). */
+  canManageRoles: boolean;
   /** The signed-in member's role; only owners can manage other owners. */
   currentRole: string | undefined;
   assignableRoles: readonly OrgRole[];
@@ -29,15 +32,19 @@ function lastActiveLabel(member: Member): string {
   return member.lastActive ? `Active ${formatDistanceToNow(new Date(member.lastActive), { addSuffix: true })}` : 'Not signed in yet';
 }
 
-export function MembersCard({ canManage, currentRole, assignableRoles, onInvite }: MembersCardProps): React.ReactElement {
+export function MembersCard({ canManage, canManageRoles, currentRole, assignableRoles, onInvite }: MembersCardProps): React.ReactElement {
   const currentUserId = useAuthStore((state) => state.user?.id);
   const { data: members = [], isLoading, isError, refetch } = useMembers();
   const changeRole = useChangeMemberRole();
   const removeMember = useRemoveMember();
   const [pending, setPending] = useState<PendingChange | null>(null);
+  const [editingAccess, setEditingAccess] = useState<Member | null>(null);
 
   const canEdit = (member: Member): boolean =>
     canManage && member.id !== currentUserId && (member.role !== 'OWNER' || currentRole === 'OWNER');
+  // Same rules as the API: the owner always has everything, and only the owner adjusts an admin.
+  const canEditAccess = (member: Member): boolean =>
+    canManageRoles && member.id !== currentUserId && member.role !== 'OWNER' && (member.role !== 'ADMIN' || currentRole === 'OWNER');
 
   async function confirmPending(): Promise<void> {
     if (!pending) return;
@@ -94,6 +101,12 @@ export function MembersCard({ canManage, currentRole, assignableRoles, onInvite 
                 </div>
                 <div className="flex items-center gap-2 pl-12 sm:pl-0">
                   {member.status !== 'ACTIVE' && <Badge variant="secondary">{formatRole(member.status)}</Badge>}
+                  {member.hasCustomPermissions && <Badge variant="outline" className="whitespace-nowrap">Custom access</Badge>}
+                  {canEditAccess(member) && (
+                    <Button variant="ghost" size="icon" aria-label={`Permissions for ${member.name || member.email}`} title="Permissions" onClick={() => setEditingAccess(member)}>
+                      <ShieldCheck className="h-4 w-4" />
+                    </Button>
+                  )}
                   {canEdit(member) ? (
                     <>
                       <Select value={member.role} onValueChange={(role) => { if (role && role !== member.role) setPending({ kind: 'role', member, role }); }}>
@@ -140,6 +153,7 @@ export function MembersCard({ canManage, currentRole, assignableRoles, onInvite 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <MemberPermissionsDialog member={editingAccess} onClose={() => setEditingAccess(null)} />
     </Card>
   );
 }

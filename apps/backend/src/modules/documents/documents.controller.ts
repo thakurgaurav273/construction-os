@@ -16,6 +16,7 @@ interface AuthUser { id: string; organizationId: string; role: string }
 export class DocumentsController {
   constructor(private readonly service: DocumentsService) {}
 
+  @RequirePermission('project.view')
   @Get()
   findAll(@Param('projectId') projectId: string, @CurrentUser() user: AuthUser) {
     return this.service.findAll(projectId, user.organizationId);
@@ -33,6 +34,7 @@ export class DocumentsController {
     return this.service.upload(projectId, user.organizationId, user.id, file);
   }
 
+  @RequirePermission('project.view')
   @Get(':documentId/download')
   async download(
     @Param('projectId') projectId: string,

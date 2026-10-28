@@ -4,7 +4,7 @@ import { DomainEvent, DomainEventsService } from '../src/common/events';
 import type { PrismaService } from '../src/database/prisma.service';
 import { NotificationRecipientsService } from '../src/modules/notifications/notification-recipients.service';
 import { NOTIFICATION_CATEGORIES } from '../src/modules/notifications/notification-categories';
-import { rolesWithPermission } from '../src/common/permissions';
+import { AccessService, rolesWithPermission } from '../src/common/permissions';
 
 const event: DomainEvent = {
   action: 'purchase_order.approved',
@@ -31,7 +31,7 @@ describe('domain events', () => {
 });
 
 describe('notification recipients', () => {
-  const recipients = new NotificationRecipientsService({} as PrismaService);
+  const recipients = new NotificationRecipientsService({} as PrismaService, {} as AccessService);
 
   it('never notifies people about their own actions', () => {
     assert.deepEqual(recipients.only('approver', 'approver'), []);

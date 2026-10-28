@@ -58,13 +58,14 @@ export default function DashboardPage(): React.ReactElement {
       );
     }
     const showInsights = can('ai.use');
+    const showAttendance = can('workforce.view');
     return (
       <>
         <GettingStartedChecklist />
         <KpiCards stats={stats} />
         <div className="grid gap-4 lg:grid-cols-7">
           <div className="lg:col-span-4">
-            {stats.spendTrend ? <SpendTrendCard trend={stats.spendTrend} /> : <AttendanceTrendCard />}
+            {stats.spendTrend ? <SpendTrendCard trend={stats.spendTrend} /> : showAttendance && <AttendanceTrendCard />}
           </div>
           <div className="space-y-4 lg:col-span-3">
             <ApprovalsCard queues={stats.approvals.queues} />
@@ -73,8 +74,8 @@ export default function DashboardPage(): React.ReactElement {
         </div>
         <ProjectOverview projects={stats.projects} totalProjects={stats.totalProjects} />
         <div className="grid gap-4 lg:grid-cols-3">
-          <div className={stats.spendTrend ? 'lg:col-span-2' : 'lg:col-span-3'}><RecentActivity activities={stats.recentActivity} /></div>
-          {stats.spendTrend && <AttendanceTrendCard />}
+          <div className={stats.spendTrend && showAttendance ? 'lg:col-span-2' : 'lg:col-span-3'}><RecentActivity activities={stats.recentActivity} /></div>
+          {stats.spendTrend && showAttendance && <AttendanceTrendCard />}
         </div>
       </>
     );
@@ -91,7 +92,9 @@ export default function DashboardPage(): React.ReactElement {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" asChild><Link href="/dashboard/reports"><BarChart3 className="mr-2 h-4 w-4" /> Reports</Link></Button>
+          <Can permission="report.view">
+            <Button variant="outline" asChild><Link href="/dashboard/reports"><BarChart3 className="mr-2 h-4 w-4" /> Reports</Link></Button>
+          </Can>
           <Can permission="project.create">
             <Button asChild data-tour="dashboard-new-project"><Link href="/dashboard/projects"><Plus className="mr-2 h-4 w-4" /> New Project</Link></Button>
           </Can>

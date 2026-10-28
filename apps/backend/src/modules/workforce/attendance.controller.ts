@@ -17,6 +17,7 @@ interface AuthUser {
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
+  @RequirePermission('workforce.view')
   @Get()
   getRoster(
     @Param('projectId') projectId: string,

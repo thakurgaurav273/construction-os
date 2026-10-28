@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@
 import { Reflector } from '@nestjs/core';
 import type { Permission } from '@sitepilot/types';
 import { PERMISSION_CATALOGUE } from './permission-catalogue';
-import { PERMISSIONS_KEY } from './require-permission.decorator';
+import { ANY_PERMISSIONS_KEY, PERMISSIONS_KEY } from './require-permission.decorator';
 
 interface RequestWithAccess {
   user?: { permissions?: Permission[] };
@@ -18,14 +18,20 @@ export class PermissionsGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (!required?.length) return true;
+    const anyOf = this.reflector.get<Permission[] | undefined>(ANY_PERMISSIONS_KEY, context.getHandler()) ?? [];
+    if (!required?.length && anyOf.length === 0) return true;
 
     const granted = new Set(context.switchToHttp().getRequest<RequestWithAccess>().user?.permissions ?? []);
-    const missing = required.filter((permission) => !granted.has(permission));
+    const missing = (required ?? []).filter((permission) => !granted.has(permission));
+    if (anyOf.length > 0 && !anyOf.some((permission) => granted.has(permission))) {
+      throw new ForbiddenException(
+        `Your access doesn't include this: ${anyOf.map((permission) => PERMISSION_CATALOGUE[permission].label.toLowerCase()).join(' or ')}. Ask an admin for access.`,
+      );
+    }
     if (missing.length === 0) return true;
 
     throw new ForbiddenException(
-      `Your role doesn't allow this: ${missing.map((permission) => PERMISSION_CATALOGUE[permission].label.toLowerCase()).join(', ')}. Ask an admin for access.`,
+      `Your access doesn't include this: ${missing.map((permission) => PERMISSION_CATALOGUE[permission].label.toLowerCase()).join(', ')}. Ask an admin for access.`,
     );
   }
 }

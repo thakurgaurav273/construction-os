@@ -4,7 +4,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateVendorDto, UpdateVendorDto } from './dto/vendor.dto';
 import { VendorView } from './vendor.mapper';
 import { VendorsService } from './vendors.service';
-import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { PermissionsGuard, RequirePermission, RequireAnyPermission } from '../../common/permissions';
 import { Audit } from '../../common/audit';
 
 interface AuthUser { id: string; organizationId: string; role: string }
@@ -14,11 +14,13 @@ interface AuthUser { id: string; organizationId: string; role: string }
 export class VendorsController {
   constructor(private readonly vendors: VendorsService) {}
 
+  @RequireAnyPermission('procurement.view', 'finance.view', 'billing.view')
   @Get()
   findAll(@CurrentUser() user: AuthUser): Promise<VendorView[]> {
     return this.vendors.findAll(user.organizationId);
   }
 
+  @RequirePermission('procurement.view')
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<VendorView> {
     return this.vendors.findOne(id, user.organizationId);

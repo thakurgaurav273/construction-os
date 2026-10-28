@@ -2,14 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OrgRole } from '@prisma/client';
 import { EmailAttachment, MailService } from '../../common/mail/mail.service';
-import { rolesWithPermission } from '../../common/permissions';
+import { AccessService } from '../../common/permissions';
 import { StorageService } from '../../common/storage/storage.service';
 import { escapeHtml } from '../../common/utils/escape-html';
 import { PrismaService } from '../../database/prisma.service';
 import type { ReportDocument } from './content/report-document';
 import { formatValue, periodLabel, projectsLabel } from './render/report-format';
 import { isReportDocument } from './reports.mapper';
-import { REPORT_LINK_TTL_SECONDS } from './reports.constants';
+import { REPORT_LINK_TTL_SECONDS, reportTypePermission } from './reports.constants';
 
 /** Above this the files go as download links only; most mail servers reject much larger messages. */
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -31,6 +31,7 @@ export class ReportDeliveryService {
     private readonly storage: StorageService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    private readonly access: AccessService,
   ) {}
 
   async deliver(reportId: string): Promise<DeliveryStatus> {
@@ -66,13 +67,20 @@ export class ReportDeliveryService {
   }
 
   private async recipients(organizationId: string, type: string, roles: string[], emails: string[]): Promise<string[]> {
-    const financeRoles = rolesWithPermission('finance.view');
-    const chosenRoles = Object.values(OrgRole).filter((role) => roles.includes(role) && (type !== 'FINANCIAL' || financeRoles.includes(role)));
+    const chosenRoles = Object.values(OrgRole).filter((role) => roles.includes(role));
+    // Each member must be allowed to see the report themselves (reports, and the area it covers), going by
+    // their own permissions rather than their role's defaults.
+    const areaPermission = reportTypePermission(type);
+    const [canSeeReports, canSeeArea] = await Promise.all([
+      this.access.userIdsWithPermission(organizationId, 'report.view'),
+      this.access.userIdsWithPermission(organizationId, areaPermission),
+    ]);
+    const allowed = new Set(canSeeReports.filter((userId) => canSeeArea.includes(userId)));
     const members = chosenRoles.length
-      ? await this.prisma.userOrganization.findMany({
+      ? (await this.prisma.userOrganization.findMany({
         where: { organizationId, role: { in: chosenRoles }, user: { status: 'ACTIVE' } },
-        select: { user: { select: { email: true } } },
-      })
+        select: { userId: true, user: { select: { email: true } } },
+      })).filter((member) => allowed.has(member.userId))
       : [];
     const unique = new Map<string, string>();
     for (const email of [...members.map((member) => member.user.email), ...emails]) unique.set(email.toLowerCase(), email);

@@ -10,7 +10,7 @@ import { PurchaseOrderWorkflowService } from './purchase-order-workflow.service'
 import { PurchaseOrderDetailView, PurchaseOrderView } from './purchase-order.mapper';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import type { Permission } from '@sitepilot/types';
-import { PermissionsGuard, RequirePermission } from '../../common/permissions';
+import { PermissionsGuard, RequirePermission, RequireAnyPermission } from '../../common/permissions';
 import { Audit } from '../../common/audit';
 
 interface AuthUser { id: string; organizationId: string; role: string; permissions: Permission[] }
@@ -24,11 +24,13 @@ export class PurchaseOrdersController {
     private readonly deliveries: DeliveriesService,
   ) {}
 
+  @RequireAnyPermission('procurement.view', 'finance.view')
   @Get()
   findAll(@Query() query: PurchaseOrderQueryDto, @CurrentUser() user: AuthUser): Promise<PurchaseOrderView[]> {
     return this.orders.findAll(user.organizationId, query);
   }
 
+  @RequireAnyPermission('procurement.view', 'finance.view')
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<PurchaseOrderDetailView> {
     return this.orders.findOne(id, user.organizationId);

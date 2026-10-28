@@ -7,8 +7,12 @@ import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { PlatformAdminGuard } from '../src/modules/ai/platform-admin.guard';
 import { Reflector } from '@nestjs/core';
 import type { Permission } from '@sitepilot/types';
+import { OrgRole } from '@prisma/client';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { RequestMethod } from '@nestjs/common';
 import {
-  ALL_PERMISSIONS, PERMISSIONS_KEY, PermissionsGuard, ROLE_PERMISSIONS, permissionsForRole,
+  ALL_PERMISSIONS, ANY_PERMISSIONS_KEY, PERMISSIONS_KEY, PermissionsGuard, ROLE_PERMISSIONS, diffPermissions, memberPermissions,
+  permissionsForRole, rolePermissions,
 } from '../src/common/permissions';
 import { ControllerClass, MODULES_DIR, loadControllers, writeRoutes } from './controller-routes';
 
@@ -97,10 +101,10 @@ describe('route permissions', () => {
 });
 
 describe('role catalogue', () => {
-  it('gives owners and admins everything and viewers nothing', () => {
+  it('gives owners and admins everything and viewers only projects and daily reports to read', () => {
     assert.deepEqual([...ROLE_PERMISSIONS.OWNER].sort(), [...ALL_PERMISSIONS].sort());
     assert.deepEqual([...ROLE_PERMISSIONS.ADMIN].sort(), [...ALL_PERMISSIONS].sort());
-    assert.deepEqual(permissionsForRole('VIEWER'), []);
+    assert.deepEqual(permissionsForRole('VIEWER').sort(), ['dailyReport.view', 'project.view']);
   });
 
   it('keeps money movement with finance and administrators', () => {
@@ -159,10 +163,96 @@ describe('PermissionsGuard', () => {
     assert.throws(() => guard.canActivate(contextFor(Example.prototype.open, [])), ForbiddenException);
   });
 
+  it('accepts any one of the listed permissions on shared lookups', () => {
+    class Lookup { list(): void {} }
+    Reflect.defineMetadata(ANY_PERMISSIONS_KEY, ['procurement.view', 'finance.view'], Lookup.prototype.list);
+    const context = (permissions: Permission[]): ExecutionContext => ({
+      getHandler: () => Lookup.prototype.list,
+      getClass: () => Lookup,
+      switchToHttp: () => ({ getRequest: () => ({ user: { permissions } }) }),
+    } as unknown as ExecutionContext);
+    assert.equal(guard.canActivate(context(['finance.view'])), true);
+    assert.throws(() => guard.canActivate(context(['billing.view'])), ForbiddenException);
+  });
+
   it('explains what is missing in plain words', () => {
     assert.throws(
       () => guard.canActivate(contextFor(Example.prototype.approve, ['finance.view'])),
       (error: Error) => error.message.includes('approve vendor invoices'),
     );
+  });
+});
+
+/** Controllers of areas whose reads are gated by a view permission (ADR-050). */
+const VIEW_GATED_CONTROLLERS = new Set([
+  'ProjectsController', 'OrganizationDailyReportsController', 'DailyReportsController', 'DocumentsController',
+  'VendorsController', 'RfqsController', 'PurchaseOrdersController', 'DeliveriesController', 'ProcurementInsightsController',
+  'MaterialsController', 'MaterialRequestsController', 'ProjectMaterialsController', 'InventoryController',
+  'WorkforceController', 'ProjectWorkforceController', 'AttendanceController', 'ReportsController',
+]);
+/** Reads deliberately open to every member: the project picker shows only names, for forms everywhere. */
+const OPEN_READS = new Set(['ProjectsController.findOptions']);
+
+describe('module view permissions', () => {
+  let controllers: ControllerClass[] = [];
+  before(async () => {
+    controllers = await loadControllers();
+  });
+
+  it('gates every read in module areas behind a view permission', () => {
+    const names = new Set(controllers.map((controller) => controller.name));
+    assert.deepEqual([...VIEW_GATED_CONTROLLERS].filter((name) => !names.has(name)), [], 'a gated controller was renamed');
+    const ungated: string[] = [];
+    for (const controller of controllers) {
+      for (const name of Object.getOwnPropertyNames(controller.prototype)) {
+        const handler = controller.prototype[name];
+        if (name === 'constructor' || typeof handler !== 'function' || !Reflect.hasMetadata(PATH_METADATA, handler)) continue;
+        if (Reflect.getMetadata(METHOD_METADATA, handler) !== RequestMethod.GET) continue;
+        const key = `${controller.name}.${name}`;
+        if (!VIEW_GATED_CONTROLLERS.has(controller.name) || OPEN_READS.has(key)) continue;
+        const required: Permission[] = [...(Reflect.getMetadata(PERMISSIONS_KEY, handler) ?? []), ...(Reflect.getMetadata(PERMISSIONS_KEY, controller) ?? [])];
+        const anyOf: Permission[] = Reflect.getMetadata(ANY_PERMISSIONS_KEY, handler) ?? [];
+        if (![...required, ...anyOf].some((permission) => permission.endsWith('.view'))) ungated.push(key);
+      }
+    }
+    assert.deepEqual(ungated, [], `Add a view permission to: ${ungated.join(', ')}`);
+  });
+
+  it('gives every role the view of each area it can act in', () => {
+    const viewFor: Partial<Record<Permission, Permission>> = {
+      'po.create': 'procurement.view', 'po.approve': 'procurement.view', 'rfq.manage': 'procurement.view', 'vendor.manage': 'procurement.view',
+      'delivery.receive': 'procurement.view', 'material.manage': 'material.view', 'material.issue': 'material.view',
+      'material.request': 'material.view', 'inventory.adjust': 'inventory.view', 'inventory.transfer': 'inventory.view',
+      'warehouse.manage': 'inventory.view', 'workforce.manage': 'workforce.view', 'attendance.mark': 'workforce.view',
+      'dailyReport.write': 'dailyReport.view', 'dailyReport.approve': 'dailyReport.view', 'report.manage': 'report.view',
+      'project.update': 'project.view', 'project.members.manage': 'project.view',
+    };
+    for (const [role, granted] of Object.entries(ROLE_PERMISSIONS)) {
+      for (const permission of granted) {
+        const view = viewFor[permission];
+        if (view) assert.ok(granted.includes(view), `${role} has ${permission} without ${view}`);
+      }
+    }
+  });
+});
+
+describe('customised permissions', () => {
+  it('applies role changes, then the member’s own additions and removals', () => {
+    const role = { granted: ['po.approve'], revoked: ['workforce.manage'] };
+    const member = { granted: ['finance.view'], revoked: ['po.approve'] };
+    const result = memberPermissions(OrgRole.SITE_ENGINEER, role, member);
+    assert.ok(result.includes('finance.view'));
+    assert.ok(!result.includes('po.approve'));
+    assert.ok(!result.includes('workforce.manage'));
+    assert.ok(result.includes('dailyReport.write'));
+  });
+
+  it('never restricts the owner and ignores permissions the product no longer has', () => {
+    assert.equal(memberPermissions(OrgRole.OWNER, { granted: [], revoked: ALL_PERMISSIONS }, { granted: [], revoked: ['audit.view'] }).length, ALL_PERMISSIONS.length);
+    assert.deepEqual(rolePermissions(OrgRole.VIEWER, { granted: ['retired.permission'], revoked: [] }).sort(), ['dailyReport.view', 'project.view']);
+  });
+
+  it('stores a chosen set as the smallest change from the base', () => {
+    assert.deepEqual(diffPermissions(['project.view', 'dailyReport.view'], ['project.view', 'report.view']), { granted: ['report.view'], revoked: ['dailyReport.view'] });
   });
 });

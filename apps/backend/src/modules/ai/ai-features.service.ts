@@ -1,7 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { AiContextService } from './ai-context.service';
+import type { Permission } from '@sitepilot/types';
+import { AI_CONTEXT_AREAS, AiContextService } from './ai-context.service';
 import { AiAnswer, AiService } from './ai.service';
 import { AiConversationsService, ChatTurn } from './ai-conversations.service';
 import { AiChatDto } from './dto/ai-settings.dto';
@@ -101,13 +102,13 @@ export class AiFeaturesService {
     private readonly conversations: AiConversationsService,
   ) {}
 
-  async projectChat(organizationId: string, userId: string, projectId: string, dto: AiChatDto): Promise<ChatReplyView> {
-    const project = await this.context.project(projectId, organizationId);
+  async projectChat(organizationId: string, userId: string, permissions: readonly Permission[], projectId: string, dto: AiChatDto): Promise<ChatReplyView> {
+    const project = await this.context.project(projectId, organizationId, permissions);
     return this.converse({ organizationId, userId, projectId, feature: 'project_chat' }, dto, `You are answering about the project "${project.name}".`, project.context);
   }
 
-  async organizationChat(organizationId: string, userId: string, dto: AiChatDto): Promise<ChatReplyView> {
-    const context = await this.context.organization(organizationId);
+  async organizationChat(organizationId: string, userId: string, permissions: readonly Permission[], dto: AiChatDto): Promise<ChatReplyView> {
+    const context = await this.context.organization(organizationId, permissions);
     return this.converse({ organizationId, userId, projectId: null, feature: 'org_chat' }, dto, 'You are answering about the whole organization across all projects.', context);
   }
 
@@ -134,7 +135,14 @@ export class AiFeaturesService {
   }
 
   /** Writes the summary onto the report so everyone sees the same one without paying for it again. */
-  async summarizeDailyReport(organizationId: string, userId: string, projectId: string, reportId: string): Promise<{ id: string; aiSummary: string } & ChatAnswerView> {
+  async summarizeDailyReport(
+    organizationId: string,
+    userId: string,
+    permissions: readonly Permission[],
+    projectId: string,
+    reportId: string,
+  ): Promise<{ id: string; aiSummary: string } & ChatAnswerView> {
+    if (!permissions.includes('dailyReport.view')) throw new ForbiddenException('Your access doesn’t include daily reports.');
     const { context } = await this.context.dailyReport(projectId, reportId, organizationId);
     const answer = await this.ai.complete(
       { organizationId, userId, feature: 'daily_report_summary' },
@@ -163,19 +171,21 @@ export class AiFeaturesService {
     return answer.text.trim();
   }
 
-  async latestInsights(organizationId: string): Promise<InsightSnapshotView | null> {
-    const snapshot = await this.prisma.aiInsightSnapshot.findFirst({ where: { organizationId }, orderBy: { createdAt: 'desc' } });
+  /** The newest snapshot built only from areas this member can view; insights are shared across the organization. */
+  async latestInsights(organizationId: string, permissions: readonly Permission[]): Promise<InsightSnapshotView | null> {
+    const recent = await this.prisma.aiInsightSnapshot.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 20 });
+    const snapshot = recent.find((candidate) => (candidate.areas.length ? candidate.areas : AI_CONTEXT_AREAS).every((area) => permissions.some((permission) => permission === area)));
     if (!snapshot) return null;
     return { insights: parseInsightsFromJson(snapshot.content), generatedAt: snapshot.createdAt, provider: snapshot.provider, model: snapshot.model };
   }
 
-  async refreshInsights(organizationId: string, userId: string): Promise<InsightSnapshotView> {
+  async refreshInsights(organizationId: string, userId: string, permissions: readonly Permission[]): Promise<InsightSnapshotView> {
     const latest = await this.prisma.aiInsightSnapshot.findFirst({ where: { organizationId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } });
     if (latest && Date.now() - latest.createdAt.getTime() < INSIGHTS_COOLDOWN_MS) {
       throw new ConflictException('Insights were refreshed a few minutes ago. Try again in a little while.');
     }
 
-    const context = await this.context.organization(organizationId);
+    const context = await this.context.organization(organizationId, permissions);
     const answer = await this.ai.complete(
       { organizationId, userId, feature: 'insights' },
       {
@@ -195,6 +205,7 @@ Only include items supported by the data. If nothing needs attention, return an 
         provider: answer.provider,
         model: answer.model,
         generatedById: userId,
+        areas: AI_CONTEXT_AREAS.filter((area) => permissions.includes(area)),
       },
     });
     return { insights, generatedAt: snapshot.createdAt, provider: snapshot.provider, model: snapshot.model };
