@@ -14,9 +14,16 @@ import { useCan, useCurrentAccess } from '@/hooks/api/use-access';
 import { UserAvatar } from '@/components/shared/UserAvatar';
 import { isItemActive, navigation } from './navigation';
 
-export function Sidebar() {
+interface SidebarProps {
+  /** Shown inside the mobile drawer: full width, never collapsed, and closes when a link is followed. */
+  inDrawer?: boolean;
+  onNavigate?: () => void;
+}
+
+export function Sidebar({ inDrawer = false, onNavigate }: SidebarProps = {}) {
   const pathname = usePathname();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [collapsed, setIsCollapsed] = useState(false);
+  const isCollapsed = !inDrawer && collapsed;
   const user = useAuthStore((state) => state.user);
   const organization = useAuthStore((state) => state.organization);
   const hydrated = useAuthHydrated();
@@ -35,9 +42,12 @@ export function Sidebar() {
   return (
     <motion.div
       initial={false}
-      animate={{ width: isCollapsed ? 72 : 240 }}
+      animate={inDrawer ? undefined : { width: isCollapsed ? 72 : 240 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className="relative flex flex-col border-r bg-sidebar h-screen z-20 hidden md:flex shrink-0"
+      className={cn(
+        'relative flex-col bg-sidebar z-20 shrink-0',
+        inDrawer ? 'flex h-full w-full' : 'hidden h-screen border-r md:flex',
+      )}
     >
       {/* Logo */}
       <div className="flex h-16 items-center px-4 border-b border-sidebar-border shrink-0">
@@ -80,14 +90,14 @@ export function Sidebar() {
       </div>
 
       {/* Collapse toggle: straddles the sidebar's edge on the line under the logo, so the container must not clip. */}
-      <button
+      {!inDrawer && <button
         type="button"
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="absolute -right-3 top-16 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full border bg-background shadow-sm hover:bg-accent hover:text-foreground text-muted-foreground z-30 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
-      </button>
+      </button>}
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 space-y-5" data-tour="sidebar-nav">
@@ -122,8 +132,11 @@ export function Sidebar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={onNavigate}
                     className={cn(
-                      'group relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
+                      'group relative flex items-center gap-3 rounded-md px-2.5 text-sm font-medium transition-colors',
+                      // Finger-sized rows in the drawer.
+                      inDrawer ? 'py-3' : 'py-2',
                       active
                         ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                         : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground',

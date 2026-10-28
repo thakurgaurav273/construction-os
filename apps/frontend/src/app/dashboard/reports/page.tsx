@@ -12,6 +12,7 @@ import { ScheduleReportSheet } from '@/features/reports/components/ScheduleRepor
 import { useReportTemplates } from '@/hooks/api/use-reports';
 import type { ReportSchedule, ReportTemplate } from '@/features/reports/types';
 import ReportsLoading from './loading';
+import { PageAction, PageHeader } from '@/components/shared/PageHeader';
 
 const TABS = ['templates', 'history', 'schedules'] as const;
 type ReportsTab = (typeof TABS)[number];
@@ -52,10 +53,7 @@ function ReportsContent(): React.ReactElement {
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Reports</h2>
-        <p className="mt-1 text-muted-foreground">Generate branded PDF and Excel reports, or schedule them to land in your team’s inbox.</p>
-      </div>
+      <PageHeader title="Reports" description="Generate branded PDF and Excel reports, or schedule them to land in your team’s inbox." />
 
       <Tabs value={tab} onValueChange={(next) => navigate(isReportsTab(next) ? next : 'templates')}>
         <TabsList data-tour="reports-tabs">

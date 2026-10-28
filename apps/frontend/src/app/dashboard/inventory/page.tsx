@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
-  Button,
   Tabs, TabsList, TabsTrigger, TabsContent,
   Skeleton,
 } from '@sitepilot/ui';
@@ -23,6 +22,7 @@ import { fetchAllInventoryItems } from '@/hooks/api/use-inventory';
 import { downloadCsv } from '@/lib/download-csv';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { ImportButton } from '@/features/data-import/components/ImportButton';
+import { PageAction, PageHeader } from '@/components/shared/PageHeader';
 
 // Analytics is chart-heavy and sits behind a tab, so load it on demand.
 const AnalyticsTab = dynamic(
@@ -93,20 +93,17 @@ export default function InventoryPage(): React.ReactElement {
       <motion.div
         initial={false}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row items-start justify-between gap-4"
       >
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Inventory</h2>
-          <p className="text-muted-foreground mt-1">
-            Know exactly what you have, where it is, and when to reorder - across every warehouse and site store.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={handleExport} disabled={exporting}>
-            <Download className="mr-1.5 h-4 w-4" /> {exporting ? 'Exporting…' : 'Export'}
-          </Button>
-          <ImportButton entity="OPENING_STOCK" />
-        </div>
+        <PageHeader
+          title="Inventory"
+          description="Know exactly what you have, where it is, and when to reorder - across every warehouse and site store."
+          actions={(
+            <>
+              <PageAction icon={Download} label={exporting ? 'Exporting…' : 'Export'} onClick={handleExport} disabled={exporting} />
+              <ImportButton entity="OPENING_STOCK" />
+            </>
+          )}
+        />
       </motion.div>
 
       {/* KPI Cards */}

@@ -43,11 +43,16 @@ export class RolePermissionsService {
     private readonly access: AccessService,
   ) {}
 
-  async catalogue(organizationId: string): Promise<RoleCatalogue> {
+  /**
+   * The full role map for people who manage the team; everyone else gets only their own role, since what
+   * other roles can do is the admins' business.
+   */
+  async catalogue(organizationId: string, viewer?: Pick<Actor, 'role' | 'permissions'>): Promise<RoleCatalogue> {
     const effective = await this.access.rolePermissionsIn(organizationId);
+    const seesAllRoles = !viewer || viewer.permissions.includes('roles.manage') || viewer.permissions.includes('members.manage');
     return {
       permissions: ALL_PERMISSIONS.map((key) => ({ key, ...PERMISSION_CATALOGUE[key] })),
-      roles: Object.values(OrgRole).map((role) => {
+      roles: Object.values(OrgRole).filter((role) => seesAllRoles || role === viewer?.role).map((role) => {
         const defaults = rolePermissions(role);
         const permissions = effective.get(role) ?? defaults;
         return { role, permissions, defaults, customized: !sameSet(defaults, permissions) };

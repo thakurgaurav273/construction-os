@@ -15,6 +15,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ProjectFormDialog } from './components/ProjectFormDialog';
 import { Can } from '@/components/shared/Can';
+import { PageAction, PageHeader } from '@/components/shared/PageHeader';
 
 const STATUS_FILTERS = ['PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED', 'ARCHIVED'] as const;
 const PRIORITY_FILTERS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
@@ -72,21 +73,17 @@ export default function ProjectsListPage() {
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Projects</h2>
-          <p className="text-muted-foreground mt-1">
-            {isLoading || !data
-              ? 'Loading…'
-              : `${data.total} ${statusFilter === 'ARCHIVED' ? 'archived ' : ''}project${data.total !== 1 ? 's' : ''}${statusFilter === 'ALL' ? ' (archived projects are hidden)' : ''}`}
-          </p>
-        </div>
-        <Can permission="project.create">
-          <Button onClick={() => setCreateOpen(true)} data-tour="projects-new">
-            <Plus className="mr-2 h-4 w-4" /> New Project
-          </Button>
-        </Can>
-      </div>
+      <PageHeader
+        title="Projects"
+        description={isLoading || !data
+          ? 'Loading…'
+          : `${data.total} ${statusFilter === 'ARCHIVED' ? 'archived ' : ''}project${data.total !== 1 ? 's' : ''}${statusFilter === 'ALL' ? ' (archived projects are hidden)' : ''}`}
+        actions={(
+          <Can permission="project.create">
+            <PageAction primary icon={Plus} label="New Project" onClick={() => setCreateOpen(true)} data-tour="projects-new" />
+          </Can>
+        )}
+      />
 
       <div className="flex flex-col sm:flex-row items-center gap-3" data-tour="projects-filters">
         <div className="relative w-full sm:max-w-md">

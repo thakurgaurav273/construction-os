@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { ModuleAccessGuard } from '@/components/layout/ModuleAccessGuard';
+import { MobileBottomNav, MobileNavDrawer } from '@/components/layout/MobileNav';
 import { CommandPalette } from '@/components/CommandPalette';
 import { BrandThemeStyle } from '@/features/branding/components/BrandThemeStyle';
 import { HelpCenter } from '@/features/help/components/HelpCenter';
@@ -22,7 +23,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Sidebar />
         </div>
         
-        {/* Mobile sidebar overlay would go here if we implemented the full mobile drawer */}
+        {/* Phones and small tablets: the menu slides in from the left. */}
+        <div className="contents print:hidden">
+          <MobileNavDrawer open={sidebarOpen} onOpenChange={setSidebarOpen} />
+        </div>
 
         <div className="flex flex-1 flex-col overflow-hidden print:block print:overflow-visible">
           <div className="contents print:hidden">
@@ -32,11 +36,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             />
           </div>
           
-          <main className="flex-1 overflow-y-auto bg-muted/20 print:overflow-visible print:bg-white">
+          {/* Bottom padding keeps content clear of the phone tab bar. */}
+          <main className="flex-1 overflow-y-auto bg-muted/20 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 print:overflow-visible print:bg-white print:pb-0">
             <ModuleAccessGuard>{children}</ModuleAccessGuard>
           </main>
         </div>
         
+        <MobileBottomNav onMore={() => setSidebarOpen(true)} />
         <CommandPalette open={commandPaletteOpen} setOpen={setCommandPaletteOpen} />
         <HelpCenter />
         <ProductTour />

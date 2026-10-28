@@ -2,7 +2,7 @@
 
 import React, { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from '@sitepilot/ui';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@sitepilot/ui';
 import { Plus, ShieldAlert } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useCan, useCurrentAccess } from '@/hooks/api/use-access';
@@ -13,6 +13,7 @@ import { RaBillsList } from '@/features/billing/components/RaBillsList';
 import { ReceivablesList } from '@/features/billing/components/ReceivablesList';
 import { MarginView } from '@/features/billing/components/margin/MarginView';
 import BillingLoading from './loading';
+import { PageAction, PageHeader } from '@/components/shared/PageHeader';
 
 const TABS = ['bills', 'receivables', 'margin', 'contracts', 'clients'] as const;
 type BillingTab = (typeof TABS)[number];
@@ -49,13 +50,11 @@ function BillingContent(): React.ReactElement {
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Billing</h2>
-          <p className="mt-1 text-muted-foreground">Running account bills against contract BOQs: to your clients, and from your subcontractors.</p>
-        </div>
-        {canManage && <Button onClick={() => setCreateOpen(true)} data-tour="billing-new-contract"><Plus className="mr-2 h-4 w-4" /> New Contract</Button>}
-      </div>
+      <PageHeader
+        title="Billing"
+        description="Running account bills against contract BOQs: to your clients, and from your subcontractors."
+        actions={canManage && <PageAction primary icon={Plus} label="New Contract" onClick={() => setCreateOpen(true)} data-tour="billing-new-contract" />}
+      />
 
       <Tabs value={tab} onValueChange={openTab}>
         <TabsList data-tour="billing-tabs">

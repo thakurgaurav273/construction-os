@@ -7,6 +7,7 @@ import { InviteMemberDialog } from './InviteMemberDialog';
 import { MembersCard } from './MembersCard';
 import { PendingInvitationsCard } from './PendingInvitationsCard';
 import { RolesPermissionsCard } from './RolesPermissionsCard';
+import { YourAccessCard } from './YourAccessCard';
 
 /** Settings → Members & Roles: the team, open invitations and what each role can do. */
 export function MembersTab(): React.ReactElement {
@@ -21,7 +22,8 @@ export function MembersTab(): React.ReactElement {
     <div className="space-y-6">
       <MembersCard canManage={canManage} canManageRoles={canManageRoles} currentRole={access?.role} assignableRoles={assignableRoles} onInvite={() => setInviteOpen(true)} />
       {canManage && <PendingInvitationsCard />}
-      <RolesPermissionsCard currentRole={access?.role} />
+      {/* The whole role map is for people who manage the team; everyone else sees their own access. */}
+      {canManage || canManageRoles ? <RolesPermissionsCard currentRole={access?.role} /> : <YourAccessCard />}
       {canManage && <InviteMemberDialog open={inviteOpen} onOpenChange={setInviteOpen} assignableRoles={assignableRoles} />}
     </div>
   );

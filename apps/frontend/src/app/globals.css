@@ -30,3 +30,14 @@
     @apply bg-muted-foreground/30;
   }
 }
+
+@layer utilities {
+  /* Swipeable rows (project tabs, settings tabs on phones) scroll without showing a scrollbar. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}

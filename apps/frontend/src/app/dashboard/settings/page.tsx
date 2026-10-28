@@ -5,6 +5,8 @@ import {
   Bell, Building2, FileSpreadsheet, History, Palette, Plug, Shield, Sparkles, UserRound, Users, type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@sitepilot/ui';
+import type { Permission } from '@sitepilot/types';
+import { useCan } from '@/hooks/api/use-access';
 import { AuditLogsTab } from '@/features/audit/components/AuditLogsTab';
 import { NotificationPreferencesTab } from '@/features/notifications/components/NotificationPreferencesTab';
 import { AiSettingsTab } from '@/features/ai/components/AiSettingsTab';
@@ -21,6 +23,8 @@ interface SettingsTab {
   name: string;
   icon: LucideIcon;
   component: React.ComponentType;
+  /** Hidden from members without it, like the main menu. Unset: everyone (personal settings, the team list). */
+  permission?: Permission;
 }
 
 /** Personal settings first, then the workspace. Ids double as URL hashes, e.g. /dashboard/settings#notifications. */
@@ -36,13 +40,13 @@ const SECTIONS: { title: string; tabs: SettingsTab[] }[] = [
   {
     title: 'Workspace',
     tabs: [
-      { id: 'organization', name: 'Organization', icon: Building2, component: OrganizationSettingsTab },
+      { id: 'organization', name: 'Organization', icon: Building2, component: OrganizationSettingsTab, permission: 'organization.manage' },
       { id: 'members', name: 'Members & Roles', icon: Users, component: MembersTab },
-      { id: 'branding', name: 'Branding', icon: Palette, component: BrandingTab },
-      { id: 'integrations', name: 'Integrations', icon: Plug, component: IntegrationsTab },
-      { id: 'ai', name: 'AI', icon: Sparkles, component: AiSettingsTab },
-      { id: 'data-import', name: 'Data Import', icon: FileSpreadsheet, component: ImportTemplatesTab },
-      { id: 'audit', name: 'Audit Logs', icon: History, component: AuditLogsTab },
+      { id: 'branding', name: 'Branding', icon: Palette, component: BrandingTab, permission: 'organization.manage' },
+      { id: 'integrations', name: 'Integrations', icon: Plug, component: IntegrationsTab, permission: 'organization.manage' },
+      { id: 'ai', name: 'AI', icon: Sparkles, component: AiSettingsTab, permission: 'ai.manage' },
+      { id: 'data-import', name: 'Data Import', icon: FileSpreadsheet, component: ImportTemplatesTab, permission: 'data.import' },
+      { id: 'audit', name: 'Audit Logs', icon: History, component: AuditLogsTab, permission: 'audit.view' },
     ],
   },
 ];
@@ -52,6 +56,11 @@ const DEFAULT_TAB = 'organization';
 
 export default function SettingsPage(): React.ReactElement {
   const [activeTab, setActiveTab] = useState(DEFAULT_TAB);
+  const can = useCan();
+  const sections = SECTIONS
+    .map((section) => ({ ...section, tabs: section.tabs.filter((tab) => !tab.permission || can(tab.permission)) }))
+    .filter((section) => section.tabs.length > 0);
+  const visibleTabs = sections.flatMap((section) => section.tabs);
 
   // Other screens link straight to a tab, and the hash keeps the tab across reloads.
   useEffect(() => {
@@ -69,19 +78,46 @@ export default function SettingsPage(): React.ReactElement {
     window.history.replaceState(null, '', `#${id}`);
   }
 
-  const ActiveTab = (TABS.find((tab) => tab.id === activeTab) ?? TABS[0]).component;
+  // A tab this member can't open (e.g. from an old link) falls back to their first one, usually Profile.
+  const ActiveTab = (visibleTabs.find((tab) => tab.id === activeTab) ?? visibleTabs[0] ?? TABS[0]).component;
+  const shownTab = visibleTabs.some((tab) => tab.id === activeTab) ? activeTab : visibleTabs[0]?.id;
+
+  // Keep the chosen tab visible in the phone tab row, which scrolls sideways.
+  useEffect(() => {
+    document.getElementById(`settings-tab-${shownTab}`)?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [shownTab]);
 
   return (
     <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
+      <div className="mb-4 sm:mb-8">
+        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Settings</h2>
         <p className="text-muted-foreground mt-1">Manage your account, your team and how this workspace is set up.</p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-8">
-        <aside className="w-full md:w-64 shrink-0">
-          <nav className="flex flex-col gap-6" aria-label="Settings">
-            {SECTIONS.map((section) => (
+      <div className="flex flex-col gap-4 md:flex-row md:gap-8">
+        {/* Phones: one swipeable row of tabs, like an app, instead of a long list above the content. */}
+        <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none md:hidden" aria-label="Settings">
+          {visibleTabs.map((tab) => (
+            <button
+              key={tab.id}
+              id={`settings-tab-${tab.id}`}
+              type="button"
+              onClick={() => openTab(tab.id)}
+              aria-current={shownTab === tab.id ? 'page' : undefined}
+              className={cn(
+                'flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                shownTab === tab.id ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-muted-foreground',
+              )}
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.name}
+            </button>
+          ))}
+        </nav>
+
+        <aside className="hidden w-64 shrink-0 md:block">
+          <nav className="flex flex-col gap-6" aria-label="Settings sections">
+            {sections.map((section) => (
               <div key={section.title} className="space-y-1">
                 <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{section.title}</p>
                 {section.tabs.map((tab) => (
@@ -89,10 +125,10 @@ export default function SettingsPage(): React.ReactElement {
                     key={tab.id}
                     type="button"
                     onClick={() => openTab(tab.id)}
-                    aria-current={activeTab === tab.id ? 'page' : undefined}
+                    aria-current={shownTab === tab.id ? 'page' : undefined}
                     className={cn(
                       'flex w-full items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                      activeTab === tab.id ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                      shownTab === tab.id ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                     )}
                   >
                     <tab.icon className="h-4 w-4" />

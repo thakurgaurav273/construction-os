@@ -13,7 +13,8 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      'inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground',
+      // On narrow screens a long row of tabs scrolls sideways instead of pushing the page wider.
+      'inline-flex h-9 max-w-full items-center justify-start overflow-x-auto scrollbar-none rounded-lg bg-muted p-1 text-muted-foreground',
       className,
     )}
     {...props}
