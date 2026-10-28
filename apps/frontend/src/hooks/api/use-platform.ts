@@ -84,3 +84,69 @@ export function useMakePlatformDefault() {
 export function useRemovePlatformKey() {
   return usePlatformMutation((provider: AiProviderId) => apiClient.delete(`/platform/ai/providers/${provider}`));
 }
+
+/** Email or storage settings saved in the app. Secrets come back only as `secretHint`. */
+export interface PlatformIntegrationRecord {
+  kind: 'STORAGE' | 'EMAIL';
+  provider: string;
+  settings: Record<string, string>;
+  secretHint: string;
+  lastVerifiedAt: string;
+  updatedByEmail: string;
+  updatedAt: string;
+}
+
+export interface PlatformIntegrations {
+  storage: PlatformIntegrationRecord | null;
+  email: PlatformIntegrationRecord | null;
+  canSave: boolean;
+}
+
+export interface StorageIntegrationInput {
+  provider: 's3' | 'r2';
+  bucket: string;
+  region?: string;
+  endpoint?: string;
+  accountId?: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+}
+
+export interface EmailIntegrationInput {
+  apiKey: string;
+  fromAddress: string;
+}
+
+const INTEGRATIONS_KEY = [...PLATFORM_KEY, 'integrations'] as const;
+
+/** Platform admins only; everyone else reads the status through useIntegrations. */
+export function usePlatformIntegrations({ enabled = true }: { enabled?: boolean } = {}) {
+  return useQuery<PlatformIntegrations>({
+    queryKey: INTEGRATIONS_KEY,
+    queryFn: async () => unwrap(await apiClient.get('/platform/integrations')),
+    enabled,
+  });
+}
+
+function useIntegrationMutation<TVariables>(request: (variables: TVariables) => Promise<unknown>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: request,
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: INTEGRATIONS_KEY }),
+      queryClient.invalidateQueries({ queryKey: ['settings', 'integrations'] }),
+    ]),
+  });
+}
+
+export function useSaveStorageIntegration() {
+  return useIntegrationMutation((input: StorageIntegrationInput) => apiClient.put('/platform/integrations/storage', input));
+}
+
+export function useSaveEmailIntegration() {
+  return useIntegrationMutation((input: EmailIntegrationInput) => apiClient.put('/platform/integrations/email', input));
+}
+
+export function useRemoveIntegration() {
+  return useIntegrationMutation((kind: 'storage' | 'email') => apiClient.delete(`/platform/integrations/${kind}`));
+}

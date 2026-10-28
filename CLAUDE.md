@@ -2255,6 +2255,11 @@ Never commit:
 - Build output
 - Generated cache
 
+Never add AI attribution to commits or pull requests.
+
+- No `Co-Authored-By: Claude ...` (or any AI agent) trailer in commit messages.
+- No "Generated with Claude Code" line in PR descriptions.
+
 ---
 
 # Code Review Checklist

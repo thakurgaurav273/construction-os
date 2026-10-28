@@ -41,6 +41,11 @@ const UNAUDITED_WRITES = new Set([
   'PlatformController.saveKey',
   'PlatformController.makeDefault',
   'PlatformController.removeKey',
+  // Platform email and storage settings belong to no tenant; changes are logged with the admin's email.
+  'PlatformIntegrationsController.saveStorage',
+  'PlatformIntegrationsController.removeStorage',
+  'PlatformIntegrationsController.saveEmail',
+  'PlatformIntegrationsController.removeEmail',
 ]);
 
 describe('audit coverage', () => {

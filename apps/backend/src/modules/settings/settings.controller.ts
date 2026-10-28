@@ -70,7 +70,7 @@ export class SettingsController {
 
   @RequirePermission('organization.manage')
   @Get('integrations')
-  getIntegrations(): IntegrationView[] {
+  getIntegrations(): Promise<IntegrationView[]> {
     return this.integrations.list();
   }
 

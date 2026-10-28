@@ -4,9 +4,13 @@ import React from 'react';
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Skeleton } from '@sitepilot/ui';
 import { AlertTriangle, HardDrive, Mail, ShieldAlert, Sparkles, type LucideIcon } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { useCan } from '@/hooks/api/use-access';
+import { useCan, useCurrentAccess } from '@/hooks/api/use-access';
 import { useAiStatus, type AiProviderId, type AiStatus } from '@/hooks/api/use-ai';
+import { usePlatformIntegrations } from '@/hooks/api/use-platform';
 import { useIntegrations, type Integration, type IntegrationState } from '@/hooks/api/use-settings';
+import { useAuthStore } from '@/store/auth.store';
+import { EmailIntegrationDialog } from './EmailIntegrationDialog';
+import { StorageIntegrationDialog } from './StorageIntegrationDialog';
 
 const STATE_BADGES: Record<IntegrationState, { label: string; variant: 'success' | 'warning' | 'secondary' }> = {
   connected: { label: 'Connected', variant: 'success' },
@@ -61,14 +65,24 @@ function aiRow(status: AiStatus): IntegrationRowProps {
   return { icon: Sparkles, name: 'AI assistant', provider: null, state: 'not_configured', detail: status.blockedReason ?? 'Add an API key or request trial access to turn on AI features.' };
 }
 
+function ManageButton({ onClick }: { onClick: () => void }): React.ReactElement {
+  return <Button variant="outline" size="sm" className="self-start" onClick={onClick}>Manage</Button>;
+}
+
 /**
  * Settings → Integrations: the outside services SitePilot relies on and whether they're working. Email and
- * storage are set up on the server; AI is set up per organization in the AI tab.
+ * storage serve every workspace, so only platform admins can manage them here; AI is set up per
+ * organization in the AI tab.
  */
 export function IntegrationsTab(): React.ReactElement {
   const canView = useCan()('organization.manage');
+  const isPlatformAdmin = useCurrentAccess().data?.isPlatformAdmin ?? false;
+  const adminEmail = useAuthStore((state) => state.user?.email) ?? '';
   const integrations = useIntegrations({ enabled: canView });
+  const platformIntegrations = usePlatformIntegrations({ enabled: isPlatformAdmin });
   const aiStatus = useAiStatus();
+  const [managing, setManaging] = React.useState<Integration['id'] | null>(null);
+  const saved = platformIntegrations.data;
 
   if (!canView) {
     return (
@@ -100,7 +114,12 @@ export function IntegrationsTab(): React.ReactElement {
           <>
             <ul className="divide-y rounded-xl border">
               {integrations.data.map((integration) => (
-                <IntegrationRow key={integration.id} icon={ICONS[integration.id]} {...integration} />
+                <IntegrationRow
+                  key={integration.id}
+                  icon={ICONS[integration.id]}
+                  {...integration}
+                  action={saved && <ManageButton onClick={() => setManaging(integration.id)} />}
+                />
               ))}
               {aiStatus.data && (
                 <IntegrationRow
@@ -109,7 +128,20 @@ export function IntegrationsTab(): React.ReactElement {
                 />
               )}
             </ul>
-            <p className="mt-3 text-xs text-muted-foreground">Email and storage are configured by whoever hosts SitePilot for you, through server settings.</p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              {saved
+                ? 'Email and storage apply to every workspace on this SitePilot. Settings saved here replace the server’s.'
+                : 'Email and storage are configured by whoever hosts SitePilot for you.'}
+            </p>
+            {saved && !saved.canSave && (
+              <p className="mt-2 text-xs text-destructive">Keys can’t be saved until the server has AI_KEYS_ENCRYPTION_KEY set.</p>
+            )}
+            {saved && (
+              <>
+                <StorageIntegrationDialog open={managing === 'storage'} onOpenChange={(open) => setManaging(open ? 'storage' : null)} saved={saved.storage} />
+                <EmailIntegrationDialog open={managing === 'email'} onOpenChange={(open) => setManaging(open ? 'email' : null)} saved={saved.email} adminEmail={adminEmail} />
+              </>
+            )}
           </>
         )}
       </CardContent>

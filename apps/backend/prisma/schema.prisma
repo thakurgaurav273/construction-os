@@ -1762,6 +1762,28 @@ model PlatformAiCredential {
   @@map("platform_ai_credentials")
 }
 
+enum PlatformIntegrationKind {
+  STORAGE
+  EMAIL
+}
+
+/// Email delivery and file storage set up in the app by a platform super admin, for every tenant. Takes
+/// precedence over the server environment. Secrets are encrypted with SecretBoxService and never returned.
+model PlatformIntegration {
+  kind            PlatformIntegrationKind @id
+  /// s3 | r2 for STORAGE, resend for EMAIL.
+  provider        String
+  /// Non-secret settings: bucket, region, endpoint, account id, sender address.
+  settings        Json
+  encryptedSecret String
+  secretHint      String
+  lastVerifiedAt  DateTime
+  updatedByEmail  String
+  updatedAt       DateTime                @updatedAt
+
+  @@map("platform_integrations")
+}
+
 /// A tenant asking to use the platform's AI: a first free trial, or more requests afterwards.
 model AiAccessRequest {
   id                String                @id @default(uuid())
