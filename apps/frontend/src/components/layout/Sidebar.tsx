@@ -29,6 +29,7 @@ import { UserMenu } from '@/features/auth/components/UserMenu';
 import { OrganizationSwitcher } from '@/features/auth/components/OrganizationSwitcher';
 import { useOrganizationSettings } from '@/hooks/api/use-settings';
 import { useCan, useCurrentAccess } from '@/hooks/api/use-access';
+import { UserAvatar } from '@/components/shared/UserAvatar';
 
 interface NavItem {
   name: string;
@@ -103,10 +104,6 @@ export function Sidebar() {
   const visibleNavigation = navigation
     .map((group) => ({ ...group, items: group.items.filter((item) => !item.permission || !access || can(item.permission)) }))
     .filter((group) => group.items.length > 0);
-
-  const userInitials = user?.name
-    ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-    : '?';
 
   const orgInitials = organization?.name
     ? organization.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
@@ -258,9 +255,7 @@ export function Sidebar() {
             )}
           >
             {hydrated ? (
-              <div className="h-8 w-8 rounded-full bg-primary/10 border flex items-center justify-center text-xs font-semibold text-primary shrink-0">
-                {userInitials}
-              </div>
+              <UserAvatar name={user?.name ?? ''} avatar={user?.avatar} className="h-8 w-8 border" fallbackClassName="text-xs font-semibold" />
             ) : (
               <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
             )}

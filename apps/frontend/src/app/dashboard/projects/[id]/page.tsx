@@ -7,6 +7,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Badge, Progress, Button, Skeleton } from '@sitepilot/ui';
 import { useProject } from '@/hooks/api/use-projects';
+import { UserAvatar } from '@/components/shared/UserAvatar';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -42,10 +43,6 @@ function activityBg(type: string) {
 function formatCrore(n: number | null | undefined) {
   if (!n) return '-';
   return `₹${(n / 10_000_000).toFixed(2)} Cr`;
-}
-
-function initials(name: string) {
-  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
 function roleLabel(role: string) {
@@ -207,9 +204,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
               <div className="space-y-4">
                 {project.members.slice(0, 4).map((member) => (
                   <div key={member.id} className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-                      {initials(member.user.name)}
-                    </div>
+                    <UserAvatar name={member.user.name} avatar={member.user.avatar} className="h-9 w-9" fallbackClassName="text-xs" />
                     <div className="overflow-hidden">
                       <p className="text-sm font-medium truncate">{member.user.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{roleLabel(member.role)}</p>

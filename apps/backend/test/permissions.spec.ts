@@ -37,8 +37,10 @@ const OPEN_WRITES = new Set([
   'HelpController.restartTour',
   'HelpController.restartAllTours',
   'HelpController.updateChecklist',
-  // Personal: a member edits only their own profile, password and sessions.
+  // Personal: a member edits only their own profile, photo, password and sessions.
   'AccountController.updateProfile',
+  'AccountController.uploadAvatar',
+  'AccountController.removeAvatar',
   'AccountController.changePassword',
   'AccountController.endOtherSessions',
   'AccountController.endSession',

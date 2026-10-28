@@ -44,7 +44,7 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
   > Verified 2026-10-24: migration tested on old-format rows (trimmed names, empty/malformed entries skipped, bad dates → no expiry, non-array and null JSON ignored, column dropped), 7 unit tests for the status rules (expiry day itself, 30-day boundary, no expiry, calendar moving on), 5 integration tests (order, stats, renew, expiry-before-issue, cross-worker and cross-organization refusals), 16 HTTP checks (seed mix, status agrees with days, stats, validation, derived status not accepted from clients, site engineer 403 but can read, audit entries on the worker, Safety and Workforce reports name each certificate with its date) and a 15-step headless-browser run (KPI and alerts, compliance order, add with validation, renew, remove with confirmation, site engineer read-only on a phone; drawer fits at 1440px and 390px)
 - [x] Certificate renewal reminders: an hourly queue job (plus one pass at startup) sends a digest per project to members with `workforce.manage` (the project team where it has any), after 08:00 in the organization's time zone, when a certificate is 30 days from expiry, in its final week, and once expired. Each stage goes out at most once per certificate (claimed with a conditional update; a renewal starts over); deactivated workers are skipped. New "Reminders" notification category (in-app and email on by default, changeable in Settings → Notifications); `NotificationsService.send` now accepts system sources as well as user actions
   > Verified 2026-10-24: 3 unit tests (stages, skipping stages already passed, wording), 7 integration tests (waits for the local morning, per-project digests to the team vs everyone, urgency order and grouping by worker with "and N more", ERROR vs WARNING, site engineers excluded, no repeats including two concurrent runs, next stages days later, renewal resets, deactivated workers, organizations kept apart), and an end-to-end run on seeded data (27 certificates → one digest per project for the owner and PM, a restart sends nothing new, bell shows the digest and opens Workforce, Reminders listed in notification settings)
-- [ ] Night-shift check-ins after midnight are recorded on the next calendar day — revisit if night crews need shift-based days
+- [x] Night shifts belong to the evening they start (ADR-046): check-ins before noon count towards the previous night, lateness is measured from the shift start, and check-out closes the latest open check-in from the last 16 hours
 
 > Verified 2026-10-19: migration on a fresh DB, seed generates 21 days of history, 31 HTTP checks (derived stats, roster, bulk mark validation, check-in lateness by shift + org timezone, worker CRUD/assign/deactivate, timeline, dashboard, org isolation) and a 19-step headless-browser run as owner and site engineer.
 
@@ -64,7 +64,7 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 - [x] Daily report approve / reject → `dailyReport.approve`
 - [x] Attendance marking → `attendance.mark`; worker create/edit/deactivate → `workforce.manage`
 - [x] OWNER escalation fixed: only owners can invite, promote to or remove owners
-- [~] Rate limiting: auth endpoints limited to 10/min per IP; a global limit waits for `TRUST_PROXY` to be set in production (behind a proxy every user shares one IP)
+- [x] Rate limiting (ADR-045): API-wide `API_RATE_LIMIT_PER_MINUTE` (default 300) counted per signed-in person, per IP when signed out; auth endpoints keep 10/min, AI 20/min (now per person); file and photo links exempt; startup warning in production without `TRUST_PROXY`
 
 ### T5. Auth hardening  `[x]`
 - [x] Bug: two logins in the same second → 500; every token now has a random `jti`
@@ -143,7 +143,7 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 - [x] Request / approve / release / cancel payments (maker-checker)
 - [x] Budget heads per project (ADR-037): add / rename / re-allocate / remove from the project Budget tab (`budget.manage`: owners, admins, project managers, finance). Committed (approved POs not yet billed) and spent (approved, part-paid and paid vendor bills), both incl. GST, are derived from the matching category, never typed in; anything outside the heads shows as Unbudgeted. PO and vendor-bill category pickers list the project's heads first. Finance, the finance summary and the Cost report use the same figures
   > Verified 2026-10-24: 4 unit tests, 38 HTTP checks (figures match orders and bills in the DB, case-insensitive matching, unbudgeted moves when heads are added or removed, a new PO counts only once approved, permissions per role, validation, cross-project isolation, finance summary and Cost report agree, audit) and a headless-browser run (add/remove a head, PO category picker, phone layout, site engineer restricted state).
-- [ ] `Project.spent` (dashboard and project header) is still a stored figure; derive it from vendor bills like the budget heads
+- [x] `Project.spent` derived from approved, part-paid and paid vendor bills (ADR-042); the stored column is dropped
 - [x] KPI formatting (₹, utilisation %), error states
 
 ### T13. Projects & Settings  `[x]`
@@ -161,7 +161,7 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 - [x] Security: change password with the current one (`POST /auth/password`, rate-limited, signs out other devices); active sessions with device, IP and last activity; sign out one device or all others. Ended sessions lose access immediately (ADR-030)
 - [x] Members & Roles: moved out of the page into feature components; invite form uses React Hook Form + Zod with a role description; real member status and last active; error states; read-only Roles & Permissions view from `GET /settings/roles`
 - [x] Integrations: email and file storage status from `GET /settings/integrations` (owners/admins) plus the organization's AI status
-- [ ] Profile photo upload (the `avatar` column exists; initials are shown today)
+- [x] Profile photo upload and removal in Settings → Profile (ADR-044); shown in the sidebar, mobile header, member list, project team and key personnel, with initials as the fallback
 
 > Verified 2026-10-26 (Settings): 65 HTTP checks (sessions listed with device, session id kept through refresh, ending one device or all others cuts off its access token at once without signing out the current one, own session protected, cross-user session ids refused, profile validation, password change rules and sign-out of other devices, role catalogue, integrations restricted to admins, member last active, audit entries with redacted passwords) and a headless-browser run (profile save updates the sidebar, password form validation and wrong-password message without sign-out, invite form validation, role view, integrations, viewer restrictions on a phone viewport with no horizontal scroll, ending a session sends that browser to sign-in).
 
@@ -194,8 +194,8 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 - [x] Client bills become receivables: due date from the contract's payment terms (default 30 days), our tax invoice number captured at certification, receipts recorded by finance (`billing.receipts`, part payments, no future dates, never more than outstanding) and voided with a reason; Billing → Receivables tab with ageing (not yet due, 1–30, 31–60, 61–90, 90+)
 - [x] Retention ledger: deduction lines can be marked as retention; each contract shows held / released / balance by bill; releasing subcontract retention raises an approved vendor bill, client retention is recorded as received
 - [x] Finance notified when a certified subcontract bill is ready for payment; audit entries for receipts, voids and retention releases
-- [ ] Correcting a certified bill (today: no reversal of a certification or its vendor bill)
-- [ ] Receivables and retention on the Finance dashboard and cash-flow forecast
+- [x] Reopening a certified bill for correction (ADR-043): cancels its vendor bill; refused once a later bill, receipt, payment or retention release depends on it
+- [x] Receivables and retention on the Finance dashboard, and a cash forecast from bills by due date (ADR-043)
 - [x] Phase 3 (ADR-033): BOQ import on the contract page and measurement book import on a draft RA bill, using the same saved layouts as Data Import (AI-proposed once, name-matched without AI, applied by code after that); layouts also listed in Settings → Data Import
 - [x] BOQ import: lines matched by item number (add / update / skip), NS codes marked extra; an optional "certified before SitePilot" column becomes one certified opening-balance bill numbered after the organization's last bill (e.g. up to RA-03, so the next bill is RA-04); opening bills move no money and aren't receivables
 - [x] Measurement book import: nested MB sheets parsed by fixed rules (item rows, "RA Bill 1st/2nd" sections, measurement rows, Deduction/Desuction rows, notes, total/hold/paid rows); dimensions kept only when they reproduce the sheet's quantity exactly, otherwise the sheet's quantity is kept (with full dimensions in the description); preview checks each item against the sheet's own totals and flags holds; pick sections; each item's rows replace that item's measurements
@@ -243,7 +243,7 @@ Verification for every task: `pnpm typecheck`, `pnpm lint`, `pnpm build` (fix on
 - [x] Notification preferences: `GET/PUT /notifications/preferences`, per category (waiting for you / your requests / team / general) × in-app / email; Settings → Notifications tab; approvals are emailed by default. Replaced the unused legacy `notification_preferences` table
 - [x] DTOs for list query, device registration and preferences (removed `any`)
 - [ ] Email delivery depends on `RESEND_API_KEY` (stubbed to the log without it); push needs a real Firebase provider
-- [ ] Notification centre page with history beyond the latest 20
+- [x] Notification history at `/dashboard/notifications`: all / unread, by category, paged, mark read, delete; "View all" from the bell
 
 > Verified 2026-10-24: migration on a fresh DB (matches the schema exactly), 34 unit tests, 21 HTTP/socket checks (live delivery, permission-based recipients, no self-notifications, preferences mute in-app, email routing, read state, isolation, transfer flow) and a headless-browser run (live toast while the app is open, bell → open link → marked read, preferences tab).
 

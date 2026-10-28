@@ -6,9 +6,7 @@ import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } fro
 import { Building2, Trash2, Upload } from 'lucide-react';
 import { useRemoveOrganizationLogo, useUploadOrganizationLogo, type OrganizationSettings } from '@/hooks/api/use-settings';
 import { getApiErrorMessage } from '@/lib/api/errors';
-
-const MAX_LOGO_BYTES = 2 * 1024 * 1024;
-const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+import { IMAGE_UPLOAD_TYPES, imageUploadError } from '@/lib/image-upload';
 
 /** The organization logo, shown in the sidebar for every member. Raster images only (an SVG could carry script). */
 export function LogoCard({ organization, canManage }: { organization: OrganizationSettings; canManage: boolean }): React.ReactElement {
@@ -21,12 +19,9 @@ export function LogoCard({ organization, canManage }: { organization: Organizati
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    if (!LOGO_TYPES.includes(file.type)) {
-      toast.error('Upload a PNG, JPG or WebP image.');
-      return;
-    }
-    if (file.size > MAX_LOGO_BYTES) {
-      toast.error('The logo must be 2 MB or smaller.');
+    const problem = imageUploadError(file, 'logo');
+    if (problem) {
+      toast.error(problem);
       return;
     }
     try {
@@ -67,7 +62,7 @@ export function LogoCard({ organization, canManage }: { organization: Organizati
               <input
                 ref={fileInputRef}
                 type="file"
-                accept={LOGO_TYPES.join(',')}
+                accept={IMAGE_UPLOAD_TYPES.join(',')}
                 className="hidden"
                 aria-label="Upload logo"
                 onChange={(event) => { void handleSelect(event); }}

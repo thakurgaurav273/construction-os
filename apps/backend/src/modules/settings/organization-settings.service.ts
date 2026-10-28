@@ -2,14 +2,12 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Organization } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../database/prisma.service';
+import { MAX_IMAGE_BYTES, readRasterImage } from '../../common/storage/image-uploads';
 import { StorageService } from '../../common/storage/storage.service';
 import { UpdateBrandingDto, UpdateOrganizationSettingsDto } from './dto/organization.dto';
 import { MIN_BRAND_CONTRAST, contrastRatio } from '../../common/branding/brand-color';
 
-export const MAX_LOGO_BYTES = 2 * 1024 * 1024;
-
-/** Raster formats only: an uploaded SVG could carry script. */
-const LOGO_TYPES: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+export const MAX_LOGO_BYTES = MAX_IMAGE_BYTES;
 
 /** Signed logo links are refreshed whenever settings are read, well before they expire. */
 const LOGO_URL_TTL_SECONDS = 24 * 60 * 60;
@@ -67,14 +65,11 @@ export class OrganizationSettingsService {
   }
 
   async uploadLogo(organizationId: string, file: Express.Multer.File | undefined): Promise<OrganizationSettingsView> {
-    if (!file) throw new BadRequestException('Choose an image to upload.');
-    const extension = LOGO_TYPES[file.mimetype];
-    if (!extension) throw new BadRequestException('Upload a PNG, JPG or WebP image.');
-    if (file.size > MAX_LOGO_BYTES) throw new BadRequestException('The logo must be 2 MB or smaller.');
+    const image = readRasterImage(file, 'logo');
 
     const previous = await this.find(organizationId);
-    const key = `organizations/${organizationId}/branding/logo-${uuidv4()}.${extension}`;
-    await this.storage.upload(key, file.buffer, file.mimetype);
+    const key = `organizations/${organizationId}/branding/logo-${uuidv4()}.${image.extension}`;
+    await this.storage.upload(key, image.buffer, image.mimeType);
     const organization = await this.prisma.organization.update({ where: { id: organizationId }, data: { logo: key } });
     await this.deleteStoredLogo(previous.logo);
     return this.toView(organization);

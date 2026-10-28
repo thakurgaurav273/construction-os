@@ -13,6 +13,7 @@ import { useUpdateProfile } from '@/hooks/api/use-account';
 import { getApiErrorMessage } from '@/lib/api/errors';
 import { useAuthHydrated, useAuthStore } from '@/store/auth.store';
 import { formatRole } from '../constants';
+import { ProfilePhoto } from './ProfilePhoto';
 import { profileSchema, type ProfileFormValues } from '../validation/account.schema';
 
 /** Settings → Profile: the signed-in person's own details. Shown on reports, approvals and the audit log. */
@@ -51,19 +52,15 @@ export function ProfileTab(): React.ReactElement {
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>
-          <CardDescription>Your name appears on daily reports, approvals and the audit log.</CardDescription>
+          <CardDescription>Your name and photo appear on daily reports, approvals, teams and the audit log.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
-              {(user.name || user.email).charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate font-medium">{user.name}</p>
-              <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-                {access?.role && <Badge variant="outline">{formatRole(access.role)}</Badge>}
-                <span className="truncate">{organization?.name}</span>
-              </div>
+          <ProfilePhoto user={user} />
+          <div className="min-w-0">
+            <p className="truncate font-medium">{user.name}</p>
+            <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+              {access?.role && <Badge variant="outline">{formatRole(access.role)}</Badge>}
+              <span className="truncate">{organization?.name}</span>
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">

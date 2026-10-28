@@ -4,12 +4,12 @@ import {
 import { AttendanceStatus, Prisma } from '@prisma/client';
 import { findOpenProject, findProjectInOrganization } from '../projects/project-guards';
 import { PrismaService } from '../../database/prisma.service';
-import { dateKeyToDbDate, toLocalMinutes } from './attendance-dates';
+import { dateKeyToDbDate, shiftMoment } from './attendance-dates';
 import {
   AttendanceCounts, AttendanceInsightsService, addToCounts, emptyAttendanceCounts,
 } from './attendance-insights.service';
 import { AttendanceEntryDto, MarkAttendanceDto } from './dto/attendance.dto';
-import { LATE_GRACE_MINUTES, OFF_SITE_STATUSES, SHIFT_START_MINUTES } from './workforce.constants';
+import { LATE_GRACE_MINUTES, MAX_OPEN_SHIFT_HOURS, OFF_SITE_STATUSES } from './workforce.constants';
 
 const ROSTER_WORKER_SELECT = {
   id: true, name: true, initials: true, role: true, trade: true, type: true, shift: true,
@@ -160,23 +160,24 @@ export class AttendanceService {
   }
 
   /**
-   * Records arrival now. Lateness uses site-local time against the worker's shift start.
-   * Night-shift arrivals after midnight are recorded on the following calendar day.
+   * Records arrival now, on the worker's shift day: a night-shift arrival after midnight still counts
+   * towards the night that started the evening before. Lateness is measured from that shift's start.
    */
   async checkIn(organizationId: string, projectId: string, userId: string, workerId: string): Promise<AttendanceRecordView> {
     await findOpenProject(this.prisma, projectId, organizationId, 'mark attendance on it');
     const worker = await this.findActiveWorker(workerId, organizationId);
-    const { timeZone, today } = await this.insights.getOrganizationToday(organizationId);
+    const { timeZone } = await this.insights.getOrganizationToday(organizationId);
     const now = new Date();
-    const date = dateKeyToDbDate(today);
+    const shift = shiftMoment(now, timeZone, worker.shift);
+    const date = dateKeyToDbDate(shift.dateKey);
 
     const existing = await this.prisma.attendance.findUnique({ where: { workerId_date: { workerId, date } } });
     if (existing && existing.projectId !== projectId) {
-      throw new ConflictException(`${worker.name} is already recorded at another site today.`);
+      throw new ConflictException(`${worker.name} is already recorded at another site for this shift.`);
     }
-    if (existing?.checkInAt) throw new ConflictException(`${worker.name} has already checked in today.`);
+    if (existing?.checkInAt) throw new ConflictException(`${worker.name} has already checked in for this shift.`);
 
-    const isLate = toLocalMinutes(now, timeZone) > SHIFT_START_MINUTES[worker.shift] + LATE_GRACE_MINUTES;
+    const isLate = shift.minutesAfterStart > LATE_GRACE_MINUTES;
     const status: AttendanceStatus = isLate ? 'LATE' : 'PRESENT';
 
     const record = await this.prisma.attendance.upsert({
@@ -188,19 +189,23 @@ export class AttendanceService {
     return toRecordView(record);
   }
 
+  /**
+   * Closes the worker's latest open check-in, whatever day it was recorded on, so a night shift (or a day
+   * shift running past midnight) can check out the next morning.
+   */
   async checkOut(organizationId: string, projectId: string, userId: string, workerId: string): Promise<AttendanceRecordView> {
     await findOpenProject(this.prisma, projectId, organizationId, 'mark attendance on it');
     const worker = await this.findActiveWorker(workerId, organizationId);
-    const { today } = await this.insights.getOrganizationToday(organizationId);
-    const date = dateKeyToDbDate(today);
-
-    const existing = await this.prisma.attendance.findUnique({ where: { workerId_date: { workerId, date } } });
-    if (!existing?.checkInAt || existing.projectId !== projectId) {
-      throw new ConflictException(`${worker.name} hasn't checked in at this site today.`);
-    }
-    if (existing.checkOutAt) throw new ConflictException(`${worker.name} has already checked out today.`);
-
     const now = new Date();
+
+    const existing = await this.prisma.attendance.findFirst({
+      where: { workerId, organizationId, checkOutAt: null, checkInAt: { gte: new Date(now.getTime() - MAX_OPEN_SHIFT_HOURS * 3_600_000) } },
+      orderBy: { checkInAt: 'desc' },
+    });
+    if (!existing?.checkInAt || existing.projectId !== projectId) {
+      throw new ConflictException(`${worker.name} has no open check-in at this site. Check in first, or they've already checked out.`);
+    }
+
     const hoursWorked = Math.round(((now.getTime() - existing.checkInAt.getTime()) / 3_600_000) * 100) / 100;
     const record = await this.prisma.attendance.update({
       where: { id: existing.id },

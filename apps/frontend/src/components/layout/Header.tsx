@@ -1,17 +1,19 @@
 'use client';
 
-import { Search, Menu, UserCircle } from 'lucide-react';
+import { Search, Menu } from 'lucide-react';
 import { Button, Skeleton } from '@sitepilot/ui';
 import { usePathname } from 'next/navigation';
 import { useAuthHydrated, useAuthStore } from '@/store/auth.store';
 
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
 import { UserMenu } from '@/features/auth/components/UserMenu';
+import { UserAvatar } from '@/components/shared/UserAvatar';
 import { HelpButton } from '@/features/help/components/HelpButton';
 
 export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void, onSearchClick: () => void }) {
   const pathname = usePathname();
   const organizationName = useAuthStore((state) => state.organization?.name);
+  const user = useAuthStore((state) => state.user);
   const hydrated = useAuthHydrated();
   
   const segments = pathname.split('/').filter(Boolean);
@@ -62,7 +64,7 @@ export function Header({ onMenuClick, onSearchClick }: { onMenuClick: () => void
             <div className="md:hidden">
               <UserMenu align="end" side="bottom">
                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" aria-label="Account menu">
-                  <UserCircle className="h-5 w-5" />
+                  <UserAvatar name={user?.name ?? ''} avatar={user?.avatar} className="h-7 w-7" fallbackClassName="text-[10px]" />
                 </Button>
               </UserMenu>
             </div>

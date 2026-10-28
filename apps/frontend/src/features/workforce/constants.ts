@@ -70,4 +70,7 @@ export const TRADE_COLORS: Record<string, string> = {
 
 export const TRADE_OPTIONS = Object.keys(TRADE_COLORS);
 
+/** Matches the API: an older check-in with no check-out is treated as forgotten, not as a shift in progress. */
+export const MAX_OPEN_SHIFT_HOURS = 16;
+
 export const DEFAULT_TRADE_COLOR = '#64748b';

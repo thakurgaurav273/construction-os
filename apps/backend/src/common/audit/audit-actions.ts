@@ -16,6 +16,8 @@ export const AUDIT_ACTIONS = {
   'auth.password_reset': action('reset their password', 'user'),
   'auth.switched_organization': action('switched into this organization', 'user'),
   'account.profile_updated': action('updated their profile', 'user'),
+  'account.avatar_updated': action('changed their profile photo', 'user'),
+  'account.avatar_removed': action('removed their profile photo', 'user'),
   'account.password_changed': action('changed their password', 'user'),
   'account.session_ended': action('signed out one of their devices', 'user'),
   'account.other_sessions_ended': action('signed out of all their other devices', 'user'),

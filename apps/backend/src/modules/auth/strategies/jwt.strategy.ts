@@ -29,7 +29,7 @@ export interface AuthenticatedUser {
 }
 
 /** Browsers send the HttpOnly cookie; API clients and Swagger can still use a Bearer header. */
-function extractAccessToken(req: Request): string | null {
+export function extractAccessToken(req: Request): string | null {
   return readCookie(req, AUTH_COOKIES.access) ?? ExtractJwt.fromAuthHeaderAsBearerToken()(req);
 }
 
