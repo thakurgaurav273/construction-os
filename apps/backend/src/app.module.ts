@@ -14,6 +14,7 @@ import { MaterialsModule } from './modules/materials/materials.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { ProcurementModule } from './modules/procurement/procurement.module';
 import { StorageModule } from './common/storage/storage.module';
+import { IntegrationSettingsModule } from './common/integrations/integration-settings.module';
 import { JobsModule } from './common/jobs';
 import { DailyReportsModule } from './modules/daily-reports/daily-reports.module';
 import { DocumentsModule } from './modules/documents/documents.module';
@@ -51,6 +52,7 @@ const DEFAULT_API_RATE_LIMIT_PER_MINUTE = 300;
     MaterialsModule,
     InventoryModule,
     ProcurementModule,
+    IntegrationSettingsModule,
     StorageModule,
     JobsModule,
     DailyReportsModule,

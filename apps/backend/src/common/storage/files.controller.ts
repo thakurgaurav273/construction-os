@@ -25,11 +25,12 @@ export class FilesController {
 
   @Get(':token')
   async download(@Param('token') token: string, @Res() res: Response): Promise<void> {
-    const grant = this.storage.localDisk?.verify(token);
-    if (!grant) throw new NotFoundException('This link has expired. Open the file again from SitePilot.');
+    const disk = this.storage.localDisk;
+    const grant = disk?.verify(token);
+    if (!disk || !grant) throw new NotFoundException('This link has expired. Open the file again from SitePilot.');
     const { key, downloadAs } = grant;
     try {
-      const body = await this.storage.download(key);
+      const body = await disk.read(key);
       res.setHeader('Content-Type', CONTENT_TYPES[extname(key).toLowerCase()] ?? 'application/octet-stream');
       const disposition = downloadAs ? 'attachment' : 'inline';
       res.setHeader('Content-Disposition', `${disposition}; filename="${(downloadAs ?? key.split('/').pop() ?? 'file').replace(/"/g, '')}"`);

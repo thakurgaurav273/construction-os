@@ -41,6 +41,11 @@ const UNAUDITED_WRITES = new Set([
   'PlatformController.saveKey',
   'PlatformController.makeDefault',
   'PlatformController.removeKey',
+  // Platform email and storage settings belong to no tenant; changes are logged with the admin's email.
+  'PlatformIntegrationsController.saveStorage',
+  'PlatformIntegrationsController.removeStorage',
+  'PlatformIntegrationsController.saveEmail',
+  'PlatformIntegrationsController.removeEmail',
 ]);
 
 describe('audit coverage', () => {
@@ -68,6 +73,11 @@ describe('audit metadata', () => {
   it('redacts credentials at any depth', () => {
     const clean = sanitizeForAudit({ password: 'hunter22', nested: { refreshToken: 'abc', name: 'Site A' }, list: [{ secretKey: 'x' }] });
     assert.deepEqual(clean, { password: '[redacted]', nested: { refreshToken: '[redacted]', name: 'Site A' }, list: [{ secretKey: '[redacted]' }] });
+  });
+
+  it('redacts cloud storage keys', () => {
+    const clean = sanitizeForAudit({ bucket: 'files', accessKeyId: 'AKIAEXAMPLE', secretAccessKey: 'x', access_key: 'y', privateKey: 'z' });
+    assert.deepEqual(clean, { bucket: 'files', accessKeyId: '[redacted]', secretAccessKey: '[redacted]', access_key: '[redacted]', privateKey: '[redacted]' });
   });
 
   it('caps long text and large lists', () => {

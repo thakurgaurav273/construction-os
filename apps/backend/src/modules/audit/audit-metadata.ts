@@ -1,5 +1,5 @@
-/** Field names whose values must never be stored: credentials, tokens and provider API keys. */
-const SENSITIVE_KEY = /password|token|secret|otp|api[-_]?key|authorization|credential/i;
+/** Field names whose values must never be stored: credentials, tokens, provider API keys and cloud access keys. */
+const SENSITIVE_KEY = /password|token|secret|otp|api[-_]?key|access[-_]?key|private[-_]?key|authorization|credential/i;
 const MAX_STRING_LENGTH = 500;
 const MAX_ARRAY_ITEMS = 50;
 const MAX_DEPTH = 4;

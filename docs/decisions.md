@@ -1877,6 +1877,78 @@ Check-ins were recorded on the calendar day. A night worker checking in at 21:00
 
 ---
 
+# ADR-047 - File Storage on Amazon S3 or Cloudflare R2
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-28
+
+---
+
+## Context
+
+Storage was picked implicitly: R2 when `R2_ACCOUNT_ID` was set, an S3-compatible endpoint when `STORAGE_ENDPOINT` was set, and otherwise a MinIO at `localhost:9000` with `minioadmin` keys. Amazon S3 itself could not work (region fixed to `auto`), `STORAGE_BUCKET` was ignored, and docker-compose set `STORAGE_PROVIDER`, which nothing read, so production fell back to a MinIO that doesn't exist.
+
+---
+
+## Decision
+
+- `STORAGE_DRIVER` chooses the backend: `local` (default, this server's disk), `s3` (Amazon S3, or any S3-compatible server when `STORAGE_ENDPOINT` is set) or `r2` (Cloudflare R2 via `R2_ACCOUNT_ID`). All share `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY` and `STORAGE_SECRET_KEY`; `s3` also needs `STORAGE_REGION`.
+- Storage is set for the whole install, not per organization. ADR-048 lets platform admins set it in the app as well.
+- Misconfiguration fails at startup (missing bucket, region or one half of a key pair, an unknown driver, an http endpoint in production). There are no fallback credentials. A `HeadBucket` check at startup logs a wrong bucket or key.
+- On Amazon S3 the access keys are optional: without them the SDK's default chain is used (IAM role, instance profile), so hosts can avoid long-lived keys.
+- Buckets stay private. `upload` returns the key, never a public URL; every download is a short-lived presigned link. `STORAGE_PUBLIC_URL` / `R2_PUBLIC_URL` are no longer read.
+- Cloudinary is not supported: it is a media CDN, not an S3-compatible store, and would need its own adapter for PDFs and Excel files.
+
+---
+
+## Consequences
+
+- Deployments that relied on the implicit MinIO fallback must set `STORAGE_DRIVER=s3` with `STORAGE_ENDPOINT`, or they get local disk.
+- Moving between backends does not copy existing files; copy the bucket (or `.storage` directory) across when switching.
+
+---
+
+# ADR-048 - Platform Admins Manage Email and Storage in the App
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-28
+
+---
+
+## Context
+
+Email (Resend) and file storage (ADR-047) could only be changed through server environment variables, so the Integrations page had no way to connect them.
+
+---
+
+## Decision
+
+- Email and storage stay one setup for the whole install. Only platform super admins (`PLATFORM_ADMIN_EMAILS`) can change them, through `/platform/integrations` (guarded by `PlatformAdminGuard`). Organization owners see the status only.
+- Settings are saved in `platform_integrations`, one row per kind (`STORAGE`, `EMAIL`). Secrets are sealed as one JSON value with `SecretBoxService` (AES-256-GCM, `AI_KEYS_ENCRYPTION_KEY`), and the API only returns a hint (the last four characters). Without the encryption key, saving is refused.
+- A saved setting takes precedence over the environment, and removing it falls back to the environment's settings.
+- Every save is tested first: storage uploads, reads and deletes a probe file in the bucket; email sends a test message to the admin. A failing setting is never saved, and provider errors are turned into messages the admin can act on.
+- `StorageService` and `MailService` cache the active client. The instance that saves reloads at once, and other instances re-check `updatedAt` every 30 seconds.
+- These are platform changes, so they are logged with the admin's email rather than written to a tenant's audit log, as with platform AI keys.
+
+---
+
+## Consequences
+
+- Switching buckets doesn't move existing files; copy them across first. Local-disk links keep working after a bucket is connected.
+- Rotating `AI_KEYS_ENCRYPTION_KEY` makes saved email and storage keys unreadable; save them again.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

@@ -27,6 +27,8 @@ export interface Integration {
   provider: string | null;
   state: IntegrationState;
   detail: string;
+  /** Saved in the app by a platform admin, or set in the server environment. */
+  source: 'app' | 'server';
 }
 
 export interface Invitation {

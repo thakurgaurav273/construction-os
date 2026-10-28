@@ -11,19 +11,21 @@ export interface IntegrationView {
   state: IntegrationState;
   /** What the state means for the organization, in plain words. */
   detail: string;
+  /** Saved in the app by a platform admin, or set in the server environment. */
+  source: 'app' | 'server';
 }
 
 const STORAGE_PROVIDERS: Record<StorageBackend, string> = {
   r2: 'Cloudflare R2',
+  s3: 'Amazon S3',
   's3-compatible': 'S3-compatible storage',
-  'local-default': 'Local MinIO',
   'local-disk': 'Local disk',
 };
 
 /**
- * Services the workspace depends on and whether they are connected. Configuration comes from the server
- * environment, so this is read-only; nothing secret (keys, endpoints) is returned. AI keys are managed per
- * organization under Settings → AI.
+ * Services the workspace depends on and whether they are connected. Email and storage are shared by every
+ * tenant and set by platform admins (in the app or the server environment), so this is read-only; nothing
+ * secret (keys, endpoints) is returned. AI keys are managed per organization under Settings → AI.
  */
 @Injectable()
 export class IntegrationsService {
@@ -32,18 +34,20 @@ export class IntegrationsService {
     private readonly storage: StorageService,
   ) {}
 
-  list(): IntegrationView[] {
-    return [this.email(), this.fileStorage()];
+  async list(): Promise<IntegrationView[]> {
+    return Promise.all([this.email(), this.fileStorage()]);
   }
 
-  private email(): IntegrationView {
-    if (!this.mail.isDeliveryConfigured) {
+  private async email(): Promise<IntegrationView> {
+    const { configured, from, source } = await this.mail.status();
+    if (!configured) {
       return {
         id: 'email',
         name: 'Email delivery',
         provider: null,
         state: 'not_configured',
         detail: 'Emails are not being sent. Invitations, password resets and email notifications won’t reach inboxes until a provider is connected.',
+        source,
       };
     }
     return {
@@ -51,20 +55,22 @@ export class IntegrationsService {
       name: 'Email delivery',
       provider: 'Resend',
       state: 'connected',
-      detail: `Invitations, password resets and notifications are sent from ${this.mail.senderAddress}.`,
+      detail: `Invitations, password resets and notifications are sent from ${from}.`,
+      source,
     };
   }
 
-  private fileStorage(): IntegrationView {
-    const backend = this.storage.backend;
+  private async fileStorage(): Promise<IntegrationView> {
+    const { backend, source } = await this.storage.status();
     return {
       id: 'storage',
       name: 'File storage',
       provider: STORAGE_PROVIDERS[backend],
-      state: backend === 'local-default' || backend === 'local-disk' ? 'development' : 'connected',
-      detail: backend === 'local-default' || backend === 'local-disk'
-        ? 'Documents, photos and logos are stored on the default local server, which is meant for development only.'
-        : 'Documents, photos and logos are stored in object storage and shared through expiring links.',
+      state: backend === 'local-disk' ? 'development' : 'connected',
+      detail: backend === 'local-disk'
+        ? 'Documents, photos and logos are stored on this server’s disk, which is meant for development only.'
+        : 'Documents, photos and logos are stored in a private bucket and shared through expiring links.',
+      source,
     };
   }
 }

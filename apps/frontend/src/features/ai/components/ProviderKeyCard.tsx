@@ -7,6 +7,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Badge, Button, Card, CardContent, Input } from '@sitepilot/ui';
 import { CheckCircle2, ExternalLink, KeyRound, Trash2 } from 'lucide-react';
 import { FormField } from '@/components/shared/FormField';
+import { SecretInput } from '@/components/shared/SecretInput';
 import { providerKeySchema, type ProviderKeyValues } from '../validation/ai.schema';
 
 export interface ProviderKeyCardData {
@@ -87,11 +88,8 @@ export function ProviderKeyCard({ provider, selectedLabel, selectLabel, disabled
         {editing ? (
           <form onSubmit={handleSubmit(submit)} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px_auto] sm:items-start" noValidate>
             <FormField label="API key" htmlFor={`key-${provider.id}`} error={errors.apiKey?.message}>
-              <Input
+              <SecretInput
                 id={`key-${provider.id}`}
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
                 placeholder={provider.configured ? 'Leave empty to keep the saved key' : 'Paste your key'}
                 disabled={disabled}
                 {...register('apiKey')}
