@@ -15,7 +15,7 @@ import { useWorkforce, useWorkforceStats } from '@/hooks/api/use-workforce';
 import { downloadCsv } from '@/lib/download-csv';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ATTENDANCE_STATUS_STYLES, SHIFT_LABELS, WORKER_TYPE_LABELS } from '@/features/workforce/constants';
-import { formatCheckIn, toDisplayStatus } from '@/features/workforce/utils/attendance';
+import { formatLastOnSite, toDisplayStatus } from '@/features/workforce/utils/attendance';
 import { MarkAttendanceSheet } from '@/features/workforce/components/MarkAttendanceSheet';
 import { WorkerFormDialog } from '@/features/workforce/components/WorkerFormDialog';
 import { WorkerDrawer } from './components/WorkerDrawer';
@@ -75,12 +75,12 @@ export default function WorkforcePage(): React.ReactElement {
     }
     downloadCsv(
       `workforce_${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Name', 'Role', 'Trade', 'Type', 'Shift', 'Project', 'Phone', 'Email', 'Today', 'Attendance % (30d)', 'Last check-in', 'PPE compliant'],
+      ['Name', 'Role', 'Trade', 'Type', 'Shift', 'Project', 'Phone', 'Email', 'Today', 'Attendance % (30d)', 'Last on site', 'PPE compliant'],
       activeWorkers.map((worker) => [
         worker.name, worker.role, worker.trade, WORKER_TYPE_LABELS[worker.type], SHIFT_LABELS[worker.shift],
         worker.project, worker.phone, worker.email,
         ATTENDANCE_STATUS_STYLES[toDisplayStatus(worker.todayStatus)].label,
-        worker.attendanceRate, formatCheckIn(worker.lastCheckInAt), worker.ppeCompliant ? 'Yes' : 'No',
+        worker.attendanceRate, formatLastOnSite(worker), worker.ppeCompliant ? 'Yes' : 'No',
       ]),
     );
     toast.success('Workforce export downloaded');

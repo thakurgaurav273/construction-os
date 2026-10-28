@@ -1949,6 +1949,38 @@ Email (Resend) and file storage (ADR-047) could only be changed through server e
 
 ---
 
+# ADR-049 - Site Engineers Manage Workers; Trades Are Open
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-28
+
+---
+
+## Context
+
+Only owners, admins and project managers could add or edit workers, and the worker form only offered ten fixed trades, so sites needing welders, scaffolders or HVAC technicians had to misfile them.
+
+---
+
+## Decision
+
+- `SITE_ENGINEER` gets `workforce.manage` by default: site engineers onboard the crews they run. Worker records hold no pay data, so this exposes nothing financial.
+- A worker's trade stays free text. The form suggests the common trades plus every trade the organization already uses, and accepts a new one. A typed trade reuses an existing one in any casing and capitalises lowercase words, so the directory doesn't split one trade into several spellings.
+
+---
+
+## Consequences
+
+- Trades without a preset get the default colour and icon in the Trades tab.
+- There is no managed trade list yet; renaming a trade means editing its workers.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

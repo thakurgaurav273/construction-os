@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ProjectsService, Paginated } from './projects.service';
+import { ProjectsService, Paginated, ProjectActivityView } from './projects.service';
 import { ProjectMembersService, AvailableMember } from './project-members.service';
 import { ProjectLifecycleService } from './project-lifecycle.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -7,6 +7,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AddMemberDto, ChangeProjectRoleDto } from './dto/add-member.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { ProjectQueryDto } from './dto/project-query.dto';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectOption, ProjectSummary } from './project.mapper';
 import { PermissionsGuard, RequirePermission } from '../../common/permissions';
@@ -43,6 +44,11 @@ export class ProjectsController {
   @Post()
   create(@Body() dto: CreateProjectDto, @CurrentUser() user: AuthUser) {
     return this.projectsService.create(user.organizationId, user.id, dto);
+  }
+
+  @Get(':id/activities')
+  findActivities(@Param('id') id: string, @Query() query: PaginationDto, @CurrentUser() user: AuthUser): Promise<Paginated<ProjectActivityView>> {
+    return this.projectsService.findActivities(id, user.organizationId, query.page, query.limit);
   }
 
   @Get(':id')

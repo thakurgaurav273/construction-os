@@ -9,9 +9,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@sitepilot/ui';
 import { useProjects } from '@/hooks/api/use-projects';
-import { useCreateWorker, useUpdateWorker, type Worker } from '@/hooks/api/use-workforce';
+import { useCreateWorker, useUpdateWorker, useWorkforce, type Worker } from '@/hooks/api/use-workforce';
 import { getApiErrorMessage } from '@/lib/api/errors';
-import { SHIFT_LABELS, TRADE_OPTIONS, WORKER_TYPE_LABELS } from '../constants';
+import { SHIFT_LABELS, WORKER_TYPE_LABELS } from '../constants';
+import { knownTrades, normalizeTrade } from '../utils/trades';
 import {
   UNASSIGNED_PROJECT, toWorkerFormValues, toWorkerInput, workerSchema, type WorkerFormValues,
 } from '../validation/worker.schema';
@@ -42,7 +43,8 @@ export function WorkerFormDialog({ open, onOpenChange, worker }: WorkerFormDialo
     defaultValues: toWorkerFormValues(worker),
   });
 
-  const tradeOptions = worker && !TRADE_OPTIONS.includes(worker.trade) ? [worker.trade, ...TRADE_OPTIONS] : TRADE_OPTIONS;
+  const { data: workers = [] } = useWorkforce({ includeInactive: true });
+  const tradeOptions = knownTrades(worker ? [worker, ...workers] : workers);
 
   // Reset only as the dialog opens; background refetches of `worker` must not wipe in-progress edits.
   const wasOpen = useRef(false);
@@ -52,7 +54,7 @@ export function WorkerFormDialog({ open, onOpenChange, worker }: WorkerFormDialo
   }, [open, worker, reset]);
 
   async function onSubmit(values: WorkerFormValues): Promise<void> {
-    const input = toWorkerInput(values);
+    const input = toWorkerInput({ ...values, trade: normalizeTrade(values.trade, tradeOptions) });
     try {
       if (worker) {
         await updateWorker.mutateAsync({ workerId: worker.id, input });
@@ -85,15 +87,12 @@ export function WorkerFormDialog({ open, onOpenChange, worker }: WorkerFormDialo
             <Field label="Role" htmlFor="worker-role" error={errors.role?.message}>
               <Input id="worker-role" placeholder="e.g. Site Supervisor" {...register('role')} />
             </Field>
-            <Field label="Trade" error={errors.trade?.message}>
-              <Controller control={control} name="trade" render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger aria-label="Trade"><SelectValue placeholder="Select a trade" /></SelectTrigger>
-                  <SelectContent>
-                    {tradeOptions.map((trade) => <SelectItem key={trade} value={trade}>{trade}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )} />
+            <Field label="Trade" htmlFor="worker-trade" error={errors.trade?.message}>
+              {/* A list to pick from that still takes a trade it doesn't have, e.g. Welding or Scaffolding. */}
+              <Input id="worker-trade" list="worker-trade-options" placeholder="Pick or type a trade" autoComplete="off" {...register('trade')} />
+              <datalist id="worker-trade-options">
+                {tradeOptions.map((trade) => <option key={trade} value={trade} />)}
+              </datalist>
             </Field>
             <Field label="Assigned project">
               <Controller control={control} name="projectId" render={({ field }) => (

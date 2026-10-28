@@ -11,7 +11,7 @@ import {
 import { useProjectWorkforce, useProjectWorkforceStats } from '@/hooks/api/use-workforce';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ATTENDANCE_STATUS_STYLES, SHIFT_LABELS, WORKER_TYPE_LABELS } from '@/features/workforce/constants';
-import { formatCheckIn, toDisplayStatus } from '@/features/workforce/utils/attendance';
+import { formatLastOnSite, toDisplayStatus } from '@/features/workforce/utils/attendance';
 import { MarkAttendanceSheet } from '@/features/workforce/components/MarkAttendanceSheet';
 
 export default function WorkforcePage({ params }: { params: { id: string } }) {
@@ -224,9 +224,9 @@ export default function WorkforcePage({ params }: { params: { id: string } }) {
                           {SHIFT_LABELS[worker.shift]} shift
                         </Badge>
                       </div>
-                      {worker.lastCheckInAt && (
+                      {(worker.lastCheckInAt || worker.lastOnSiteDate) && (
                         <p className="text-[10px] text-muted-foreground mt-1 truncate">
-                          Last check-in: {formatCheckIn(worker.lastCheckInAt)}
+                          Last on site: {formatLastOnSite(worker)}
                         </p>
                       )}
                     </div>

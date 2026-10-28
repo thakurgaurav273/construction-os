@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 
 export interface Project {
@@ -82,15 +82,27 @@ export interface ProjectDetail extends Project {
     role: string;
     user: { id: string; name: string; email: string; avatar: string | null };
   }[];
-  activities: {
-    id: string;
-    type: string;
-    title: string;
-    description: string | null;
-    createdAt: string;
-    actor: { id: string; name: string; avatar: string | null };
-  }[];
+  /** The latest few; the whole history comes from useProjectActivities. */
+  activities: ProjectActivity[];
 }
+
+export interface ProjectActivity {
+  id: string;
+  type: string;
+  title: string;
+  description: string | null;
+  createdAt: string;
+  actor: { id: string; name: string; avatar: string | null };
+}
+
+interface ProjectActivityPage {
+  items: ProjectActivity[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+const ACTIVITY_PAGE_SIZE = 20;
 
 /** Every project that can take new work, for pickers and filters. */
 export function useProjects() {
@@ -131,6 +143,21 @@ export function useProject(id: string) {
       const res = await apiClient.get(`/projects/${id}`);
       return res.data.data ?? res.data;
     },
+    enabled: !!id,
+    staleTime: 30_000,
+  });
+}
+
+/** The project's whole timeline, newest first, loaded a page at a time. */
+export function useProjectActivities(id: string) {
+  return useInfiniteQuery({
+    queryKey: ['project', id, 'activities'],
+    queryFn: async ({ pageParam }): Promise<ProjectActivityPage> => {
+      const res = await apiClient.get(`/projects/${id}/activities`, { params: { page: pageParam, limit: ACTIVITY_PAGE_SIZE } });
+      return res.data.data ?? res.data;
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined),
     enabled: !!id,
     staleTime: 30_000,
   });

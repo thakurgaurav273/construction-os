@@ -73,8 +73,9 @@ export const ROLE_PERMISSIONS: Record<OrgRole, readonly Permission[]> = {
     'report.manage',
     'billing.view', 'contract.manage', 'billing.prepare', 'billing.certify',
   ],
-  // Site engineers keep the measurement book; certifying stays with project managers.
-  SITE_ENGINEER: [...SITE_BASICS, 'po.create', 'billing.view', 'billing.prepare'],
+  // Site engineers keep the measurement book; certifying stays with project managers. They onboard the
+  // crews they run, so they manage worker records (no pay data lives there).
+  SITE_ENGINEER: [...SITE_BASICS, 'workforce.manage', 'po.create', 'billing.view', 'billing.prepare'],
   STORE_MANAGER: [
     'ai.use', 'document.upload', 'delivery.receive', 'material.manage', 'material.issue', 'inventory.adjust', 'inventory.transfer',
     'warehouse.manage',

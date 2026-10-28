@@ -4,92 +4,15 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  LayoutDashboard,
-  Briefcase,
-  FileText,
-  Sparkles,
-  ShoppingCart,
-  Package,
-  Warehouse,
-  Users,
-  DollarSign,
-  Receipt,
-  BarChart3,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Lightbulb,
-  type LucideIcon,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Skeleton, cn } from '@sitepilot/ui';
-import type { Permission } from '@sitepilot/types';
 import { useAuthHydrated, useAuthStore } from '@/store/auth.store';
 import { UserMenu } from '@/features/auth/components/UserMenu';
 import { OrganizationSwitcher } from '@/features/auth/components/OrganizationSwitcher';
 import { useOrganizationSettings } from '@/hooks/api/use-settings';
 import { useCan, useCurrentAccess } from '@/hooks/api/use-access';
 import { UserAvatar } from '@/components/shared/UserAvatar';
-
-interface NavItem {
-  name: string;
-  href: string;
-  icon: LucideIcon;
-  /** Hidden for members whose role doesn't grant it. */
-  permission?: Permission;
-}
-
-interface NavGroup {
-  group: string;
-  items: NavItem[];
-}
-
-const navigation: NavGroup[] = [
-  {
-    group: 'Overview',
-    items: [
-      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    ],
-  },
-  {
-    group: 'Projects',
-    items: [
-      { name: 'Projects',      href: '/dashboard/projects',      icon: Briefcase },
-      { name: 'Daily Reports', href: '/dashboard/daily-reports', icon: FileText },
-      { name: 'AI Assistant',  href: '/dashboard/ai-assistant',  icon: Sparkles, permission: 'ai.use' },
-      { name: 'AI Insights',   href: '/dashboard/ai',            icon: Lightbulb, permission: 'ai.use' },
-    ],
-  },
-  {
-    group: 'Operations',
-    items: [
-      { name: 'Procurement', href: '/dashboard/procurement', icon: ShoppingCart },
-      { name: 'Materials',   href: '/dashboard/materials',   icon: Package },
-      { name: 'Inventory',   href: '/dashboard/inventory',   icon: Warehouse },
-      { name: 'Workforce',   href: '/dashboard/workforce',   icon: Users },
-    ],
-  },
-  {
-    group: 'Business',
-    items: [
-      { name: 'Finance', href: '/dashboard/finance',  icon: DollarSign, permission: 'finance.view' },
-      { name: 'Billing', href: '/dashboard/billing',  icon: Receipt, permission: 'billing.view' },
-      { name: 'Reports', href: '/dashboard/reports',  icon: BarChart3 },
-    ],
-  },
-  {
-    group: 'Administration',
-    items: [
-      { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-    ],
-  },
-];
-
-function isItemActive(href: string, pathname: string): boolean {
-  if (href === '/dashboard') return pathname === '/dashboard';
-  // Whole path segments only, so /dashboard/ai doesn't light up on /dashboard/ai-assistant.
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
+import { isItemActive, navigation } from './navigation';
 
 export function Sidebar() {
   const pathname = usePathname();

@@ -11,10 +11,11 @@ import {
   Phone, Clock, MoreHorizontal, Eye,
 } from 'lucide-react';
 import type { Worker } from '@/hooks/api/use-workforce';
-import { ATTENDANCE_STATUS_STYLES, TRADE_OPTIONS, type AttendanceDisplayStatus } from '@/features/workforce/constants';
+import { ATTENDANCE_STATUS_STYLES, type AttendanceDisplayStatus } from '@/features/workforce/constants';
+import { knownTrades } from '@/features/workforce/utils/trades';
 import { AttendanceStatusLabel } from '@/features/workforce/components/AttendanceStatusLabel';
 import {
-  attendanceRateTone, avatarColorFor, formatCheckIn, toDisplayStatus,
+  attendanceRateTone, avatarColorFor, formatLastOnSite, toDisplayStatus,
 } from '@/features/workforce/utils/attendance';
 
 const PAGE_SIZE = 15;
@@ -32,6 +33,7 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
   const [tradeFilter, setTradeFilter] = useState<string>('all');
   const [showInactive, setShowInactive] = useState(false);
   const [page, setPage] = useState(1);
+  const tradeOptions = useMemo(() => knownTrades(workers), [workers]);
 
   const filtered = useMemo(() => {
     return workers.filter((w) => {
@@ -103,7 +105,7 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Trades</SelectItem>
-            {TRADE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            {tradeOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
 
@@ -135,7 +137,7 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Today</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap hidden lg:table-cell">Exp</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap hidden md:table-cell" title="Last 30 days">Att %</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap hidden xl:table-cell">Last Check-in</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap hidden xl:table-cell">Last on Site</th>
                 <th className="px-4 py-3 w-10"></th>
               </tr>
             </thead>
@@ -197,7 +199,7 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
                     <td className="px-4 py-3 hidden xl:table-cell">
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3 shrink-0" />
-                        <span className="whitespace-nowrap">{formatCheckIn(worker.lastCheckInAt)}</span>
+                        <span className="whitespace-nowrap">{formatLastOnSite(worker)}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">

@@ -8,7 +8,7 @@ export const ROLE_SUMMARIES: Record<OrgRole, string> = {
   OWNER: 'Full access, including granting the Owner role and removing other owners.',
   ADMIN: 'Full access to every module and setting, except managing owners.',
   PROJECT_MANAGER: 'Runs projects: approves daily reports and purchase orders, manages materials and sites.',
-  SITE_ENGINEER: 'Works on site: daily reports, attendance, deliveries and purchase requests.',
+  SITE_ENGINEER: 'Works on site: daily reports, attendance, the crew directory, deliveries and purchase requests.',
   STORE_MANAGER: 'Looks after stores: stock, issues, transfers and adjustments.',
   PROCUREMENT: 'Buys for projects: vendors, RFQs and purchase orders.',
   FINANCE: 'Handles money: vendor bills, payments and financial reports.',

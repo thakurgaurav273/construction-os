@@ -56,7 +56,10 @@ export interface Worker {
   isActive: boolean;
   todayStatus: AttendanceStatus | null;
   attendanceRate: number | null;
+  /** Latest timed check-in; null for days marked from the register. */
   lastCheckInAt: string | null;
+  /** Latest day (YYYY-MM-DD) the worker was on site, however it was marked. */
+  lastOnSiteDate: string | null;
 }
 
 export interface AttendanceHistoryItem {

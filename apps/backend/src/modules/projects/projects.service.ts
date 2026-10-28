@@ -23,6 +23,28 @@ export interface Paginated<T> {
   totalPages: number;
 }
 
+const ACTIVITY_INCLUDE = { actor: { select: { id: true, name: true, avatar: true } } } satisfies Prisma.ActivityInclude;
+
+export interface ProjectActivityView {
+  id: string;
+  type: string;
+  title: string;
+  description: string | null;
+  createdAt: Date;
+  actor: { id: string; name: string; avatar: string | null };
+}
+
+function toActivityView(activity: Prisma.ActivityGetPayload<{ include: typeof ACTIVITY_INCLUDE }>): ProjectActivityView {
+  return {
+    id: activity.id,
+    type: activity.type,
+    title: activity.title,
+    description: activity.description,
+    createdAt: activity.createdAt,
+    actor: activity.actor,
+  };
+}
+
 @Injectable()
 export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -62,6 +84,18 @@ export class ProjectsService {
     return { items, total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) };
   }
 
+  /** The project's whole timeline, newest first, a page at a time. Archived projects keep their history. */
+  async findActivities(id: string, organizationId: string, page: number, limit: number): Promise<Paginated<ProjectActivityView>> {
+    const project = await this.prisma.project.findFirst({ where: { id, organizationId, deletedAt: null }, select: { id: true } });
+    if (!project) throw new NotFoundException('Project not found');
+    const where = { projectId: id, organizationId };
+    const [rows, total] = await Promise.all([
+      this.prisma.activity.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit, include: ACTIVITY_INCLUDE }),
+      this.prisma.activity.count({ where }),
+    ]);
+    return { items: rows.map(toActivityView), total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) };
+  }
+
   /** Every project that can still take new work, for pickers and filters. Archived projects are excluded. */
   async findOptions(organizationId: string): Promise<ProjectOption[]> {
     return this.prisma.project.findMany({
@@ -85,9 +119,7 @@ export class ProjectsService {
         activities: {
           orderBy: { createdAt: 'desc' },
           take: 8,
-          include: {
-            actor: { select: { id: true, name: true, avatar: true } },
-          },
+          include: ACTIVITY_INCLUDE,
         },
       },
     });
@@ -117,14 +149,7 @@ export class ProjectsService {
         joinedAt: m.joinedAt,
         user: m.user,
       })),
-      activities: project.activities.map((a) => ({
-        id: a.id,
-        type: a.type,
-        title: a.title,
-        description: a.description,
-        createdAt: a.createdAt,
-        actor: a.actor,
-      })),
+      activities: project.activities.map(toActivityView),
     };
   }
 

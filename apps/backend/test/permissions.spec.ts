@@ -110,6 +110,11 @@ describe('role catalogue', () => {
     }
   });
 
+  it('lets the people running sites manage the workforce', () => {
+    const roles = Object.entries(ROLE_PERMISSIONS).filter(([, granted]) => granted.includes('workforce.manage')).map(([role]) => role).sort();
+    assert.deepEqual(roles, ['ADMIN', 'OWNER', 'PROJECT_MANAGER', 'SITE_ENGINEER']);
+  });
+
   it('hides financial data from site, store and procurement roles', () => {
     for (const role of ['SITE_ENGINEER', 'STORE_MANAGER', 'PROCUREMENT', 'VIEWER'] as const) {
       assert.ok(!permissionsForRole(role).includes('finance.view'), `${role} can see finance`);

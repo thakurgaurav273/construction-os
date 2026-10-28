@@ -10,8 +10,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Card, CardContent, Skeleton } from '@sitepilot/ui';
-import { useProject } from '@/hooks/api/use-projects';
+import { Button, Card, CardContent, Skeleton } from '@sitepilot/ui';
+import { useProjectActivities } from '@/hooks/api/use-projects';
 import { formatRelativeTime } from '@/lib/utils';
 import { EmptyState } from '@/components/shared/EmptyState';
 
@@ -27,14 +27,17 @@ function iconFor(type: string) {
 }
 
 export default function ProjectTimelinePage({ params }: { params: { id: string } }) {
-  const { data: project, isLoading } = useProject(params.id);
-  const activities = project?.activities ?? [];
+  const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = useProjectActivities(params.id);
+  const activities = data?.pages.flatMap((page) => page.items) ?? [];
+  const total = data?.pages[0]?.total ?? 0;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h3 className="text-xl font-semibold tracking-tight">Activity Timeline</h3>
-        <p className="text-sm text-muted-foreground">The latest changes on this project. The full history is in Settings → Audit Logs.</p>
+        <p className="text-sm text-muted-foreground">
+          Everything that has happened on this project, newest first{total > 0 ? ` · ${total} ${total === 1 ? 'event' : 'events'}` : ''}.
+        </p>
       </div>
 
       {isLoading ? (
@@ -51,6 +54,13 @@ export default function ProjectTimelinePage({ params }: { params: { id: string }
             ))}
           </CardContent>
         </Card>
+      ) : isError ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title="Unable to load the timeline"
+          description="Check your connection and try again."
+          action={<Button variant="outline" onClick={() => refetch()}>Retry</Button>}
+        />
       ) : activities.length === 0 ? (
         <EmptyState
           icon={ActivityIcon}
@@ -96,6 +106,14 @@ export default function ProjectTimelinePage({ params }: { params: { id: string }
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {hasNextPage && (
+        <div className="flex justify-center">
+          <Button variant="outline" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+            {isFetchingNextPage ? 'Loading…' : `Load older events (${total - activities.length} more)`}
+          </Button>
+        </div>
       )}
     </div>
   );

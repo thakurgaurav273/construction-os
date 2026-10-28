@@ -15,7 +15,7 @@ export const workforceHelp: HelpModule = {
       permission: 'workforce.manage',
       steps: [
         'Open Workforce and click Add Worker.',
-        'Enter the name, trade, type (employee or contract) and contact details.',
+        'Enter the name, trade (pick one or type a new one, e.g. Welding), type (employee or contract) and contact details.',
         'Assign the worker to a project so they appear on that project’s attendance sheet.',
       ],
     },
