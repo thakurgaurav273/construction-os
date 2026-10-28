@@ -30,6 +30,7 @@ import { VendorsTab } from './components/VendorsTab';
 import { VendorDrawer } from './components/VendorDrawer';
 import { DeliveriesTab } from './components/DeliveriesTab';
 import ProcurementLoading from './loading';
+import { PageAction, PageHeader } from '@/components/shared/PageHeader';
 
 // Analytics is chart-heavy and sits behind a tab, so load it on demand.
 const AnalyticsTab = dynamic(
@@ -111,37 +112,22 @@ export default function ProcurementPage(): React.ReactElement {
       <motion.div
         initial={false}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row items-start justify-between gap-4"
       >
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Procurement</h2>
-          <p className="text-muted-foreground mt-1">
-            {summary
-              ? `${summary.pendingApprovals} orders awaiting approval · ${summary.openRfqs} RFQs in progress`
-              : 'Purchase orders, RFQs, vendors and deliveries'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="mr-1.5 h-4 w-4" /> Export
-          </Button>
-          <ImportButton />
-          {can('vendor.manage') && (
-            <Button variant="outline" onClick={() => setCreateDialog('vendor')}>
-              <Building2 className="mr-1.5 h-4 w-4" /> Add Vendor
-            </Button>
+        <PageHeader
+          title="Procurement"
+          description={summary
+            ? `${summary.pendingApprovals} orders awaiting approval · ${summary.openRfqs} RFQs in progress`
+            : 'Purchase orders, RFQs, vendors and deliveries'}
+          actions={(
+            <>
+              <PageAction icon={Download} label="Export" onClick={handleExport} />
+              <ImportButton />
+              {can('vendor.manage') && <PageAction icon={Building2} label="Add Vendor" onClick={() => setCreateDialog('vendor')} />}
+              {can('rfq.manage') && <PageAction icon={ClipboardList} label="New RFQ" onClick={() => setCreateDialog('rfq')} />}
+              {can('po.create') && <PageAction primary icon={Plus} label="New Purchase Order" onClick={() => setCreateDialog('order')} data-tour="procurement-new-order" />}
+            </>
           )}
-          {can('rfq.manage') && (
-            <Button variant="outline" onClick={() => setCreateDialog('rfq')}>
-              <Plus className="mr-1.5 h-4 w-4" /> New RFQ
-            </Button>
-          )}
-          {can('po.create') && (
-            <Button onClick={() => setCreateDialog('order')} data-tour="procurement-new-order">
-              <Plus className="mr-1.5 h-4 w-4" /> New Purchase Order
-            </Button>
-          )}
-        </div>
+        />
       </motion.div>
 
       <ProcurementKpis summary={summary} />

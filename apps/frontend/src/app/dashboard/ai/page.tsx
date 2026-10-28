@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { Badge, Button, Card, CardContent, Skeleton, cn } from '@sitepilot/ui';
@@ -11,6 +10,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { AiUnavailableNotice } from '@/features/ai/components/AiUnavailableNotice';
 import { useAiInsights, useAiStatus, useRefreshAiInsights, type AiInsight } from '@/hooks/api/use-ai';
 import { getApiErrorMessage } from '@/lib/api/errors';
+import { PageAction, PageHeader } from '@/components/shared/PageHeader';
 
 const SEVERITY: Record<AiInsight['severity'], { icon: LucideIcon; label: string; className: string }> = {
   critical: { icon: AlertOctagon, label: 'Critical', className: 'border-red-200 bg-red-50/60 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300' },
@@ -60,22 +60,25 @@ export default function AiCommandCenterPage(): React.ReactElement {
 
   return (
     <div className="mx-auto max-w-5xl flex-1 space-y-6 p-4 pt-6 md:p-8">
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
-        <div>
-          <h2 className="flex items-center gap-2 text-3xl font-bold tracking-tight"><Sparkles className="h-7 w-7 text-violet-500" /> AI Command Center</h2>
-          <p className="mt-1 text-muted-foreground">
-            What needs attention across your projects, written by AI from live budgets, schedules, approvals, deliveries, stock and attendance.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild><Link href="/dashboard/ai-assistant"><MessageSquare className="mr-1.5 h-4 w-4" /> Ask a question</Link></Button>
-          {!unavailable && (
-            <Button onClick={() => { void regenerate(); }} disabled={refresh.isPending}>
-              <RefreshCw className={cn('mr-1.5 h-4 w-4', refresh.isPending && 'animate-spin')} /> {snapshot ? 'Refresh' : 'Generate insights'}
-            </Button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title={<span className="flex items-center gap-2"><Sparkles className="h-6 w-6 text-violet-500" /> AI Command Center</span>}
+        description="What needs attention across your projects, written by AI from live budgets, schedules, approvals, deliveries, stock and attendance."
+        actions={(
+          <>
+            <PageAction icon={MessageSquare} label="Ask a question" href="/dashboard/ai-assistant" />
+            {!unavailable && (
+              <PageAction
+                primary
+                icon={RefreshCw}
+                label={snapshot ? 'Refresh' : 'Generate insights'}
+                onClick={() => { void regenerate(); }}
+                disabled={refresh.isPending}
+                className={cn(refresh.isPending && '[&_svg]:animate-spin')}
+              />
+            )}
+          </>
+        )}
+      />
 
       {snapshot && (
         <p className="text-xs text-muted-foreground">

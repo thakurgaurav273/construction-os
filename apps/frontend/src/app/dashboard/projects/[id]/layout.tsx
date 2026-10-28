@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { ChevronRight, ArrowLeft, Building2, MapPin, Calendar, CheckCircle2, Archive, AlertTriangle, Lock } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ChevronRight, ArrowLeft, Building2, MapPin, Calendar, CheckCircle2, Archive, AlertTriangle, Lock, Pencil } from 'lucide-react';
 import type { Permission } from '@sitepilot/types';
 import { format } from 'date-fns';
 
@@ -30,6 +30,9 @@ const tabs: { name: string; href: string; permission?: Permission }[] = [
   { name: 'Workforce',       href: '/workforce',       permission: 'workforce.view' },
 ];
 
+const COMPACT_AFTER_PX = 48;
+const EXPAND_BELOW_PX = 8;
+
 function statusVariant(status: string) {
   if (status === 'ACTIVE') return 'default' as const;
   if (status === 'COMPLETED') return 'outline' as const;
@@ -52,6 +55,15 @@ export default function ProjectDetailLayout({
   const projectId = params.id;
   const { data: project, isLoading, isError, refetch } = useProject(projectId);
   const [editOpen, setEditOpen] = useState(false);
+  const [compact, setCompact] = useState(false);
+
+  // Desktop only (phones scroll the whole page): shrink the header once the tab content is scrolled, and
+  // restore it near the top. The gap between the two thresholds stops it flickering as its height changes.
+  function handleContentScroll(event: React.UIEvent<HTMLDivElement>): void {
+    const top = event.currentTarget.scrollTop;
+    if (!compact && top > COMPACT_AFTER_PX) setCompact(true);
+    else if (compact && top < EXPAND_BELOW_PX) setCompact(false);
+  }
   const can = useCan();
   const accessLoaded = useCurrentAccess().data !== undefined;
   const isTabActive = (href: string): boolean => (href === ''
@@ -64,63 +76,97 @@ export default function ProjectDetailLayout({
     <div className="relative flex flex-1 flex-col md:h-full">
       {/* Desktop: the project header stays put and the tab content scrolls. Phones: the whole page scrolls, so the header doesn't take half the screen. */}
       <div className="z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:sticky md:top-0">
-        {/* Breadcrumb */}
-        <div className="px-4 md:px-8 py-3 flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/dashboard/projects" className="hover:text-foreground transition-colors flex items-center">
-            <ArrowLeft className="mr-1 h-4 w-4" /> Projects
-          </Link>
-          <ChevronRight className="h-4 w-4" />
-          {isLoading
-            ? <Skeleton className="h-4 w-40" />
-            : <span className="text-foreground font-medium truncate">{project?.name ?? 'Project'}</span>}
-        </div>
-
-        {/* Project Header */}
-        <div className="px-4 md:px-8 py-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
-                <Building2 className="h-6 w-6" />
+        {/* Breadcrumb: folds away once the page is scrolled on desktop. */}
+        <AnimatePresence initial={false}>
+          {!compact && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="overflow-hidden"
+            >
+              <div className="flex items-center gap-2 px-4 pt-3 text-sm text-muted-foreground md:px-8">
+                <Link href="/dashboard/projects" className="flex items-center transition-colors hover:text-foreground">
+                  <ArrowLeft className="mr-1 h-4 w-4" /> Projects
+                </Link>
+                <ChevronRight className="h-4 w-4 shrink-0" />
+                {isLoading
+                  ? <Skeleton className="h-4 w-40" />
+                  : <span className="truncate font-medium text-foreground">{project?.name ?? 'Project'}</span>}
               </div>
-              {isLoading
-                ? <Skeleton className="h-9 w-64" />
-                : <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{project?.name}</h1>}
-              {!isLoading && project && (
-                <Badge variant={statusVariant(project.status)} className="capitalize text-sm px-3 py-1">
-                  {statusLabel(project.status)}
-                </Badge>
-              )}
-            </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-              {isLoading ? (
-                <Skeleton className="h-4 w-80" />
-              ) : project ? (
-                <>
-                  {project.location && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4" /> {project.location}
+        {/* Project header: full on load, one slim row while scrolled (desktop), back to full at the top. */}
+        <div className={cn('flex items-start justify-between gap-3 px-4 transition-[padding] duration-200 md:items-center md:px-8', compact ? 'py-2.5' : 'py-4 md:py-5')}>
+          <div className="flex min-w-0 items-start gap-3 md:items-center">
+            <div className={cn(
+              'flex shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-all duration-200',
+              compact ? 'h-8 w-8 rounded-lg' : 'h-10 w-10 md:h-12 md:w-12',
+            )}>
+              <Building2 className={compact ? 'h-4 w-4' : 'h-5 w-5 md:h-6 md:w-6'} />
+            </div>
+            <div className="min-w-0 space-y-1.5">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                {isLoading
+                  ? <Skeleton className="h-8 w-56" />
+                  : <h1 className={cn('font-bold tracking-tight transition-all duration-200', compact ? 'truncate text-lg' : 'text-xl sm:text-2xl md:text-3xl')}>{project?.name}</h1>}
+                {!isLoading && project && (
+                  <Badge variant={statusVariant(project.status)} className={cn('capitalize', compact ? 'px-2 py-0 text-xs' : 'px-2.5 py-0.5 text-xs md:text-sm')}>
+                    {statusLabel(project.status)}
+                  </Badge>
+                )}
+                {compact && project && (
+                  <span className="hidden items-center gap-1 text-sm font-medium text-emerald-600 dark:text-emerald-500 md:flex">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> {project.progress}%
+                  </span>
+                )}
+              </div>
+
+              <AnimatePresence initial={false}>
+                {!compact && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground sm:text-sm">
+                      {isLoading ? (
+                        <Skeleton className="h-4 w-72" />
+                      ) : project ? (
+                        <>
+                          {project.location && (
+                            <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> {project.location}</span>
+                          )}
+                          {project.expectedCompletion && (
+                            <span className="flex items-center gap-1.5">
+                              <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Due {format(new Date(project.expectedCompletion), 'd MMM yyyy')}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-500">
+                            <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> {project.progress}% complete
+                          </span>
+                        </>
+                      ) : null}
                     </div>
-                  )}
-                  {project.expectedCompletion && (
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Due {format(new Date(project.expectedCompletion), 'MMMM do, yyyy')}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-500 font-medium">
-                    <CheckCircle2 className="h-4 w-4" /> {project.progress}% Complete
-                  </div>
-                </>
-              ) : null}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
           {project && (
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex shrink-0 items-center gap-2">
               {project.status !== 'ARCHIVED' && (
                 <Can permission="project.update">
-                  <Button onClick={() => setEditOpen(true)}>Edit Project</Button>
+                  <Button size={compact ? 'sm' : 'default'} onClick={() => setEditOpen(true)} aria-label="Edit project">
+                    <Pencil className="h-4 w-4 md:mr-1.5" />
+                    <span className="hidden md:inline">Edit Project</span>
+                  </Button>
                 </Can>
               )}
               <ProjectActionsMenu project={project} />
@@ -159,7 +205,7 @@ export default function ProjectDetailLayout({
         </div>
       </div>
 
-      <div className="flex-1 bg-muted/20 p-4 md:overflow-y-auto md:p-8">
+      <div className="flex-1 bg-muted/20 p-4 md:overflow-y-auto md:p-8" onScroll={handleContentScroll}>
         <div className="max-w-7xl mx-auto w-full h-full space-y-6">
           {project?.status === 'ARCHIVED' && (
             <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">

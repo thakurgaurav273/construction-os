@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { Can } from '@/components/shared/Can';
 import { ImportWizard } from '@/features/data-import/components/ImportWizard';
 import { isImportEntity } from '@/features/data-import/import-entities';
+import { PageAction, PageHeader } from '@/components/shared/PageHeader';
 
 function ImportWizardFromQuery(): React.ReactElement {
   const requested = useSearchParams().get('entity');
@@ -17,12 +18,10 @@ function ImportWizardFromQuery(): React.ReactElement {
 export default function ImportsPage(): React.ReactElement {
   return (
     <div className="mx-auto w-full max-w-5xl flex-1 space-y-6 p-4 pt-6 md:p-8">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Import data</h2>
-        <p className="mt-1 text-muted-foreground">
-          Bring in materials, vendors, opening stock and purchase orders from your own spreadsheets. SitePilot learns each layout once and reuses it.
-        </p>
-      </div>
+      <PageHeader
+        title="Import data"
+        description="Bring in materials, vendors, opening stock and purchase orders from your own spreadsheets. SitePilot learns each layout once and reuses it."
+      />
       <Can
         permission="data.import"
         fallback={(

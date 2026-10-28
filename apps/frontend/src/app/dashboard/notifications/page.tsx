@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
@@ -15,6 +14,7 @@ import {
   type Notification,
 } from '@/hooks/api/use-notifications';
 import { getApiErrorMessage } from '@/lib/api/errors';
+import { PageAction, PageHeader } from '@/components/shared/PageHeader';
 
 const ALL_CATEGORIES = 'all';
 
@@ -57,20 +57,16 @@ export default function NotificationsPage(): React.ReactElement {
 
   return (
     <div className="flex-1 space-y-6 p-4 pt-6 md:p-8">
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Notifications</h2>
-          <p className="mt-1 text-muted-foreground">Approvals, decisions on your requests and team updates in this organization.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/settings#notifications"><Settings2 className="mr-2 h-4 w-4" /> Preferences</Link>
-          </Button>
-          <Button onClick={() => markAllRead.mutate()} disabled={!data?.unread || markAllRead.isPending}>
-            <Check className="mr-2 h-4 w-4" /> Mark all as read
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Notifications"
+        description="Approvals, decisions on your requests and team updates in this organization."
+        actions={(
+          <>
+            <PageAction icon={Settings2} label="Preferences" href="/dashboard/settings#notifications" />
+            <PageAction primary icon={Check} label="Mark all as read" onClick={() => markAllRead.mutate()} disabled={!data?.unread || markAllRead.isPending} />
+          </>
+        )}
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Tabs value={unreadOnly ? 'unread' : 'all'} onValueChange={(value) => applyFilter(() => setUnreadOnly(value === 'unread'))}>

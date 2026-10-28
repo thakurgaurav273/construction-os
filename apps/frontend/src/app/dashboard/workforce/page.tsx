@@ -25,6 +25,7 @@ import { TradesTab } from './components/TradesTab';
 import { ComplianceTab } from './components/ComplianceTab';
 import { WorkforceAlerts } from './components/WorkforceAlerts';
 import { Can } from '@/components/shared/Can';
+import { PageAction, PageHeader } from '@/components/shared/PageHeader';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -92,29 +93,22 @@ export default function WorkforcePage(): React.ReactElement {
       <motion.div
         initial={false}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row items-start justify-between gap-4"
       >
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Workforce</h2>
-          <p className="text-muted-foreground mt-1">
-            {stats ? `${stats.total} active workers across your sites` : 'Workers, daily attendance and compliance'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" /> Export
-          </Button>
-          <Can permission="attendance.mark">
-            <Button variant="outline" onClick={() => setAttendanceOpen(true)} data-tour="workforce-attendance">
-              <ClipboardCheck className="mr-2 h-4 w-4" /> Mark Attendance
-            </Button>
-          </Can>
-          <Can permission="workforce.manage">
-            <Button onClick={() => setAddOpen(true)} data-tour="workforce-new">
-              <UserPlus className="mr-2 h-4 w-4" /> Add Worker
-            </Button>
-          </Can>
-        </div>
+        <PageHeader
+          title="Workforce"
+          description={stats ? `${stats.total} active workers across your sites` : 'Workers, daily attendance and compliance'}
+          actions={(
+            <>
+              <PageAction icon={Download} label="Export" onClick={handleExport} />
+              <Can permission="attendance.mark">
+                <PageAction icon={ClipboardCheck} label="Mark Attendance" onClick={() => setAttendanceOpen(true)} data-tour="workforce-attendance" />
+              </Can>
+              <Can permission="workforce.manage">
+                <PageAction primary icon={UserPlus} label="Add Worker" onClick={() => setAddOpen(true)} data-tour="workforce-new" />
+              </Can>
+            </>
+          )}
+        />
       </motion.div>
 
       {/* KPI Cards */}

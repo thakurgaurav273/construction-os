@@ -19,6 +19,7 @@ import { PaymentsTab } from './components/PaymentsTab';
 import { BudgetTab } from './components/BudgetTab';
 import { CashFlowTab } from './components/CashFlowTab';
 import { InvoiceDrawer } from './components/InvoiceDrawer';
+import { PageAction, PageHeader } from '@/components/shared/PageHeader';
 
 function FinanceLoading(): React.ReactElement {
   return (
@@ -114,26 +115,19 @@ function FinanceWorkspace({ canRecordInvoice }: { canRecordInvoice: boolean }): 
       <motion.div
         initial={false}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row items-start justify-between gap-4"
       >
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Finance</h2>
-          <p className="text-muted-foreground mt-1">
-            {summary
-              ? `${summary.approvals.invoicesPending} bills awaiting approval · ${summary.payables.overdueCount} overdue`
-              : 'Vendor bills, payments, budgets and cash flow'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="mr-1.5 h-4 w-4" /> Export
-          </Button>
-          {canRecordInvoice && (
-            <Button onClick={() => setCreateOpen(true)} data-tour="finance-new">
-              <Plus className="mr-1.5 h-4 w-4" /> Record Invoice
-            </Button>
+        <PageHeader
+          title="Finance"
+          description={summary
+            ? `${summary.approvals.invoicesPending} bills awaiting approval · ${summary.payables.overdueCount} overdue`
+            : 'Vendor bills, payments, budgets and cash flow'}
+          actions={(
+            <>
+              <PageAction icon={Download} label="Export" onClick={handleExport} />
+              {canRecordInvoice && <PageAction primary icon={Plus} label="Record Invoice" onClick={() => setCreateOpen(true)} data-tour="finance-new" />}
+            </>
           )}
-        </div>
+        />
       </motion.div>
 
       <FinanceKpis summary={summary} />
