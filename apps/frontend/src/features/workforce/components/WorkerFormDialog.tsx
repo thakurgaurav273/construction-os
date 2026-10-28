@@ -80,7 +80,7 @@ export function WorkerFormDialog({ open, onOpenChange, worker }: WorkerFormDialo
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Full name" htmlFor="worker-name" error={errors.name?.message}>
               <Input id="worker-name" placeholder="e.g. Rajesh Kumar" {...register('name')} />
             </Field>
@@ -152,7 +152,7 @@ export function WorkerFormDialog({ open, onOpenChange, worker }: WorkerFormDialo
 
           <fieldset className="space-y-3 rounded-lg border p-3">
             <legend className="px-1 text-sm font-medium">Emergency contact (optional)</legend>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Input aria-label="Emergency contact name" placeholder="Name" {...register('emergencyName')} />
               <Input aria-label="Emergency contact phone" placeholder="Phone" type="tel" {...register('emergencyPhone')} />
               <Input aria-label="Relation" placeholder="Relation" {...register('emergencyRelation')} />

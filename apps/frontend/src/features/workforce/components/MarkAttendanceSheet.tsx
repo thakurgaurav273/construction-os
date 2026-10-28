@@ -36,7 +36,7 @@ export function MarkAttendanceSheet({ open, onOpenChange, projectId: fixedProjec
           <SheetDescription>Record who was on site. Workers you leave unmarked are not saved.</SheetDescription>
         </SheetHeader>
 
-        <div className="grid gap-3 sm:grid-cols-2 px-5 py-4 border-b">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 px-5 py-4 border-b">
           {!fixedProjectId && (
             <div className="space-y-1.5">
               <Label>Project</Label>

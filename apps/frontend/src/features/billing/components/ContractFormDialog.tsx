@@ -85,7 +85,7 @@ export function ContractFormDialog({ open, onOpenChange, contract, defaultDirect
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
           {!contract && (
-            <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Contract type">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Contract type">
               {DIRECTIONS.map((option) => (
                 <button
                   key={option}
@@ -105,7 +105,7 @@ export function ContractFormDialog({ open, onOpenChange, contract, defaultDirect
             </div>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Project" error={errors.projectId?.message}>
               <Controller control={control} name="projectId" render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange} disabled={!!contract}>

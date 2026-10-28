@@ -38,7 +38,7 @@ const AnalyticsTab = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-72 w-full rounded-xl" />)}
       </div>
     ),
@@ -132,7 +132,7 @@ export default function ProcurementPage(): React.ReactElement {
 
       <ProcurementKpis summary={summary} />
 
-      <div className="grid gap-6 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
         <motion.div
           initial={false}
           animate={{ opacity: 1, y: 0 }}

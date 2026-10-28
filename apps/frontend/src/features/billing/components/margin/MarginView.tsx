@@ -31,7 +31,7 @@ function Row({ row }: { row: MarginRow }): React.ReactElement {
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="grid w-full gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))] md:items-center"
+        className="grid grid-cols-1 w-full gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))] md:items-center"
       >
         <span className="flex min-w-0 items-start gap-2">
           {open ? <ChevronDown className="mt-0.5 h-4 w-4 shrink-0" /> : <ChevronRight className="mt-0.5 h-4 w-4 shrink-0" />}

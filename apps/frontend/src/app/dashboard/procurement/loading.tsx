@@ -26,7 +26,7 @@ export default function ProcurementLoading(): React.ReactElement {
       </div>
 
       {/* KPI cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {Array.from({ length: 6 }).map((_, index) => (
           <div key={index} className="rounded-xl border border-border/60 bg-card p-6 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
@@ -40,7 +40,7 @@ export default function ProcurementLoading(): React.ReactElement {
       </div>
 
       {/* Content + AI rail */}
-      <div className="grid gap-6 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
         <div className="xl:col-span-3 space-y-4">
           <Skeleton className="h-10 w-96 rounded-md" />
           <div className="rounded-xl border border-border/60 bg-card p-4 space-y-3">

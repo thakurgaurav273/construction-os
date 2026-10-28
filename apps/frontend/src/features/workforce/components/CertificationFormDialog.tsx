@@ -60,7 +60,7 @@ export function CertificationFormDialog({ worker, certification, open, onOpenCha
           <FormField label="Certificate" htmlFor="certification-name" error={errors.name?.message}>
             <Input id="certification-name" placeholder="Safety Induction Certificate" autoFocus {...register('name')} />
           </FormField>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Issued by" htmlFor="certification-issuer" error={errors.issuer?.message}>
               <Input id="certification-issuer" placeholder="Optional" {...register('issuer')} />
             </FormField>

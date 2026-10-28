@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/utils';
 import { INVOICE_STATUS_OPTIONS } from '@/features/finance/constants';
 import type { Invoice } from '@/features/finance/types';
 import { FinanceStatusBadge } from '@/features/finance/components/FinanceStatusBadge';
+import { MobileCard, MobileCardList, useIncrementalItems } from '@/components/shared/MobileList';
 
 interface InvoicesTabProps {
   invoices: Invoice[];
@@ -37,6 +38,7 @@ export function InvoicesTab({ invoices, onSelect }: InvoicesTabProps): React.Rea
         && (match === 'all' || invoice.matchStatus === match);
     });
   }, [invoices, search, status, match]);
+  const phoneList = useIncrementalItems(filtered, `${search}|${status}|${match}`);
 
   return (
     <div className="space-y-4">
@@ -73,7 +75,36 @@ export function InvoicesTab({ invoices, onSelect }: InvoicesTabProps): React.Rea
 
       <p className="text-sm text-muted-foreground">Showing {filtered.length} of {invoices.length} invoices</p>
 
-      <div className="rounded-xl border overflow-hidden">
+      <MobileCardList
+        items={phoneList.visible}
+        getKey={(invoice) => invoice.id}
+        hasMore={phoneList.hasMore}
+        onLoadMore={phoneList.loadMore}
+        empty={<div className="rounded-xl border py-16 text-center text-sm text-muted-foreground">No invoices match your filters.</div>}
+        renderCard={(invoice) => (
+          <MobileCard
+            onClick={() => onSelect(invoice)}
+            title={invoice.invoiceNumber}
+            subtitle={`${invoice.vendorName}${invoice.purchaseOrder ? ` · ${invoice.purchaseOrder.poNumber}` : ''}`}
+            aside={<FinanceStatusBadge kind="invoice" value={invoice.isOverdue ? 'OVERDUE' : invoice.status} />}
+            meta={[
+              { label: 'Total', value: <span className="font-semibold">{formatCurrency(invoice.totalAmount)}</span> },
+              { label: 'Balance', value: invoice.balanceDue > 0 ? formatCurrency(invoice.balanceDue) : '—' },
+              {
+                label: 'Due',
+                value: (
+                  <span className={invoice.isOverdue ? 'text-red-600 dark:text-red-400 font-semibold' : undefined}>
+                    {format(new Date(invoice.dueDate), 'dd MMM yyyy')}
+                  </span>
+                ),
+              },
+              { label: 'Project', value: invoice.project?.name ?? '—' },
+            ]}
+          />
+        )}
+      />
+
+      <div className="hidden rounded-xl border overflow-hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

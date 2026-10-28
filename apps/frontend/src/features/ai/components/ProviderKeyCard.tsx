@@ -86,7 +86,7 @@ export function ProviderKeyCard({ provider, selectedLabel, selectLabel, disabled
         </div>
 
         {editing ? (
-          <form onSubmit={handleSubmit(submit)} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px_auto] sm:items-start" noValidate>
+          <form onSubmit={handleSubmit(submit)} className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_220px_auto] sm:items-start" noValidate>
             <FormField label="API key" htmlFor={`key-${provider.id}`} error={errors.apiKey?.message}>
               <SecretInput
                 id={`key-${provider.id}`}

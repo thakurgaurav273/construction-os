@@ -49,7 +49,7 @@ export function ClientFormDialog({ open, onOpenChange, client, onSaved }: Client
           <DialogDescription>The owner or main contractor you bill on client contracts. Shown on RA bills.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Name" htmlFor="client-name" error={errors.name?.message} className="sm:col-span-2">
               <Input id="client-name" placeholder="NTPC Ltd" autoFocus {...register('name')} />
             </FormField>

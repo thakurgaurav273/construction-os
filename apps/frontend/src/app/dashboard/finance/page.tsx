@@ -25,10 +25,10 @@ function FinanceLoading(): React.ReactElement {
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
       <div className="space-y-2"><Skeleton className="h-8 w-48" /><Skeleton className="h-4 w-80" /></div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-[118px] rounded-xl" />)}
       </div>
-      <div className="grid gap-6 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
         <Skeleton className="h-96 rounded-xl xl:col-span-3" />
         <Skeleton className="h-64 rounded-xl" />
       </div>
@@ -132,7 +132,7 @@ function FinanceWorkspace({ canRecordInvoice }: { canRecordInvoice: boolean }): 
 
       <FinanceKpis summary={summary} />
 
-      <div className="grid gap-6 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
         <motion.div
           initial={false}
           animate={{ opacity: 1, y: 0 }}

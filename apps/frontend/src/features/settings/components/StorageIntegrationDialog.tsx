@@ -102,7 +102,7 @@ export function StorageIntegrationDialog({ open, onOpenChange, saved }: StorageI
               <Input id="storage-account" autoComplete="off" spellCheck={false} {...register('accountId')} />
             </FormField>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField label="Region" htmlFor="storage-region" error={errors.region?.message}>
                 <Input id="storage-region" placeholder="ap-south-1" autoComplete="off" spellCheck={false} {...register('region')} />
               </FormField>
@@ -114,7 +114,7 @@ export function StorageIntegrationDialog({ open, onOpenChange, saved }: StorageI
           <FormField label="Bucket" htmlFor="storage-bucket" error={errors.bucket?.message} hint="Keep public access off; files are shared through expiring links.">
             <Input id="storage-bucket" placeholder="sitepilot-files" autoComplete="off" spellCheck={false} {...register('bucket')} />
           </FormField>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Access key ID" htmlFor="storage-access-key" error={errors.accessKeyId?.message}>
               <Input id="storage-access-key" autoComplete="off" spellCheck={false} {...register('accessKeyId')} />
             </FormField>

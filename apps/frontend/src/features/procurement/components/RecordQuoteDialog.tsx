@@ -82,7 +82,7 @@ export function RecordQuoteDialog({ request, onClose }: RecordQuoteDialogProps):
             ))}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <FormField label="Lead time (days)" htmlFor="quote-lead" error={errors.leadTimeDays?.message}>
               <Input id="quote-lead" type="number" min={0} max={365} {...register('leadTimeDays')} />
             </FormField>

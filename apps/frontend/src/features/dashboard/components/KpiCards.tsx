@@ -33,7 +33,7 @@ function KpiCard({ title, icon: Icon, value, hint, href }: KpiCardProps): React.
 export function KpiCards({ stats }: { stats: DashboardStats }): React.ReactElement {
   const firstQueue = stats.approvals.queues[0];
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <KpiCard
         title="Active Projects"
         icon={Building2}

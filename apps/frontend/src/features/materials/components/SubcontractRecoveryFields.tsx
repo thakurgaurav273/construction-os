@@ -31,7 +31,7 @@ export function SubcontractRecoveryFields({
   if (!canSeeBilling || !projectId || contracts.length === 0) return null;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <FormField
         label={type === 'ISSUE' ? 'Issued to' : 'Returned by'}
         hint={selectedContractId !== NO_SUBCONTRACT ? 'Recovered from their next RA bill.' : undefined}

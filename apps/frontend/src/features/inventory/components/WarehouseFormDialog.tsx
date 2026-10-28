@@ -64,7 +64,7 @@ export function WarehouseFormDialog({ open, onOpenChange, warehouse, onSaved }: 
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr]">
             <FormField label="Store name" htmlFor="store-name" error={errors.name?.message}>
               <Input id="store-name" placeholder="e.g. Whitefield Site Store" {...register('name')} />
             </FormField>
@@ -73,7 +73,7 @@ export function WarehouseFormDialog({ open, onOpenChange, warehouse, onSaved }: 
             </FormField>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Type" error={errors.type?.message}>
               <Controller control={control} name="type" render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>
@@ -108,7 +108,7 @@ export function WarehouseFormDialog({ open, onOpenChange, warehouse, onSaved }: 
             <Input id="store-address" {...register('address')} />
           </FormField>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <FormField label="City" htmlFor="store-city" error={errors.city?.message}>
               <Input id="store-city" {...register('city')} />
             </FormField>

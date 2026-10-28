@@ -17,6 +17,7 @@ import { AttendanceStatusLabel } from '@/features/workforce/components/Attendanc
 import {
   attendanceRateTone, avatarColorFor, formatLastOnSite, toDisplayStatus,
 } from '@/features/workforce/utils/attendance';
+import { MobileCard, MobileCardList, useIncrementalItems } from '@/components/shared/MobileList';
 
 const PAGE_SIZE = 15;
 
@@ -54,6 +55,8 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(page, totalPages);
   const paginated = filtered.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
+
+  const phoneList = useIncrementalItems(filtered, `${search}|${statusFilter}|${tradeFilter}|${showInactive}`);
 
   const resetPage = useCallback(() => setPage(1), []);
 
@@ -121,11 +124,37 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Showing {paginated.length} of {filtered.length} workers
+        <span className="md:hidden">{filtered.length} workers</span>
+        <span className="hidden md:inline">Showing {paginated.length} of {filtered.length} workers</span>
       </p>
 
+      <MobileCardList
+        items={phoneList.visible}
+        getKey={(worker) => worker.id}
+        hasMore={phoneList.hasMore}
+        onLoadMore={phoneList.loadMore}
+        empty={<div className="rounded-xl border py-16 text-center text-sm text-muted-foreground">No workers match your filters.</div>}
+        renderCard={(worker) => (
+          <MobileCard
+            onClick={() => onSelectWorker(worker)}
+            title={worker.name}
+            subtitle={(
+              <>
+                {worker.role}
+                {!worker.isActive && <span className="ml-1.5 text-destructive">· Inactive</span>}
+              </>
+            )}
+            aside={<AttendanceStatusLabel status={worker.todayStatus} />}
+            meta={[
+              { label: 'Trade', value: worker.trade },
+              { label: 'Project', value: worker.project ?? 'Not assigned' },
+            ]}
+          />
+        )}
+      />
+
       {/* Table */}
-      <div className="rounded-xl border overflow-hidden">
+      <div className="hidden rounded-xl border overflow-hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -223,7 +252,7 @@ export function DirectoryTab({ workers, onSelectWorker }: DirectoryTabProps): Re
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="hidden items-center justify-between md:flex">
           <p className="text-xs text-muted-foreground">
             Page {safeCurrentPage} of {totalPages}
           </p>

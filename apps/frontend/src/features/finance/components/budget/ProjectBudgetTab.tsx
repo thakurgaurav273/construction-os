@@ -39,7 +39,7 @@ function BudgetKpis({ budget }: { budget: ProjectBudget }): React.ReactElement {
   const { totals, projectBudget } = budget;
   const unallocated = projectBudget === null ? null : projectBudget - totals.allocated;
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Kpi
         label="Allocated to heads"
         value={formatCompactINR(totals.allocated)}
@@ -78,7 +78,7 @@ export function ProjectBudgetTab({ projectId }: { projectId: string }): React.Re
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-28 rounded-xl" />)}</div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-28 rounded-xl" />)}</div>
         <Skeleton className="h-72 rounded-xl" />
       </div>
     );

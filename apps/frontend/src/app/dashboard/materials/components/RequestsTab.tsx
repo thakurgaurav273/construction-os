@@ -8,6 +8,7 @@ import {
 import { AlertTriangle, ChevronLeft, ChevronRight, ClipboardList, Plus, Search } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Can } from '@/components/shared/Can';
+import { useAccumulatedPages } from '@/components/shared/MobileList';
 import { useProjects } from '@/hooks/api/use-projects';
 import {
   useMaterialRequests, type MaterialRequestFilters, type MaterialRequestStatus, type MaterialRequestStatusFilter,
@@ -47,6 +48,7 @@ export function RequestsTab(): React.ReactElement {
   }), [search, status, projectId, page]);
   const { data, isLoading, isError, refetch } = useMaterialRequests(filters);
   const requests = data?.items ?? [];
+  const phoneRequests = useAccumulatedPages({ items: data?.items, page, resetKey: [search, status, projectId].join('|') });
   const totalPages = data?.totalPages ?? 1;
   const isFiltered = filters.search !== undefined || projectId !== ALL || status !== 'OPEN';
 
@@ -57,6 +59,12 @@ export function RequestsTab(): React.ReactElement {
         <Plus className="mr-1.5 h-4 w-4" /> Request Material
       </Button>
     </Can>
+  );
+
+  const loadingSkeleton = (
+    <div className="rounded-xl border p-4 space-y-3">
+      {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-11 w-full rounded-md" />)}
+    </div>
   );
 
   return (
@@ -101,11 +109,9 @@ export function RequestsTab(): React.ReactElement {
           description="Check your connection and try again."
           action={<Button variant="outline" onClick={() => refetch()}>Retry</Button>}
         />
-      ) : isLoading ? (
-        <div className="rounded-xl border p-4 space-y-3">
-          {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-11 w-full rounded-md" />)}
-        </div>
-      ) : requests.length === 0 ? (
+      ) : isLoading && phoneRequests.length === 0 ? (
+        loadingSkeleton
+      ) : !isLoading && requests.length === 0 ? (
         <EmptyState
           icon={ClipboardList}
           title={isFiltered ? 'No requests match these filters' : 'No open material requests'}
@@ -116,9 +122,19 @@ export function RequestsTab(): React.ReactElement {
         />
       ) : (
         <>
-          <MaterialRequestsTable requests={requests} onSelect={setSelectedId} showProject />
+          {/* A later page loading on phones keeps the cards; the desktop table shows one page at a time. */}
+          {isLoading && <div className="hidden md:block">{loadingSkeleton}</div>}
+          <MaterialRequestsTable
+            requests={requests}
+            onSelect={setSelectedId}
+            showProject
+            phoneRequests={phoneRequests}
+            hasMore={page < totalPages}
+            onLoadMore={() => setPage((current) => current + 1)}
+            isLoadingMore={isLoading}
+          />
           {totalPages > 1 && (
-            <div className="flex items-center justify-between">
+            <div className="hidden md:flex items-center justify-between">
               <p className="text-xs text-muted-foreground">Page {page} of {totalPages}</p>
               <div className="flex items-center gap-1">
                 <Button variant="outline" size="sm" aria-label="Previous page" className="h-8 w-8 p-0"

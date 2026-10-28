@@ -22,7 +22,7 @@ const qty = (value: number | string): string => formatNumber(Number(value));
 
 function AnalyticsSkeleton(): React.ReactElement {
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {Array.from({ length: 4 }).map((_, i) => (
         <Skeleton key={i} className="h-72 w-full rounded-xl" />
       ))}
@@ -72,7 +72,7 @@ function AnalyticsContent({ analytics }: { analytics: InventoryAnalytics }): Rea
   } = analytics;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <MaterialsChartCard title="Inventory Value by Warehouse" description="Stock value held per warehouse">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={valueByWarehouse} layout="vertical" margin={{ top: 5, right: 24, left: 8, bottom: 0 }}>
@@ -160,7 +160,7 @@ function AnalyticsContent({ analytics }: { analytics: InventoryAnalytics }): Rea
           {deadStock.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">No idle inventory detected.</p>
           ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {deadStock.map((item) => (
                 <div key={`${item.name}-${item.warehouse}`} className="flex items-center justify-between gap-2 border-b border-dashed py-2">
                   <div className="min-w-0">

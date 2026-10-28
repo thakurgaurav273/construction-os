@@ -21,7 +21,7 @@ export function AiChatEmptyState({ suggestions, onSelect }: AiChatEmptyStateProp
           Answers come from your live SitePilot data. The assistant says so when the data doesn&apos;t cover a question.
         </p>
       </div>
-      <div className="grid w-full gap-2.5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 w-full gap-2.5 sm:grid-cols-2">
         {suggestions.map((suggestion, index) => (
           <button
             key={suggestion}

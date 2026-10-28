@@ -39,7 +39,7 @@ export function ChangePasswordCard(): React.ReactElement {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormField label="Current password" htmlFor="current-password" error={errors.currentPassword?.message} className="md:col-span-2 md:max-w-[calc(50%-0.5rem)]">
               <Input id="current-password" type="password" autoComplete="current-password" {...register('currentPassword')} />
             </FormField>

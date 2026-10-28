@@ -64,7 +64,7 @@ export function RfqFormDialog({ open, onOpenChange, onCreated }: RfqFormDialogPr
             <Input id="rfq-title" placeholder="e.g. Curtain wall glazing for Block C" {...register('title')} />
           </FormField>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Project" error={errors.projectId?.message}>
               <Controller control={control} name="projectId" render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>

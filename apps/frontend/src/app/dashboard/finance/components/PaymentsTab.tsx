@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/utils';
 import { PAYMENT_METHODS, PAYMENT_STATUS_OPTIONS } from '@/features/finance/constants';
 import type { Payment } from '@/features/finance/types';
 import { FinanceStatusBadge } from '@/features/finance/components/FinanceStatusBadge';
+import { MobileCard, MobileCardList, useIncrementalItems } from '@/components/shared/MobileList';
 import { PaymentRowActions } from './PaymentRowActions';
 
 const METHOD_LABEL = new Map<string, string>(PAYMENT_METHODS.map((method) => [method.value, method.label.split(' (')[0]]));
@@ -23,6 +24,8 @@ export function PaymentsTab({ payments, onOpenInvoice }: PaymentsTabProps): Reac
     if (status === 'open') return payment.status === 'PENDING' || payment.status === 'APPROVED';
     return payment.status === status;
   }), [payments, status]);
+  const phoneList = useIncrementalItems(filtered, status);
+  const emptyMessage = status === 'open' ? 'Nothing waiting. Payments appear here once requested against an approved invoice.' : 'No payments match this filter.';
 
   return (
     <div className="space-y-4">
@@ -38,7 +41,41 @@ export function PaymentsTab({ payments, onOpenInvoice }: PaymentsTabProps): Reac
         </Select>
       </div>
 
-      <div className="rounded-xl border overflow-hidden">
+      <MobileCardList
+        items={phoneList.visible}
+        getKey={(payment) => payment.id}
+        hasMore={phoneList.hasMore}
+        onLoadMore={phoneList.loadMore}
+        empty={<div className="rounded-xl border py-16 text-center text-sm text-muted-foreground">{emptyMessage}</div>}
+        renderCard={(payment) => {
+          const invoiceId = payment.invoice?.id;
+          const hasActions = payment.status === 'PENDING' || payment.status === 'APPROVED';
+          return (
+            <MobileCard
+              onClick={invoiceId ? () => onOpenInvoice(invoiceId) : undefined}
+              title={payment.paymentNumber}
+              subtitle={`${payment.vendorName}${payment.invoice ? ` · ${payment.invoice.invoiceNumber}` : ''}`}
+              aside={<span className="text-sm font-semibold">{formatCurrency(payment.amount)}</span>}
+              meta={[
+                { label: 'Status', value: <FinanceStatusBadge kind="payment" value={payment.status} /> },
+                {
+                  label: payment.paidDate ? 'Paid' : 'Due',
+                  value: (
+                    <span className={payment.isOverdue ? 'text-red-600 dark:text-red-400 font-semibold' : undefined}>
+                      {format(new Date(payment.paidDate ?? payment.dueDate), 'dd MMM yyyy')}
+                    </span>
+                  ),
+                },
+                { label: 'Method', value: METHOD_LABEL.get(payment.method) ?? payment.method },
+                { label: 'Project', value: payment.project?.name ?? '—' },
+              ]}
+              footer={hasActions ? <PaymentRowActions payment={payment} /> : undefined}
+            />
+          );
+        }}
+      />
+
+      <div className="hidden rounded-xl border overflow-hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -55,7 +92,7 @@ export function PaymentsTab({ payments, onOpenInvoice }: PaymentsTabProps): Reac
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-16 text-center text-muted-foreground">
-                    {status === 'open' ? 'Nothing waiting. Payments appear here once requested against an approved invoice.' : 'No payments match this filter.'}
+                    {emptyMessage}
                   </td>
                 </tr>
               ) : filtered.map((payment) => {
