@@ -132,7 +132,7 @@ export function BrandColorCard({ organization, canManage }: { organization: Orga
           </fieldset>
 
           {valid && (
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <Preview hex={draft} dark={false} />
               <Preview hex={draft} dark />
             </div>

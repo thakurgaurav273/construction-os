@@ -48,7 +48,7 @@ export function GettingStartedChecklist(): React.ReactElement | null {
             <PartyPopper className="h-4 w-4 text-primary" aria-hidden="true" /> Every step is done.
           </p>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {steps.map((step) => {
               const done = progress.checklist.steps[step.key];
               return (

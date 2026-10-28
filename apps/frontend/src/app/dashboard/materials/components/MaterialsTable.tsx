@@ -15,6 +15,7 @@ import {
   type MaterialListItem, type MaterialStatus, type MaterialFilters,
 } from '@/hooks/api/use-materials';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { MobileCard, MobileCardList, useAccumulatedPages } from '@/components/shared/MobileList';
 import { formatDate, formatNumber } from '@/lib/utils';
 import { MaterialStatusBadge } from './MaterialStatusBadge';
 
@@ -83,6 +84,8 @@ export function MaterialsTable({ onSelect }: MaterialsTableProps): React.ReactEl
   }), [search, categoryId, supplierId, status, lowStockOnly, sort, order, page]);
 
   const { data, isLoading, isError, refetch } = useMaterials(filters);
+  const listKey = [search, categoryId, supplierId, status, lowStockOnly, sort, order].join('|');
+  const phoneItems = useAccumulatedPages({ items: data?.items, page, resetKey: listKey });
 
   function handleSort(key: SortKey): void {
     if (key === sort) {
@@ -101,6 +104,16 @@ export function MaterialsTable({ onSelect }: MaterialsTableProps): React.ReactEl
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
+
+  const loadingSkeleton = (
+    <div className="rounded-xl border overflow-hidden">
+      <div className="p-4 space-y-3">
+        {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+          <Skeleton key={i} className="h-11 w-full rounded-md" />
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -166,15 +179,9 @@ export function MaterialsTable({ onSelect }: MaterialsTableProps): React.ReactEl
           description="Something went wrong while fetching the catalogue. Check your connection and try again."
           action={<Button onClick={() => refetch()}>Retry</Button>}
         />
-      ) : isLoading ? (
-        <div className="rounded-xl border overflow-hidden">
-          <div className="p-4 space-y-3">
-            {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-              <Skeleton key={i} className="h-11 w-full rounded-md" />
-            ))}
-          </div>
-        </div>
-      ) : items.length === 0 ? (
+      ) : isLoading && phoneItems.length === 0 ? (
+        loadingSkeleton
+      ) : !isLoading && items.length === 0 ? (
         <EmptyState
           icon={PackageSearch}
           title="No materials found"
@@ -182,173 +189,200 @@ export function MaterialsTable({ onSelect }: MaterialsTableProps): React.ReactEl
         />
       ) : (
         <>
-          <p className="text-sm text-muted-foreground">
-            Showing {items.length} of {formatNumber(total)} materials
-          </p>
+          <MobileCardList
+            items={phoneItems}
+            getKey={(material) => material.id}
+            hasMore={page < totalPages}
+            onLoadMore={() => setPage((current) => current + 1)}
+            isLoadingMore={isLoading}
+            renderCard={(material) => (
+              <MobileCard
+                onClick={() => onSelect(material.id)}
+                title={material.name}
+                subtitle={[material.sku, material.categoryName].filter(Boolean).join(' · ')}
+                aside={<MaterialStatusBadge status={material.status} />}
+                meta={[
+                  { label: 'Available', value: `${formatNumber(material.available)} ${material.unit}` },
+                  { label: 'Reserved', value: formatNumber(material.reserved) },
+                  { label: 'Supplier', value: material.supplierName ?? '-' },
+                  { label: 'Updated', value: formatDate(material.updatedAt) },
+                ]}
+              />
+            )}
+          />
 
-          <div className="rounded-xl border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/60">
-                    <th className={headClass}>
-                      <button
-                        type="button"
-                        onClick={() => handleSort('name')}
-                        className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-                      >
-                        Material <SortIcon column="name" />
-                      </button>
-                    </th>
-                    <th className={`${headClass} hidden lg:table-cell`}>Category</th>
-                    <th className={`${headClass} hidden xl:table-cell text-center`}>Projects</th>
-                    <th className={`${headClass} hidden lg:table-cell`}>Supplier</th>
-                    <th className={`${headClass} text-right`}>
-                      <button
-                        type="button"
-                        onClick={() => handleSort('available')}
-                        className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-                      >
-                        Available <SortIcon column="available" />
-                      </button>
-                    </th>
-                    <th className={`${headClass} hidden md:table-cell text-right`}>
-                      <button
-                        type="button"
-                        onClick={() => handleSort('reserved')}
-                        className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-                      >
-                        Reserved <SortIcon column="reserved" />
-                      </button>
-                    </th>
-                    <th className={`${headClass} hidden xl:table-cell text-right`}>
-                      <button
-                        type="button"
-                        onClick={() => handleSort('minStock')}
-                        className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-                      >
-                        Min Stock <SortIcon column="minStock" />
-                      </button>
-                    </th>
-                    <th className={headClass}>Status</th>
-                    <th className={`${headClass} hidden lg:table-cell`}>
-                      <button
-                        type="button"
-                        onClick={() => handleSort('updatedAt')}
-                        className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-                      >
-                        Updated <SortIcon column="updatedAt" />
-                      </button>
-                    </th>
-                    <th className="px-4 py-3 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((material, idx) => (
-                    <motion.tr
-                      key={material.id}
-                      initial={false}
-                      animate={{ opacity: 1, y: 0 }}
-                      onClick={() => onSelect(material.id)}
-                      className="border-b last:border-0 hover:bg-muted/40 transition-colors cursor-pointer group"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <MaterialThumb material={material} />
-                          <div className="min-w-0">
-                            <p className="font-semibold group-hover:text-primary transition-colors truncate max-w-[220px]">
-                              {material.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{material.sku}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground whitespace-nowrap">
-                        {material.categoryName ?? '-'}
-                      </td>
-                      <td className="px-4 py-3 hidden xl:table-cell text-center text-muted-foreground">
-                        {material.projectCount}
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
-                        <span className="max-w-[160px] truncate inline-block align-middle">
-                          {material.supplierName ?? '-'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
-                        {formatNumber(material.available)}
-                        <span className="text-xs font-normal text-muted-foreground"> {material.unit}</span>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell text-right text-muted-foreground whitespace-nowrap">
-                        {formatNumber(material.reserved)}
-                      </td>
-                      <td className="px-4 py-3 hidden xl:table-cell text-right text-muted-foreground whitespace-nowrap">
-                        {formatNumber(material.minStock)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <MaterialStatusBadge status={material.status} />
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground whitespace-nowrap">
-                        {formatDate(material.updatedAt)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelect(material.id);
-                          }}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                Page {page} of {totalPages}
+          {/* A later page loading on phones keeps the cards above; the desktop table shows one page at a time. */}
+          {isLoading ? <div className="hidden md:block">{loadingSkeleton}</div> : (
+            <div className="hidden md:block space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {items.length} of {formatNumber(total)} materials
               </p>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNum = i + 1;
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={page === pageNum ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setPage(pageNum)}
-                      className="h-8 w-8 p-0 text-xs"
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+
+              <div className="rounded-xl border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/60">
+                        <th className={headClass}>
+                          <button
+                            type="button"
+                            onClick={() => handleSort('name')}
+                            className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                          >
+                            Material <SortIcon column="name" />
+                          </button>
+                        </th>
+                        <th className={`${headClass} hidden lg:table-cell`}>Category</th>
+                        <th className={`${headClass} hidden xl:table-cell text-center`}>Projects</th>
+                        <th className={`${headClass} hidden lg:table-cell`}>Supplier</th>
+                        <th className={`${headClass} text-right`}>
+                          <button
+                            type="button"
+                            onClick={() => handleSort('available')}
+                            className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                          >
+                            Available <SortIcon column="available" />
+                          </button>
+                        </th>
+                        <th className={`${headClass} hidden md:table-cell text-right`}>
+                          <button
+                            type="button"
+                            onClick={() => handleSort('reserved')}
+                            className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                          >
+                            Reserved <SortIcon column="reserved" />
+                          </button>
+                        </th>
+                        <th className={`${headClass} hidden xl:table-cell text-right`}>
+                          <button
+                            type="button"
+                            onClick={() => handleSort('minStock')}
+                            className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                          >
+                            Min Stock <SortIcon column="minStock" />
+                          </button>
+                        </th>
+                        <th className={headClass}>Status</th>
+                        <th className={`${headClass} hidden lg:table-cell`}>
+                          <button
+                            type="button"
+                            onClick={() => handleSort('updatedAt')}
+                            className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                          >
+                            Updated <SortIcon column="updatedAt" />
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((material, idx) => (
+                        <motion.tr
+                          key={material.id}
+                          initial={false}
+                          animate={{ opacity: 1, y: 0 }}
+                          onClick={() => onSelect(material.id)}
+                          className="border-b last:border-0 hover:bg-muted/40 transition-colors cursor-pointer group"
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <MaterialThumb material={material} />
+                              <div className="min-w-0">
+                                <p className="font-semibold group-hover:text-primary transition-colors truncate max-w-[220px]">
+                                  {material.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{material.sku}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground whitespace-nowrap">
+                            {material.categoryName ?? '-'}
+                          </td>
+                          <td className="px-4 py-3 hidden xl:table-cell text-center text-muted-foreground">
+                            {material.projectCount}
+                          </td>
+                          <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground">
+                            <span className="max-w-[160px] truncate inline-block align-middle">
+                              {material.supplierName ?? '-'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
+                            {formatNumber(material.available)}
+                            <span className="text-xs font-normal text-muted-foreground"> {material.unit}</span>
+                          </td>
+                          <td className="px-4 py-3 hidden md:table-cell text-right text-muted-foreground whitespace-nowrap">
+                            {formatNumber(material.reserved)}
+                          </td>
+                          <td className="px-4 py-3 hidden xl:table-cell text-right text-muted-foreground whitespace-nowrap">
+                            {formatNumber(material.minStock)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <MaterialStatusBadge status={material.status} />
+                          </td>
+                          <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDate(material.updatedAt)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelect(material.id);
+                              }}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Page {page} of {totalPages}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="h-8 w-8 p-0"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const pageNum = i + 1;
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={page === pageNum ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setPage(pageNum)}
+                          className="h-8 w-8 p-0 text-xs"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="h-8 w-8 p-0"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>

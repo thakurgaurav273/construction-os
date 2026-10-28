@@ -17,6 +17,7 @@ import { useDailyReports } from '@/hooks/api/use-daily-reports';
 import { DailyReportStatusBadge } from '@/features/daily-reports/components/DailyReportStatusBadge';
 import { REPORT_STATUS_OPTIONS } from '@/features/daily-reports/constants';
 import { Can } from '@/components/shared/Can';
+import { MobileCard, MobileCardList, useIncrementalItems } from '@/components/shared/MobileList';
 
 export default function DailyReportsListPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
     const matchesStatus = statusFilter === 'all' || report.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+  const phoneList = useIncrementalItems(filtered, `${search}|${statusFilter}`);
 
   return (
     <motion.div
@@ -113,62 +115,90 @@ export default function DailyReportsListPage({ params }: { params: { id: string 
               ) : undefined}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-muted-foreground uppercase bg-muted/30">
-                  <tr>
-                    <th className="px-6 py-4 font-medium">Date</th>
-                    <th className="px-6 py-4 font-medium">Author</th>
-                    <th className="px-6 py-4 font-medium">Weather</th>
-                    <th className="px-6 py-4 font-medium">Labour</th>
-                    <th className="px-6 py-4 font-medium">Issues</th>
-                    <th className="px-6 py-4 font-medium">Status</th>
-                    <th className="px-6 py-4 font-medium text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {filtered.length === 0 ? (
+            <>
+              <MobileCardList
+                className="p-4"
+                items={phoneList.visible}
+                getKey={(report) => report.id}
+                hasMore={phoneList.hasMore}
+                onLoadMore={phoneList.loadMore}
+                empty={<p className="py-12 text-center text-sm text-muted-foreground">No reports match your filters.</p>}
+                renderCard={(report) => (
+                  <MobileCard
+                    href={`/dashboard/projects/${params.id}/daily-reports/${report.id}`}
+                    title={format(new Date(report.date), 'MMM dd, yyyy')}
+                    subtitle={report.submittedBy?.name ?? '—'}
+                    aside={<DailyReportStatusBadge status={report.status} />}
+                    meta={[
+                      { label: 'Labour', value: report.labourCount },
+                      {
+                        label: 'Issues',
+                        value: report.issues.length > 0
+                          ? <span className="font-medium text-amber-600">{report.issues.length} logged</span>
+                          : 'None',
+                      },
+                      { label: 'Weather', value: report.weather ?? '—' },
+                    ]}
+                  />
+                )}
+              />
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-muted-foreground uppercase bg-muted/30">
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-muted-foreground">No reports match your filters.</td>
+                      <th className="px-6 py-4 font-medium">Date</th>
+                      <th className="px-6 py-4 font-medium">Author</th>
+                      <th className="px-6 py-4 font-medium">Weather</th>
+                      <th className="px-6 py-4 font-medium">Labour</th>
+                      <th className="px-6 py-4 font-medium">Issues</th>
+                      <th className="px-6 py-4 font-medium">Status</th>
+                      <th className="px-6 py-4 font-medium text-right">Actions</th>
                     </tr>
-                  ) : filtered.map((report) => {
-                    const issueCount = report.issues.length;
-                    return (
-                      <tr key={report.id} className="hover:bg-muted/10 transition-colors group">
-                        <td className="px-6 py-4 font-medium flex items-center">
-                          <FileText className="mr-3 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                          {format(new Date(report.date), 'MMM dd, yyyy')}
-                        </td>
-                        <td className="px-6 py-4">{report.submittedBy?.name ?? '—'}</td>
-                        <td className="px-6 py-4 text-muted-foreground">{report.weather ?? '—'}</td>
-                        <td className="px-6 py-4 text-muted-foreground">{report.labourCount}</td>
-                        <td className="px-6 py-4">
-                          {issueCount > 0 ? (
-                            <span className="flex items-center text-amber-600 font-medium">
-                              <AlertCircle className="mr-1.5 h-3.5 w-3.5" /> {issueCount} logged
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <DailyReportStatusBadge status={report.status} />
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => router.push(`/dashboard/projects/${params.id}/daily-reports/${report.id}`)}
-                          >
-                            View
-                          </Button>
-                        </td>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {filtered.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-muted-foreground">No reports match your filters.</td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    ) : filtered.map((report) => {
+                      const issueCount = report.issues.length;
+                      return (
+                        <tr key={report.id} className="hover:bg-muted/10 transition-colors group">
+                          <td className="px-6 py-4 font-medium flex items-center">
+                            <FileText className="mr-3 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                            {format(new Date(report.date), 'MMM dd, yyyy')}
+                          </td>
+                          <td className="px-6 py-4">{report.submittedBy?.name ?? '—'}</td>
+                          <td className="px-6 py-4 text-muted-foreground">{report.weather ?? '—'}</td>
+                          <td className="px-6 py-4 text-muted-foreground">{report.labourCount}</td>
+                          <td className="px-6 py-4">
+                            {issueCount > 0 ? (
+                              <span className="flex items-center text-amber-600 font-medium">
+                                <AlertCircle className="mr-1.5 h-3.5 w-3.5" /> {issueCount} logged
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <DailyReportStatusBadge status={report.status} />
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => router.push(`/dashboard/projects/${params.id}/daily-reports/${report.id}`)}
+                            >
+                              View
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

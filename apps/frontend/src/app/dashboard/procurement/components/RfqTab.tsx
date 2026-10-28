@@ -12,6 +12,7 @@ import { StatusBadge } from './StatusBadge';
 import { formatCompactINR } from './procurement-format';
 import { PROCUREMENT_CATEGORIES, RFQ_STATUS_OPTIONS } from '@/features/procurement/constants';
 import type { Rfq } from '@/features/procurement/types';
+import { MobileCard, MobileCardList, useIncrementalItems } from '@/components/shared/MobileList';
 
 const COLUMN_COUNT = 10;
 
@@ -45,6 +46,9 @@ export function RfqTab({ rfqs, onSelect }: RfqTabProps): React.ReactElement {
       return matchesSearch && matchesStatus && matchesCategory;
     });
   }, [rfqs, search, statusFilter, categoryFilter]);
+
+  const phoneList = useIncrementalItems(filtered, `${search}|${statusFilter}|${categoryFilter}`);
+  const emptyMessage = rfqs.length === 0 ? 'No RFQs yet. Issue one to start collecting vendor quotes.' : 'No RFQs match your filters.';
 
   return (
     <div className="space-y-4">
@@ -90,8 +94,37 @@ export function RfqTab({ rfqs, onSelect }: RfqTabProps): React.ReactElement {
         Showing {filtered.length} of {rfqs.length} RFQs
       </p>
 
+      <MobileCardList
+        items={phoneList.visible}
+        getKey={(rfq) => rfq.id}
+        hasMore={phoneList.hasMore}
+        onLoadMore={phoneList.loadMore}
+        empty={<div className="rounded-xl border bg-card px-4 py-12 text-center text-sm text-muted-foreground">{emptyMessage}</div>}
+        renderCard={(rfq) => (
+          <MobileCard
+            onClick={() => onSelect(rfq)}
+            title={rfq.rfqNumber}
+            subtitle={rfq.title}
+            aside={<StatusBadge kind="rfq" value={rfq.status} />}
+            meta={[
+              { label: 'Responses', value: `${rfq.quotesReceived}/${rfq.vendorsInvited}` },
+              {
+                label: 'Closing',
+                value: (
+                  <span className={rfq.isClosingSoon || rfq.isPastClosing ? 'font-semibold text-amber-600 dark:text-amber-400' : undefined}>
+                    {format(new Date(rfq.closingDate), 'dd MMM yyyy')}
+                  </span>
+                ),
+              },
+              { label: 'Category', value: rfq.category },
+              { label: 'Est. Value', value: rfq.estimatedValue ? formatCompactINR(rfq.estimatedValue) : '—' },
+            ]}
+          />
+        )}
+      />
+
       {/* Table */}
-      <div className="rounded-xl border overflow-hidden">
+      <div className="hidden rounded-xl border overflow-hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -112,7 +145,7 @@ export function RfqTab({ rfqs, onSelect }: RfqTabProps): React.ReactElement {
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={COLUMN_COUNT} className="py-16 text-center text-muted-foreground">
-                    {rfqs.length === 0 ? 'No RFQs yet. Issue one to start collecting vendor quotes.' : 'No RFQs match your filters.'}
+                    {emptyMessage}
                   </td>
                 </tr>
               ) : (

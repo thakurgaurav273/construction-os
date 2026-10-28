@@ -61,7 +61,7 @@ export function VendorFormDialog({ open, onOpenChange, vendor }: VendorFormDialo
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Vendor name" htmlFor="vendor-name" error={errors.name?.message}>
               <Input id="vendor-name" placeholder="e.g. Tata Steel Ltd" {...register('name')} />
             </FormField>
@@ -97,7 +97,7 @@ export function VendorFormDialog({ open, onOpenChange, vendor }: VendorFormDialo
             )} />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Contact person" htmlFor="vendor-contact" error={errors.contactPerson?.message}>
               <Input id="vendor-contact" {...register('contactPerson')} />
             </FormField>

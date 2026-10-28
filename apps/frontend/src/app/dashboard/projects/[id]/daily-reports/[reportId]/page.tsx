@@ -95,7 +95,7 @@ export default function DailyReportDetailPage({
             <Calendar className="h-4 w-4 text-muted-foreground" /> Overview
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid sm:grid-cols-3 gap-6 p-6">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-6 p-6">
           <div>
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Date</p>
             <p className="font-semibold">{format(new Date(report.date), 'EEEE, MMM dd, yyyy')}</p>
@@ -173,7 +173,7 @@ export default function DailyReportDetailPage({
 
       {/* Materials & Equipment */}
       {(materials.length > 0 || equipment.length > 0) && (
-        <div className="grid sm:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {materials.length > 0 && (
             <Card>
               <CardHeader className="border-b bg-muted/20">

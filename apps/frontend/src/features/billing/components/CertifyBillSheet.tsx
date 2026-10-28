@@ -88,7 +88,7 @@ export function CertifyBillSheet({ bill, open, onOpenChange }: CertifyBillSheetP
                         Claimed<br /><span className="text-sm font-medium text-foreground">{formatQuantity(line.claimedQuantity)} {line.unit}</span>
                       </p>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-[160px_minmax(0,1fr)]">
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-[160px_minmax(0,1fr)]">
                       <FormField label={`Certified (${line.unit})`} htmlFor={`certify-${index}`} error={lineErrors?.certifiedQuantity?.message}>
                         <Input id={`certify-${index}`} type="number" step="any" min={0} {...register(`lines.${index}.certifiedQuantity`)} />
                       </FormField>

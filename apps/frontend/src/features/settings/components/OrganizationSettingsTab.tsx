@@ -63,7 +63,7 @@ export function OrganizationSettingsTab(): React.ReactElement {
       <Card>
         <CardContent className="space-y-4 p-6">
           <Skeleton className="h-20 w-20 rounded-xl" />
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-10 w-full" />)}
           </div>
         </CardContent>
@@ -91,7 +91,7 @@ export function OrganizationSettingsTab(): React.ReactElement {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Radix Select can report an empty value while its options re-render; those calls are ignored below. */}
-          <fieldset disabled={!canManage} className="grid gap-4 md:grid-cols-2">
+          <fieldset disabled={!canManage} className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormField label="Organization name" htmlFor="org-name" error={errors.name?.message}>
               <Input id="org-name" {...register('name')} />
             </FormField>

@@ -57,7 +57,7 @@ export function MarkPaidDialog({ payment, onClose }: MarkPaidDialogProps): React
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Paid on" htmlFor="paid-date" error={errors.paidDate?.message}>
               <Input id="paid-date" type="date" max={today} {...register('paidDate')} />
             </FormField>

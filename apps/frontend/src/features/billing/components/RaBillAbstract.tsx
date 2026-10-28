@@ -63,7 +63,7 @@ export function RaBillAbstract({ bill, onOpenLine, editable }: RaBillAbstractPro
             {lines.map((line) => {
               const held = line.certifiedQuantity !== null ? line.claimedQuantity - line.certifiedQuantity : 0;
               return (
-                <li key={line.contractItemId} className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_auto] lg:items-center">
+                <li key={line.contractItemId} className="grid grid-cols-1 gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_auto] lg:items-center">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">
                       {line.itemNo}

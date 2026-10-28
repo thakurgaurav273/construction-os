@@ -20,7 +20,7 @@ export function GeneralInfoCard() {
           <Calendar className="mr-2 h-5 w-5 text-muted-foreground" /> General Information
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-6 md:grid-cols-3">
+      <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="report-date">Date</Label>
           <Input id="report-date" type="date" {...register('date')} />
@@ -99,7 +99,7 @@ export function LabourCard() {
           Total <span className="font-semibold text-foreground">{totalOnSite}</span>
         </span>
       </CardHeader>
-      <CardContent className="grid gap-6 sm:grid-cols-3">
+      <CardContent className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         {LABOUR_FIELDS.map(({ key, label }) => (
           <div key={key} className="space-y-2">
             <Label htmlFor={`labour-${key}`}>{label}</Label>

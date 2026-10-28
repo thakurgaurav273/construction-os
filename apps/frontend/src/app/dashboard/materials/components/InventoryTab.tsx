@@ -90,7 +90,7 @@ export function InventoryTab({ onSelect }: InventoryTabProps): React.ReactElemen
         {Array.from({ length: 2 }).map((_, i) => (
           <div key={i} className="space-y-3">
             <Skeleton className="h-8 w-56 rounded-md" />
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 3 }).map((_, j) => (
                 <Skeleton key={j} className="h-40 w-full rounded-xl" />
               ))}
@@ -131,7 +131,7 @@ export function InventoryTab({ onSelect }: InventoryTabProps): React.ReactElemen
               {formatCompactINR(group.inventoryValue)} on hand
             </Badge>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {group.items.map((item) => (
               <StockCard key={item.id} item={item} onSelect={onSelect} />
             ))}

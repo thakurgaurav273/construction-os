@@ -30,7 +30,7 @@ export default function RaBillPage(): React.ReactElement {
     return (
       <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
         <Skeleton className="h-8 w-72" />
-        <div className="grid gap-6 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <Skeleton className="h-96 w-full rounded-xl xl:col-span-2" />
           <Skeleton className="h-72 w-full rounded-xl" />
         </div>
@@ -106,7 +106,7 @@ export default function RaBillPage(): React.ReactElement {
         </Card>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="min-w-0 xl:col-span-2">
           <RaBillAbstract bill={bill} editable={editable} onOpenLine={(line) => setOpenItemId(line.contractItemId)} />
         </div>

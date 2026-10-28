@@ -22,7 +22,7 @@ export function SheetUploadStep({ entities, entity, onEntityChange, onUpload, re
           <CardTitle>What does the sheet contain?</CardTitle>
           <CardDescription>Import materials and vendors before stock or orders that refer to them.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Type of data">
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Type of data">
           {entities.map((definition) => {
             const { icon: Icon, summary } = ENTITY_PRESENTATION[definition.entity];
             const selected = entity === definition.entity;

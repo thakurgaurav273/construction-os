@@ -76,7 +76,7 @@ export function CashFlowTab({ cashFlow, summary }: CashFlowTabProps): React.Reac
         <EmptyState icon={TrendingUp} title="No cash flow recorded" description="Monthly inflows, outflows and forecasts appear here once entered." />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Burn rate</CardTitle><CardDescription>Average monthly outflow</CardDescription></CardHeader>
               <CardContent><p className="text-2xl font-bold">{formatCompactINR(burnRate)}</p></CardContent>

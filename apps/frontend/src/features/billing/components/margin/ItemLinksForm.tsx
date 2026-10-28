@@ -83,7 +83,7 @@ export function ItemLinksForm({ contract, options }: ItemLinksFormProps): React.
               const linked = clientItems.get(links?.[item.id] ?? '');
               const suggestion = options.suggestions[item.id];
               return (
-                <li key={item.id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] md:items-center">
+                <li key={item.id} className="grid grid-cols-1 gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] md:items-center">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">{item.itemNo}{item.rateCode && <span className="ml-2 text-xs font-normal text-muted-foreground">{item.rateCode}</span>}</p>
                     <p className="line-clamp-2 text-xs text-muted-foreground">{item.description}</p>

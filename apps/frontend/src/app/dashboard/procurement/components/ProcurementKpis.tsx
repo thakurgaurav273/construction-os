@@ -33,7 +33,7 @@ function periodTrend(current: number, previous: number): Trend {
 export function ProcurementKpis({ summary }: { summary: ProcurementSummary | undefined }): React.ReactElement {
   if (!summary) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-[118px] rounded-xl" />)}
       </div>
     );
@@ -92,7 +92,7 @@ export function ProcurementKpis({ summary }: { summary: ProcurementSummary | und
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
     >
       {cards.map((card) => (
         <motion.div key={card.title} variants={itemVariants}>

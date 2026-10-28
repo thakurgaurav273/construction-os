@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { StatusBadge } from './StatusBadge';
 import { formatCurrency } from './procurement-format';
 import { PRIORITY_RANK } from '@/features/procurement/constants';
+import { MobileCard, MobileCardList, useIncrementalItems } from '@/components/shared/MobileList';
 import type { PurchaseOrder } from '@/features/procurement/types';
 
 const PAGE_SIZE = 12;
@@ -64,6 +65,7 @@ export function PurchaseOrderTable({
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(page, totalPages);
   const paginated = sorted.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
+  const phoneList = useIncrementalItems(sorted, `${orders.length}|${sortKey}|${sortDir}`);
 
   function handleSort(key: SortKey): void {
     if (key === sortKey) {
@@ -83,11 +85,33 @@ export function PurchaseOrderTable({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
+      <p className="hidden text-sm text-muted-foreground md:block">
         Showing {paginated.length} of {orders.length} purchase orders
       </p>
 
-      <div className="rounded-xl border overflow-hidden">
+      <MobileCardList
+        items={phoneList.visible}
+        getKey={(po) => po.id}
+        hasMore={phoneList.hasMore}
+        onLoadMore={phoneList.loadMore}
+        empty={<div className="rounded-xl border bg-card px-4 py-12 text-center text-sm text-muted-foreground">{emptyMessage}</div>}
+        renderCard={(po) => (
+          <MobileCard
+            onClick={() => onSelect(po)}
+            title={po.poNumber}
+            subtitle={po.vendor?.name ?? '—'}
+            aside={<StatusBadge kind="approval" value={po.status} />}
+            meta={[
+              { label: 'Amount', value: <span className="font-semibold">{formatCurrency(po.amount)}</span> },
+              { label: 'Expected', value: format(new Date(po.expectedDelivery), 'dd MMM yyyy') },
+              { label: 'Delivery', value: <StatusBadge kind="delivery" value={po.isOverdue ? 'DELAYED' : po.deliveryStatus} /> },
+              { label: 'Project', value: po.project?.name ?? '—' },
+            ]}
+          />
+        )}
+      />
+
+      <div className="hidden rounded-xl border overflow-hidden md:block">
         <div className="overflow-x-auto max-h-[640px] overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10">
@@ -213,7 +237,7 @@ export function PurchaseOrderTable({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="hidden items-center justify-between md:flex">
           <p className="text-xs text-muted-foreground">
             Page {safeCurrentPage} of {totalPages}
           </p>

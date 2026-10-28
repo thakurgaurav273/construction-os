@@ -70,7 +70,7 @@ export function ReceivablesList(): React.ReactElement {
                 <li key={item.id}>
                   <Link
                     href={`/dashboard/billing/ra-bills/${item.id}`}
-                    className="grid gap-2 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-4"
+                    className="grid grid-cols-1 gap-2 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-4"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{item.code} · {item.contract.title}</p>

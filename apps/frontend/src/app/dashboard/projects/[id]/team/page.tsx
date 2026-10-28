@@ -30,7 +30,7 @@ export default function ProjectTeamPage({ params }: { params: { id: string } }) 
       </div>
 
       {isLoading ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i} className="h-full">
               <CardContent className="p-6 space-y-4">
@@ -60,7 +60,7 @@ export default function ProjectTeamPage({ params }: { params: { id: string } }) 
         <motion.div
           initial={false}
           animate={{ opacity: 1 }}
-          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         >
           {members.map((member, i) => (
             <motion.div

@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { AlertCircle, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { Button, Skeleton } from '@sitepilot/ui';
 import type { PaginatedDailyReports } from '@/hooks/api/use-daily-reports';
+import { MobileCard, MobileCardList, useAccumulatedPages } from '@/components/shared/MobileList';
 import { DailyReportStatusBadge } from './DailyReportStatusBadge';
 
 interface OrganizationReportsTableProps {
@@ -14,13 +15,17 @@ interface OrganizationReportsTableProps {
   hasFilters: boolean;
   onRetry: () => void;
   onPageChange: (page: number) => void;
+  /** Changes with the filters, so the phone list starts over instead of appending. */
+  listKey: string;
 }
 
 const COLUMNS = ['Date', 'Project', 'Author', 'Labour', 'Issues', 'Status', ''];
 
 export function OrganizationReportsTable({
-  data, isLoading, isError, hasFilters, onRetry, onPageChange,
+  data, isLoading, isError, hasFilters, onRetry, onPageChange, listKey,
 }: OrganizationReportsTableProps) {
+  const phoneItems = useAccumulatedPages({ items: data?.items, page: data?.page ?? 1, resetKey: listKey });
+
   if (isLoading) {
     return (
       <div className="bg-card border rounded-xl p-4 space-y-3">
@@ -42,84 +47,112 @@ export function OrganizationReportsTable({
   const lastRow = Math.min(data.page * data.limit, data.total);
   const totalPages = Math.max(1, Math.ceil(data.total / data.limit));
 
-  return (
-    <div className="bg-card border rounded-xl overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/30">
-              {COLUMNS.map((column) => (
-                <th key={column} className="text-left px-4 py-3 font-medium text-muted-foreground">{column}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.items.length === 0 && (
-              <tr>
-                <td colSpan={COLUMNS.length} className="px-4 py-12 text-center text-muted-foreground">
-                  {hasFilters
-                    ? 'No reports match your filters.'
-                    : 'No daily reports yet. Start one from a project to build the site record.'}
-                </td>
-              </tr>
-            )}
-            {data.items.map((report) => (
-              <tr key={report.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                <td className="px-4 py-3 font-medium whitespace-nowrap">
-                  <span className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                    {format(new Date(report.date), 'MMM dd, yyyy')}
-                  </span>
-                </td>
-                <td className="px-4 py-3">{report.project.name}</td>
-                <td className="px-4 py-3 text-muted-foreground">{report.submittedBy.name}</td>
-                <td className="px-4 py-3 text-muted-foreground">{report.labourCount}</td>
-                <td className="px-4 py-3">
-                  {report.issues.length > 0 ? (
-                    <span className="flex items-center text-amber-600 font-medium whitespace-nowrap">
-                      <AlertCircle className="mr-1.5 h-3.5 w-3.5" /> {report.issues.length} logged
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </td>
-                <td className="px-4 py-3"><DailyReportStatusBadge status={report.status} /></td>
-                <td className="px-4 py-3 text-right">
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/dashboard/projects/${report.projectId}/daily-reports/${report.id}`}>View</Link>
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+  const emptyMessage = hasFilters
+    ? 'No reports match your filters.'
+    : 'No daily reports yet. Start one from a project to build the site record.';
 
-      {data.total > 0 && (
-        <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-muted-foreground">
-          <span>Showing {firstRow}–{lastRow} of {data.total}</span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label="Previous page"
-              disabled={data.page <= 1}
-              onClick={() => onPageChange(data.page - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label="Next page"
-              disabled={data.page >= totalPages}
-              onClick={() => onPageChange(data.page + 1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+  return (
+    <>
+      <MobileCardList
+        items={phoneItems}
+        getKey={(report) => report.id}
+        hasMore={data.page < totalPages}
+        onLoadMore={() => onPageChange(data.page + 1)}
+        empty={<div className="rounded-xl border bg-card px-4 py-12 text-center text-sm text-muted-foreground">{emptyMessage}</div>}
+        renderCard={(report) => (
+          <MobileCard
+            href={`/dashboard/projects/${report.projectId}/daily-reports/${report.id}`}
+            title={format(new Date(report.date), 'MMM dd, yyyy')}
+            subtitle={`${report.project.name} · ${report.submittedBy.name}`}
+            aside={<DailyReportStatusBadge status={report.status} />}
+            meta={[
+              { label: 'Labour', value: report.labourCount },
+              {
+                label: 'Issues',
+                value: report.issues.length > 0
+                  ? <span className="font-medium text-amber-600">{report.issues.length} logged</span>
+                  : 'None',
+              },
+            ]}
+          />
+        )}
+      />
+      <div className="hidden overflow-hidden rounded-xl border bg-card md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                {COLUMNS.map((column) => (
+                  <th key={column} className="text-left px-4 py-3 font-medium text-muted-foreground">{column}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.length === 0 && (
+                <tr>
+                  <td colSpan={COLUMNS.length} className="px-4 py-12 text-center text-muted-foreground">
+                    {emptyMessage}
+                  </td>
+                </tr>
+              )}
+              {data.items.map((report) => (
+                <tr key={report.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                  <td className="px-4 py-3 font-medium whitespace-nowrap">
+                    <span className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                      {format(new Date(report.date), 'MMM dd, yyyy')}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">{report.project.name}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{report.submittedBy.name}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{report.labourCount}</td>
+                  <td className="px-4 py-3">
+                    {report.issues.length > 0 ? (
+                      <span className="flex items-center text-amber-600 font-medium whitespace-nowrap">
+                        <AlertCircle className="mr-1.5 h-3.5 w-3.5" /> {report.issues.length} logged
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3"><DailyReportStatusBadge status={report.status} /></td>
+                  <td className="px-4 py-3 text-right">
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/dashboard/projects/${report.projectId}/daily-reports/${report.id}`}>View</Link>
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
-    </div>
+
+        {data.total > 0 && (
+          <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-muted-foreground">
+            <span>Showing {firstRow}–{lastRow} of {data.total}</span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label="Previous page"
+                disabled={data.page <= 1}
+                onClick={() => onPageChange(data.page - 1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label="Next page"
+                disabled={data.page >= totalPages}
+                onClick={() => onPageChange(data.page + 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

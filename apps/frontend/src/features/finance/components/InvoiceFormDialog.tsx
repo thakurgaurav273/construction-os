@@ -110,7 +110,7 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice, defaults, onSav
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Vendor" error={errors.vendorId?.message}>
               <Controller control={control} name="vendorId" render={({ field }) => (
                 <Select
@@ -182,7 +182,7 @@ export function InvoiceFormDialog({ open, onOpenChange, invoice, defaults, onSav
 
           <InvoiceLinesEditor control={control} register={register} errors={errors} billable={billable} />
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Description (optional)" htmlFor="invoice-description" error={errors.description?.message}>
               <Input id="invoice-description" placeholder="e.g. TMT bars for Tower C, floors 5-6" {...register('description')} />
             </FormField>

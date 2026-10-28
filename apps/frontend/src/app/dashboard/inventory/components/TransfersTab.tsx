@@ -14,6 +14,7 @@ import {
   type TransferStatus, type TransferFilters,
 } from '@/hooks/api/use-inventory';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { MobileCard, MobileCardList, useAccumulatedPages } from '@/components/shared/MobileList';
 import { formatDate, formatNumber } from '@/lib/utils';
 import { getTransferStatusMeta } from './inventory-format';
 import { CreateTransferDialog } from './CreateTransferDialog';
@@ -58,9 +59,21 @@ export function TransfersTab({ onSelect }: TransfersTabProps): React.ReactElemen
   }), [search, status, warehouseId, page]);
 
   const { data, isLoading, isError, refetch } = useTransfers(filters);
+  const listKey = [search, status, warehouseId].join('|');
+  const phoneItems = useAccumulatedPages({ items: data?.items, page, resetKey: listKey });
 
   const items = data?.items ?? [];
   const totalPages = data?.totalPages ?? 1;
+
+  const loadingSkeleton = (
+    <div className="rounded-xl border overflow-hidden">
+      <div className="p-4 space-y-3">
+        {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+          <Skeleton key={i} className="h-11 w-full rounded-md" />
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -110,15 +123,9 @@ export function TransfersTab({ onSelect }: TransfersTabProps): React.ReactElemen
           description="Something went wrong while fetching stock transfers. Please try again."
           action={<Button onClick={() => refetch()}>Retry</Button>}
         />
-      ) : isLoading ? (
-        <div className="rounded-xl border overflow-hidden">
-          <div className="p-4 space-y-3">
-            {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-              <Skeleton key={i} className="h-11 w-full rounded-md" />
-            ))}
-          </div>
-        </div>
-      ) : items.length === 0 ? (
+      ) : isLoading && phoneItems.length === 0 ? (
+        loadingSkeleton
+      ) : !isLoading && items.length === 0 ? (
         <EmptyState
           icon={ArrowLeftRight}
           title="No transfers found"
@@ -127,87 +134,116 @@ export function TransfersTab({ onSelect }: TransfersTabProps): React.ReactElemen
         />
       ) : (
         <>
-          <div className="rounded-xl border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/60">
-                    <th className={headClass}>Code</th>
-                    <th className={headClass}>Route</th>
-                    <th className={`${headClass} hidden md:table-cell text-center`}>Items</th>
-                    <th className={`${headClass} hidden md:table-cell text-right`}>Qty</th>
-                    <th className={headClass}>Status</th>
-                    <th className={`${headClass} hidden lg:table-cell`}>Created</th>
-                    <th className="px-4 py-3 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((transfer, idx) => {
-                    const meta = getTransferStatusMeta(transfer.status);
-                    return (
-                      <motion.tr
-                        key={transfer.id}
-                        initial={false}
-                        animate={{ opacity: 1, y: 0 }}
-                        onClick={() => onSelect(transfer.id)}
-                        className="border-b last:border-0 hover:bg-muted/40 transition-colors cursor-pointer group"
-                      >
-                        <td className="px-4 py-3 font-semibold group-hover:text-primary transition-colors whitespace-nowrap">
-                          {transfer.code}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <span className="font-medium truncate max-w-[120px]">{transfer.fromWarehouseName}</span>
-                            <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                            <span className="font-medium truncate max-w-[120px]">{transfer.toWarehouseName}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 hidden md:table-cell text-center text-muted-foreground">
-                          {transfer.itemCount}
-                        </td>
-                        <td className="px-4 py-3 hidden md:table-cell text-right text-muted-foreground whitespace-nowrap">
-                          {formatNumber(transfer.totalQuantity)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant="outline" className={cn('font-medium', meta.badgeClass)}>{meta.label}</Badge>
-                        </td>
-                        <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground whitespace-nowrap">
-                          {formatDate(transfer.createdAt)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </td>
-                      </motion.tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <MobileCardList
+            items={phoneItems}
+            getKey={(transfer) => transfer.id}
+            hasMore={page < totalPages}
+            onLoadMore={() => setPage((current) => current + 1)}
+            isLoadingMore={isLoading}
+            renderCard={(transfer) => {
+              const meta = getTransferStatusMeta(transfer.status);
+              return (
+                <MobileCard
+                  onClick={() => onSelect(transfer.id)}
+                  title={transfer.code}
+                  subtitle={`${transfer.fromWarehouseName} → ${transfer.toWarehouseName}`}
+                  aside={<Badge variant="outline" className={cn('font-medium', meta.badgeClass)}>{meta.label}</Badge>}
+                  meta={[
+                    { label: 'Items', value: transfer.itemCount },
+                    { label: 'Qty', value: formatNumber(transfer.totalQuantity) },
+                    { label: 'Created', value: formatDate(transfer.createdAt) },
+                  ]}
+                />
+              );
+            }}
+          />
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">Page {page} of {totalPages}</p>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+          {/* A later page loading on phones keeps the cards above; the desktop table shows one page at a time. */}
+          {isLoading ? <div className="hidden md:block">{loadingSkeleton}</div> : (
+            <div className="hidden md:block space-y-4">
+              <div className="rounded-xl border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/60">
+                        <th className={headClass}>Code</th>
+                        <th className={headClass}>Route</th>
+                        <th className={`${headClass} hidden md:table-cell text-center`}>Items</th>
+                        <th className={`${headClass} hidden md:table-cell text-right`}>Qty</th>
+                        <th className={headClass}>Status</th>
+                        <th className={`${headClass} hidden lg:table-cell`}>Created</th>
+                        <th className="px-4 py-3 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((transfer, idx) => {
+                        const meta = getTransferStatusMeta(transfer.status);
+                        return (
+                          <motion.tr
+                            key={transfer.id}
+                            initial={false}
+                            animate={{ opacity: 1, y: 0 }}
+                            onClick={() => onSelect(transfer.id)}
+                            className="border-b last:border-0 hover:bg-muted/40 transition-colors cursor-pointer group"
+                          >
+                            <td className="px-4 py-3 font-semibold group-hover:text-primary transition-colors whitespace-nowrap">
+                              {transfer.code}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <span className="font-medium truncate max-w-[120px]">{transfer.fromWarehouseName}</span>
+                                <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                                <span className="font-medium truncate max-w-[120px]">{transfer.toWarehouseName}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 hidden md:table-cell text-center text-muted-foreground">
+                              {transfer.itemCount}
+                            </td>
+                            <td className="px-4 py-3 hidden md:table-cell text-right text-muted-foreground whitespace-nowrap">
+                              {formatNumber(transfer.totalQuantity)}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Badge variant="outline" className={cn('font-medium', meta.badgeClass)}>{meta.label}</Badge>
+                            </td>
+                            <td className="px-4 py-3 hidden lg:table-cell text-xs text-muted-foreground whitespace-nowrap">
+                              {formatDate(transfer.createdAt)}
+                            </td>
+                            <td className="px-4 py-3">
+                              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </td>
+                          </motion.tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">Page {page} of {totalPages}</p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="h-8 w-8 p-0"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="h-8 w-8 p-0"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>

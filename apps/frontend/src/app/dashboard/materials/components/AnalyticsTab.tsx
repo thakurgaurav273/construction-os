@@ -21,7 +21,7 @@ const truncate = (value: string): string => (value.length > 16 ? `${value.slice(
 
 function AnalyticsSkeleton(): React.ReactElement {
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {Array.from({ length: 4 }).map((_, i) => (
         <Skeleton key={i} className="h-72 w-full rounded-xl" />
       ))}
@@ -33,7 +33,7 @@ function AnalyticsContent({ dashboard }: { dashboard: MaterialsDashboard }): Rea
   const { categorySplit, consumptionTrend, supplierSpend, lowStock, deadStock } = dashboard;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <MaterialsChartCard
         title="Consumption Trend"
         description="Inbound vs outbound stock movement over time"

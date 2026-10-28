@@ -194,7 +194,7 @@ export function SiteStockDialog({ open, onOpenChange, type, projectId, materialI
             )} />
           </FormField>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField
               label={material ? `Quantity (${material.unit})` : 'Quantity'}
               htmlFor="site-stock-quantity"

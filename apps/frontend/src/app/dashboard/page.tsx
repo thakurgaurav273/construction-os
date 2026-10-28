@@ -23,10 +23,10 @@ import { PageAction, PageHeader } from '@/components/shared/PageHeader';
 function DashboardSkeleton(): React.ReactElement {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Loading dashboard">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-xl" />)}
       </div>
-      <div className="grid gap-4 lg:grid-cols-7">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
         <Skeleton className="h-[380px] rounded-xl lg:col-span-4" />
         <Skeleton className="h-[380px] rounded-xl lg:col-span-3" />
       </div>
@@ -63,7 +63,7 @@ export default function DashboardPage(): React.ReactElement {
       <>
         <GettingStartedChecklist />
         <KpiCards stats={stats} />
-        <div className="grid gap-4 lg:grid-cols-7">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
           <div className="lg:col-span-4">
             {stats.spendTrend ? <SpendTrendCard trend={stats.spendTrend} /> : showAttendance && <AttendanceTrendCard />}
           </div>
@@ -73,7 +73,7 @@ export default function DashboardPage(): React.ReactElement {
           </div>
         </div>
         <ProjectOverview projects={stats.projects} totalProjects={stats.totalProjects} />
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className={stats.spendTrend && showAttendance ? 'lg:col-span-2' : 'lg:col-span-3'}><RecentActivity activities={stats.recentActivity} /></div>
           {stats.spendTrend && showAttendance && <AttendanceTrendCard />}
         </div>

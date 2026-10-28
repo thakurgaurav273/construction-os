@@ -106,7 +106,7 @@ export function TradesTab({ workers }: { workers: Worker[] }): React.ReactElemen
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
       >
         {trades.map((stat) => {
           const onSitePct = Math.round((stat.onSite / stat.total) * 100);

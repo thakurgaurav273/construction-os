@@ -61,7 +61,7 @@ export function PaymentRequestDialog({ invoice, onClose }: PaymentRequestDialogP
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Amount (₹)" htmlFor="payment-amount" error={errors.amount?.message}>
               <Input id="payment-amount" type="number" step="0.01" min={0} max={maxAmount} {...register('amount')} />
             </FormField>

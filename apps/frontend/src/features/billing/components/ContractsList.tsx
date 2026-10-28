@@ -40,7 +40,7 @@ export function ContractsList({ onCreate }: { onCreate?: () => void }): React.Re
               <li key={contract.id}>
                 <Link
                   href={`/dashboard/billing/contracts/${contract.id}`}
-                  className="grid gap-2 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:grid-cols-[minmax(0,1fr)_auto_180px_auto] md:items-center md:gap-4"
+                  className="grid grid-cols-1 gap-2 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:grid-cols-[minmax(0,1fr)_auto_180px_auto] md:items-center md:gap-4"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">

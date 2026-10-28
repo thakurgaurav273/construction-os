@@ -2017,6 +2017,42 @@ Reading operational data needed no permission, so every member saw every module 
 
 ---
 
+# ADR-051 - Phone Layout: Drawer, Tab Bar, Bottom Sheets and Card Lists
+
+**Status**
+
+Accepted
+
+**Date**
+
+2026-10-28
+
+---
+
+## Context
+
+Below the `md` breakpoint the app showed desktop layouts squeezed: the hamburger did nothing, tables scrolled sideways, dialogs floated mid-screen and long labels pushed cards off the screen.
+
+---
+
+## Decision
+
+- **Navigation:** the sidebar opens as a left drawer (the same component and permissions as the desktop sidebar), plus a bottom tab bar with Home, the member's three most useful areas they can open, and More (the drawer). The header becomes an app bar with the page title.
+- **Page headers:** every module page uses `PageHeader`/`PageAction`. On phones secondary actions become icon buttons and only the primary action keeps its label.
+- **Dialogs are bottom sheets on phones,** set once in the shared `DialogContent`: docked to the bottom, rounded top, scrollable up to 92% of the screen, padded for the home indicator. From `sm` up they are centred dialogs as before.
+- **Detail drawers rise as tall sheets on phones** (94% of the screen, shared `SheetContent` right side); from `sm` up they slide in from the right. The menu drawer stays on the left.
+- **Lists:** tables stay tables from `md` up. Below that, `MobileCardList` shows the same rows as cards in one scroll that loads more as the end comes into view: `useIncrementalItems` reveals client-side lists in batches, and `useAccumulatedPages` keeps server pages so the phone list grows while the desktop pager still shows one page. Filters reset both.
+- **No sideways overflow:** responsive grids always declare `grid-cols-1` for phones so a long single-line label can't widen its column; shared tab rows scroll sideways. The main content area never scrolls sideways (`overflow-x-hidden`), and `pnpm --filter @sitepilot/frontend check:mobile` (Playwright with the installed Chrome) opens every module page and a project's tabs at 375 and 393 px and fails on anything that sticks out past the screen.
+
+---
+
+## Consequences
+
+- Detail-heavy financial tables (budget, cash flow, invoice matching) and print layouts keep horizontal scrolling on phones.
+- A list converted to cards renders both views; only one is visible at a time.
+
+---
+
 # Future ADRs
 
 Future architectural decisions should be recorded here.

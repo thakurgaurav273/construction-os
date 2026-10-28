@@ -31,7 +31,7 @@ export function PermissionChecklist({ catalogue, selected, baseline, onToggle, l
   const groups = useMemo(() => groupByArea(catalogue), [catalogue]);
 
   return (
-    <div className="grid gap-5 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
       {groups.map((group) => (
         <section key={group.name} aria-labelledby={`permission-group-${group.name}`}>
           <h4 id={`permission-group-${group.name}`} className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.name}</h4>

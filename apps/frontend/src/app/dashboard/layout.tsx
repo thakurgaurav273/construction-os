@@ -36,8 +36,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             />
           </div>
           
-          {/* Bottom padding keeps content clear of the phone tab bar. */}
-          <main className="flex-1 overflow-y-auto bg-muted/20 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 print:overflow-visible print:bg-white print:pb-0">
+          {/* Bottom padding keeps content clear of the phone tab bar. Pages never scroll sideways: wide tables
+              scroll inside their own container, and anything else that's too wide is clipped, not the whole page. */}
+          <main className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/20 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 print:overflow-visible print:bg-white print:pb-0">
             <ModuleAccessGuard>{children}</ModuleAccessGuard>
           </main>
         </div>

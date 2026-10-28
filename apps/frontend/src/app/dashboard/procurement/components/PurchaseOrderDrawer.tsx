@@ -13,6 +13,7 @@ import { formatCurrency } from './procurement-format';
 import { PurchaseOrderActions } from './PurchaseOrderActions';
 import { PurchaseOrderDeliveries } from './PurchaseOrderDeliveries';
 import { RecordHistory } from '@/features/audit/components/RecordHistory';
+import { MobileCard } from '@/components/shared/MobileList';
 
 interface PurchaseOrderDrawerProps {
   orderId: string | null;
@@ -131,7 +132,26 @@ export function PurchaseOrderDrawer({ orderId, open, onClose, onOpenOrder }: Pur
                 )}
 
                 <Section icon={Package} title="Line Items">
-                  <div className="overflow-x-auto">
+                  <div className="space-y-2 md:hidden">
+                    {order.items.map((item) => (
+                      <MobileCard
+                        key={item.id}
+                        title={item.description}
+                        subtitle={[
+                          item.material && `Stock item · ${item.material.name}`,
+                          order.status === 'APPROVED' && `${item.receivedQuantity} of ${item.quantity} ${item.unit} received`,
+                        ].filter(Boolean).join(' · ') || undefined}
+                        aside={<span className="text-sm font-semibold">{formatCurrency(item.total)}</span>}
+                        meta={[
+                          { label: 'Qty', value: `${item.quantity} ${item.unit}` },
+                          { label: 'Rate', value: formatCurrency(item.rate) },
+                          { label: 'GST', value: `${item.taxPercent}%` },
+                          { label: 'Disc', value: `${item.discountPercent}%` },
+                        ]}
+                      />
+                    ))}
+                  </div>
+                  <div className="hidden overflow-x-auto md:block">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b text-muted-foreground">

@@ -25,7 +25,7 @@ export function MappingFieldRow({
 }: MappingFieldRowProps): React.ReactElement {
   const selectId = `column-${field.key}`;
   return (
-    <div className="grid gap-2 border-b py-4 last:border-b-0 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] md:gap-6">
+    <div className="grid grid-cols-1 gap-2 border-b py-4 last:border-b-0 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] md:gap-6">
       <div>
         <label htmlFor={selectId} className="text-sm font-medium">
           {field.label}

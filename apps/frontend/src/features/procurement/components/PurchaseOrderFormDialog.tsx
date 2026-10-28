@@ -89,7 +89,7 @@ export function PurchaseOrderFormDialog({
         {context && <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">{context}</div>}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Project" error={errors.projectId?.message}>
               <Controller control={control} name="projectId" render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>

@@ -114,7 +114,7 @@ export default function ProjectMaterialsPage({ params }: { params: { id: string 
               tone={summary.overPlanCount > 0 ? 'danger' : undefined}
             />
           </div>
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <ProjectMaterialsList lines={items} onPlan={canPlan ? setPlanLine : undefined} />
             <RecentIssuesList issues={recentIssues} />
           </div>

@@ -63,7 +63,7 @@ export function ContractBoqCard({ contract, canEdit }: ContractBoqCardProps): Re
             {contract.items.map((item) => {
               const progress = item.quantity > 0 ? Math.min(100, (item.certifiedQuantity / item.quantity) * 100) : 0;
               return (
-                <li key={item.id} className="grid gap-2 px-4 py-3 md:grid-cols-[80px_minmax(0,1fr)_200px_200px] md:items-center">
+                <li key={item.id} className="grid grid-cols-1 gap-2 px-4 py-3 md:grid-cols-[80px_minmax(0,1fr)_200px_200px] md:items-center">
                   <div className="text-sm font-medium">
                     {item.itemNo}
                     {item.rateCode && <p className="text-xs font-normal text-muted-foreground">{item.rateCode}</p>}

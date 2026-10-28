@@ -116,7 +116,7 @@ export default function WorkforcePage(): React.ReactElement {
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
       >
         <motion.div variants={itemVariants}>
           <KpiCard title="Total Workforce" value={stats?.total} description="Active across all sites" icon={<Users className="h-4 w-4" />} />
@@ -163,7 +163,7 @@ export default function WorkforcePage(): React.ReactElement {
       </motion.div>
 
       {/* Main Content + Alerts */}
-      <div className="grid gap-6 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-4">
         <motion.div
           initial={false}
           animate={{ opacity: 1, y: 0 }}

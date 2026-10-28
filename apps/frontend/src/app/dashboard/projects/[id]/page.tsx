@@ -59,7 +59,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
 
   if (isLoading) {
     return (
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         <div className="xl:col-span-2"><Skeleton className="h-64 rounded-xl" /></div>
         <div className="space-y-6"><Skeleton className="h-28 rounded-xl" /><Skeleton className="h-28 rounded-xl" /></div>
         <div className="xl:col-span-2"><Skeleton className="h-64 rounded-xl" /></div>
@@ -81,7 +81,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
   const manager = project.members?.find((m) => m.role === 'MANAGER');
 
   return (
-    <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+    <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
       {/* About */}
       <motion.div variants={itemVariants} className="xl:col-span-2">
         <Card className="h-full">

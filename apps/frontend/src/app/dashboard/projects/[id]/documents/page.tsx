@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@sitepilot/ui';
 import { useDocuments, useUploadDocument, useDeleteDocument, useDocumentDownloadUrl, type ProjectDocument } from '@/hooks/api/use-documents';
 import { Can } from '@/components/shared/Can';
+import { MobileCard, MobileCardList, useIncrementalItems } from '@/components/shared/MobileList';
 
 const categories = ['All Documents', 'pdf', 'doc', 'image', 'file'];
 const categoryLabels: Record<string, string> = { pdf: 'PDF', doc: 'Document', image: 'Image', file: 'Other' };
@@ -51,6 +52,7 @@ export default function DocumentsPage({ params }: { params: { id: string } }) {
     const matchesCat = activeCategory === 'All Documents' || doc.type === activeCategory;
     return matchesSearch && matchesCat;
   });
+  const phoneDocs = useIncrementalItems(filteredDocs, `${search}|${activeCategory}|${viewMode}`);
 
   const handleUploadClick = () => fileInputRef.current?.click();
 
@@ -170,43 +172,63 @@ export default function DocumentsPage({ params }: { params: { id: string } }) {
               ))}
             </div>
           ) : (
-            <div className="rounded-xl border bg-card overflow-hidden">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Type</th>
-                    <th className="px-4 py-3 font-medium">Size</th>
-                    <th className="px-4 py-3 font-medium">Uploaded</th>
-                    <th className="px-4 py-3 font-medium text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {filteredDocs.map((doc) => (
-                    <tr key={doc.id} className="hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => setSelectedDoc(doc)}>
-                      <td className="px-4 py-3 font-medium flex items-center gap-3">
-                        <div className="h-8 w-8 rounded bg-muted/50 flex items-center justify-center shrink-0">{getFileIcon(doc.type)}</div>
-                        <span className="truncate max-w-[200px] sm:max-w-[300px]">{doc.name}</span>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground capitalize">{doc.type}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatBytes(doc.size)}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{new Date(doc.createdAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleDownload(doc)}><Download className="mr-2 h-4 w-4" /> Download</DropdownMenuItem>
-                            <Can permission="document.delete"><DropdownMenuItem className="text-destructive" onClick={() => handleDelete(doc)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem></Can>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
+            <>
+              <MobileCardList
+                items={phoneDocs.visible}
+                getKey={(doc) => doc.id}
+                hasMore={phoneDocs.hasMore}
+                onLoadMore={phoneDocs.loadMore}
+                renderCard={(doc) => (
+                  <MobileCard
+                    onClick={() => setSelectedDoc(doc)}
+                    title={doc.name}
+                    subtitle={doc.uploadedBy?.name}
+                    aside={<Badge variant="outline" className="text-[10px] capitalize">{doc.type}</Badge>}
+                    meta={[
+                      { label: 'Size', value: formatBytes(doc.size) },
+                      { label: 'Uploaded', value: new Date(doc.createdAt).toLocaleDateString() },
+                    ]}
+                  />
+                )}
+              />
+              <div className="hidden rounded-xl border bg-card overflow-hidden md:block">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/50 text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Name</th>
+                      <th className="px-4 py-3 font-medium">Type</th>
+                      <th className="px-4 py-3 font-medium">Size</th>
+                      <th className="px-4 py-3 font-medium">Uploaded</th>
+                      <th className="px-4 py-3 font-medium text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredDocs.map((doc) => (
+                      <tr key={doc.id} className="hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => setSelectedDoc(doc)}>
+                        <td className="px-4 py-3 font-medium flex items-center gap-3">
+                          <div className="h-8 w-8 rounded bg-muted/50 flex items-center justify-center shrink-0">{getFileIcon(doc.type)}</div>
+                          <span className="truncate max-w-[200px] sm:max-w-[300px]">{doc.name}</span>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground capitalize">{doc.type}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{formatBytes(doc.size)}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{new Date(doc.createdAt).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleDownload(doc)}><Download className="mr-2 h-4 w-4" /> Download</DropdownMenuItem>
+                              <Can permission="document.delete"><DropdownMenuItem className="text-destructive" onClick={() => handleDelete(doc)}><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem></Can>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>

@@ -164,6 +164,7 @@ export default function DailyReportsPage() {
         hasFilters={debouncedSearch !== '' || statusFilter !== ALL || projectFilter !== ALL}
         onRetry={() => reports.refetch()}
         onPageChange={setPage}
+        listKey={`${debouncedSearch}|${statusFilter}|${projectFilter}`}
       />
     </div>
   );

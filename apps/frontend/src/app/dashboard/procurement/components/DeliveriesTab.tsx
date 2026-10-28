@@ -17,6 +17,7 @@ import {
   AnalyticsChart, AXIS_TICK, CHART_TOOLTIP_STYLE, CHART_GRID_STROKE, CHART_COLORS,
 } from './AnalyticsChart';
 import { DeliveryTimeline } from './DeliveryTimeline';
+import { MobileCard, MobileCardList, useIncrementalItems } from '@/components/shared/MobileList';
 
 const DELIVERY_FILTERS = ['all', 'SCHEDULED', 'IN_TRANSIT', 'RECEIVED', 'DELAYED', 'CANCELLED'] as const;
 type DeliveryFilter = (typeof DELIVERY_FILTERS)[number];
@@ -71,10 +72,14 @@ export function DeliveriesTab({ deliveries, analytics, onOpenOrder }: Deliveries
     [deliveries],
   );
   const filtered = useMemo(() => deliveries.filter((d) => matchesFilter(d, statusFilter)), [deliveries, statusFilter]);
+  const phoneList = useIncrementalItems(filtered, statusFilter);
+  const emptyMessage = deliveries.length === 0
+    ? 'No deliveries yet. Schedule one from an approved purchase order.'
+    : 'No deliveries match this filter.';
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {STATUS_CARDS.map((card, idx) => {
           const Icon = card.icon;
           return (
@@ -93,7 +98,7 @@ export function DeliveriesTab({ deliveries, analytics, onOpenOrder }: Deliveries
         })}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <AnalyticsChart title="Weekly Deliveries" description="Received on time vs late, by week" height={260}>
           {analytics ? (
             <ResponsiveContainer width="100%" height="100%">
@@ -127,7 +132,7 @@ export function DeliveriesTab({ deliveries, analytics, onOpenOrder }: Deliveries
         </AnalyticsChart>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-1">
           <CardContent className="p-5">
             <h4 className="text-sm font-semibold mb-4">Upcoming Deliveries</h4>
@@ -153,7 +158,29 @@ export function DeliveriesTab({ deliveries, analytics, onOpenOrder }: Deliveries
             </Select>
           </div>
 
-          <div className="rounded-xl border overflow-hidden">
+          <MobileCardList
+            items={phoneList.visible}
+            getKey={(delivery) => delivery.id}
+            hasMore={phoneList.hasMore}
+            onLoadMore={phoneList.loadMore}
+            empty={<div className="rounded-xl border bg-card px-4 py-12 text-center text-sm text-muted-foreground">{emptyMessage}</div>}
+            renderCard={(delivery) => (
+              <MobileCard
+                onClick={() => onOpenOrder(delivery.purchaseOrder.id)}
+                title={delivery.purchaseOrder.poNumber}
+                subtitle={delivery.vendor?.name ?? '—'}
+                aside={<StatusBadge kind="delivery" value={deliveryBadgeValue(delivery)} />}
+                meta={[
+                  { label: 'Date', value: format(new Date(delivery.receivedAt ?? delivery.scheduledDate), 'dd MMM yyyy') },
+                  { label: 'GRN / Tracking', value: delivery.grnNumber ?? delivery.trackingId ?? '—' },
+                  { label: 'Items', value: itemSummary(delivery) },
+                  { label: 'Project', value: delivery.project?.name ?? '—' },
+                ]}
+              />
+            )}
+          />
+
+          <div className="hidden rounded-xl border overflow-hidden md:block">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -172,9 +199,7 @@ export function DeliveriesTab({ deliveries, analytics, onOpenOrder }: Deliveries
                   {filtered.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-16 text-center text-muted-foreground">
-                        {deliveries.length === 0
-                          ? 'No deliveries yet. Schedule one from an approved purchase order.'
-                          : 'No deliveries match this filter.'}
+                        {emptyMessage}
                       </td>
                     </tr>
                   ) : (

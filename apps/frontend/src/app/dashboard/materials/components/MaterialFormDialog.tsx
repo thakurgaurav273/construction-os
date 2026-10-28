@@ -74,7 +74,7 @@ export function MaterialFormDialog({ open, onClose, material }: MaterialFormDial
             <Input id="material-name" placeholder="e.g. OPC 53 Grade Cement" {...register('name')} />
           </FormField>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="SKU" htmlFor="material-sku" error={errors.sku?.message}>
               <Input id="material-sku" placeholder="CEM-OPC-53" {...register('sku')} />
             </FormField>
@@ -110,7 +110,7 @@ export function MaterialFormDialog({ open, onClose, material }: MaterialFormDial
             </FormField>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <FormField
               label="Unit cost (₹)"
               htmlFor="material-cost"

@@ -23,7 +23,7 @@ function periodTrend(current: number, previous: number): { trendLabel?: string; 
 export function FinanceKpis({ summary }: { summary: FinanceSummary | undefined }): React.ReactElement {
   if (!summary) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-[118px] rounded-xl" />)}
       </div>
     );
@@ -97,7 +97,7 @@ export function FinanceKpis({ summary }: { summary: FinanceSummary | undefined }
   ];
 
   return (
-    <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => (
         <motion.div key={card.title} variants={itemVariants}>
           <ProcurementKpiCard {...card} />

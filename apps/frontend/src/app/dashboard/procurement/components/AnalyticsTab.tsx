@@ -35,7 +35,7 @@ export function AnalyticsTab(): React.ReactElement {
 
   if (isLoading) {
     return (
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-72 w-full rounded-xl" />)}
       </div>
     );
@@ -67,7 +67,7 @@ export function AnalyticsTab(): React.ReactElement {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <SummaryCard
           label="Committed Spend"
           value={formatCompactINR(totals.committed)}
@@ -88,7 +88,7 @@ export function AnalyticsTab(): React.ReactElement {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <AnalyticsChart
           title="Committed vs Received"
           description="Approved order value against goods received, by month"
