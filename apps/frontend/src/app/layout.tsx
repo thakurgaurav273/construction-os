@@ -24,6 +24,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  // Lets the header and tab bar pad themselves around notches and the home indicator.
+  viewportFit: 'cover',
 };
 
 /**

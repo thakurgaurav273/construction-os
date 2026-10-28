@@ -173,7 +173,7 @@ export default function WorkforcePage(): React.ReactElement {
         <motion.div
           initial={false}
           animate={{ opacity: 1, y: 0 }}
-          className="xl:col-span-3"
+          className="min-w-0 xl:col-span-3"
         >
           {isLoading && <Skeleton className="h-[420px] w-full rounded-xl" />}
           {isError && (

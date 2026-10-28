@@ -61,8 +61,9 @@ export default function ProjectDetailLayout({
   const blockedTab = accessLoaded ? tabs.find((tab) => tab.permission && isTabActive(tab.href) && !can(tab.permission)) : undefined;
 
   return (
-    <div className="flex-1 flex flex-col h-full relative">
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+    <div className="relative flex flex-1 flex-col md:h-full">
+      {/* Desktop: the project header stays put and the tab content scrolls. Phones: the whole page scrolls, so the header doesn't take half the screen. */}
+      <div className="z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:sticky md:top-0">
         {/* Breadcrumb */}
         <div className="px-4 md:px-8 py-3 flex items-center gap-2 text-sm text-muted-foreground">
           <Link href="/dashboard/projects" className="hover:text-foreground transition-colors flex items-center">
@@ -83,7 +84,7 @@ export default function ProjectDetailLayout({
               </div>
               {isLoading
                 ? <Skeleton className="h-9 w-64" />
-                : <h1 className="text-3xl font-bold tracking-tight">{project?.name}</h1>}
+                : <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{project?.name}</h1>}
               {!isLoading && project && (
                 <Badge variant={statusVariant(project.status)} className="capitalize text-sm px-3 py-1">
                   {statusLabel(project.status)}
@@ -158,7 +159,7 @@ export default function ProjectDetailLayout({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-muted/20 p-4 md:p-8">
+      <div className="flex-1 bg-muted/20 p-4 md:overflow-y-auto md:p-8">
         <div className="max-w-7xl mx-auto w-full h-full space-y-6">
           {project?.status === 'ARCHIVED' && (
             <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">

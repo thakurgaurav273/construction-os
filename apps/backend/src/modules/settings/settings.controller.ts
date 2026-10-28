@@ -69,7 +69,7 @@ export class SettingsController {
 
   @Get('roles')
   getRoles(@CurrentUser() user: AuthUser): Promise<RoleCatalogue> {
-    return this.rolePermissions.catalogue(user.organizationId);
+    return this.rolePermissions.catalogue(user.organizationId, user);
   }
 
   @RequirePermission('roles.manage')
